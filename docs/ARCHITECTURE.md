@@ -65,6 +65,8 @@ Prices can be overridden in options.
    - **ask_risky** (default): pause on risky calls.
    - **autopilot**: never pause, except that shell still requires its own
      enable switch.
+   - **yolo**: autopilot that also skips the ask-after-web-content rule.
+     Deny and ask rules, members and unattended runs behave as in autopilot.
 
    A pause sends an approval card to the panel: a plain-language summary, the
    arguments, and a diff for YAML, dashboard and file edits. Approve or deny

@@ -65,6 +65,7 @@
   "mode_ask_risky": "Vor riskanten Aktionen fragen",
   "mode_reviewer": "Prüfer entscheidet über riskante Aktionen",
   "mode_autopilot": "Autopilot",
+  "mode_yolo": "YOLO",
   "mode_read_only": "Nur lesen",
   "edit": "Bearbeiten",
   "retry": "Erneut versuchen",

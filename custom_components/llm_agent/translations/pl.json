@@ -276,6 +276,7 @@
         "ask_risky": "Pytaj przed ryzykownymi działaniami (zalecane)",
         "reviewer": "Recenzent: drugi model AI decyduje o ryzykownych działaniach i pyta ciebie w razie wątpliwości",
         "autopilot": "Autopilot: nigdy nie pytaj",
+        "yolo": "YOLO: nigdy nie pytaj, nawet po przeczytaniu stron WWW lub wyników wyszukiwania",
         "read_only": "Tylko odczyt: może sprawdzać i wyjaśniać, ale nigdy niczego nie zmienia"
       }
     },

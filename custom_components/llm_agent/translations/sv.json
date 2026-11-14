@@ -276,6 +276,7 @@
         "ask_risky": "Fråga före riskfyllda åtgärder (rekommenderas)",
         "reviewer": "Granskare: en andra AI-modell avgör riskfyllda åtgärder och frågar dig vid osäkerhet",
         "autopilot": "Autopilot: fråga aldrig",
+        "yolo": "YOLO: fråga aldrig, inte ens efter att ha läst webbsidor eller sökresultat",
         "read_only": "Skrivskyddat: kan titta och förklara, men ändrar aldrig något"
       }
     },

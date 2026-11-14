@@ -276,6 +276,7 @@
         "ask_risky": "Chiedi prima delle azioni rischiose (consigliato)",
         "reviewer": "Revisore: un secondo modello di IA decide sulle azioni rischiose e chiede a te se ha dubbi",
         "autopilot": "Pilota automatico: non chiedere mai",
+        "yolo": "YOLO: non chiedere mai, anche dopo aver letto pagine web o risultati di ricerca",
         "read_only": "Sola lettura: può consultare e spiegare, ma non modifica mai nulla"
       }
     },

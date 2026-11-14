@@ -276,6 +276,7 @@
         "ask_risky": "Perguntar antes de ações arriscadas (recomendado)",
         "reviewer": "Revisor: um segundo modelo de IA decide sobre ações arriscadas e pergunta a você quando está em dúvida",
         "autopilot": "Piloto automático: nunca perguntar",
+        "yolo": "YOLO: nunca perguntar, mesmo após ler páginas da web ou resultados de pesquisa",
         "read_only": "Somente leitura: pode consultar e explicar, mas nunca altera nada"
       }
     },

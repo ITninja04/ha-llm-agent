@@ -152,7 +152,7 @@ All settings are under **Settings → Devices & services → LLM Agent → Confi
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| Approval mode | Ask before risky actions | `Ask before every change`, `Ask before risky actions`, `Reviewer` (a second AI model decides risky actions), `Autopilot` (never asks), or `Read only` (it looks and explains, but never changes anything). |
+| Approval mode | Ask before risky actions | `Ask before every change`, `Ask before risky actions`, `Reviewer` (a second AI model decides risky actions), `Autopilot` (never asks), `YOLO` (never asks, even after reading web content), or `Read only` (it looks and explains, but never changes anything). |
 | Back up before risky actions | On | Takes a full HA backup before HACS installs and integration removal. |
 | Protect sensitive data | On | Blocks reading `secrets.yaml`, auth and credential storage, databases, and files outside `/config`. Also blocks commands that issue tokens. |
 | Refuse restart when configuration is invalid | On | Restarts only after a passing config check. |
@@ -209,7 +209,9 @@ approval mode (the reviewer can't approve them), and can be undone.
 
 **Web content.** Pages and search results can contain text written to steer an AI. Once a
 chat has read anything from the web, every change in that chat asks you first, whatever
-the approval mode, including Reviewer and Autopilot. Fetching addresses on your own network is blocked
+the approval mode, including Reviewer and Autopilot. The one exception is YOLO, which
+turns this off on purpose: a page that tells the AI to change something gets it done
+without a prompt. Household members' chats still ask. Fetching addresses on your own network is blocked
 unless you allow it, and that check also covers public names that point at your LAN.
 
 **Approval rules.** Under **Approval rules**, one rule per line decides calls in every

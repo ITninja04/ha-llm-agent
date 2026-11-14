@@ -59,6 +59,7 @@ from .const import (
     MODE_AUTOPILOT,
     MODE_READ_ONLY,
     MODE_REVIEWER,
+    MODE_YOLO,
     setting,
 )
 from .phone import MAX_TEXT as PHONE_MAX_TEXT, PhoneApprovals, phone_service
@@ -708,7 +709,7 @@ class ChatRun:
         decision = "auto"
         options = self.agent.options
         mode = options.get(CONF_APPROVAL_MODE, "ask_risky")
-        if self.member and mode in (MODE_AUTOPILOT, MODE_REVIEWER):
+        if self.member and mode in (MODE_AUTOPILOT, MODE_REVIEWER, MODE_YOLO):
             mode = MODE_ASK_RISKY  # a member's chat never skips an approval
         rule: Rule | None = None
         if rules := parse_rules(options.get(CONF_TOOL_RULES))[0]:
@@ -746,8 +747,9 @@ class ChatRun:
             and not (self.member and risk.level is Level.RISKY)
         )
         # Once the chat has read web content, that content may be steering the model,
-        # so every change asks first, whatever the approval mode or rules.
-        tainted = bool(self.conv.get("untrusted")) and changes
+        # so every change asks first, whatever the approval mode or rules. YOLO is the
+        # admin's explicit opt-out; a member's chat never gets here as YOLO (see above).
+        tainted = bool(self.conv.get("untrusted")) and changes and mode != MODE_YOLO
         if tainted:
             note = "this chat has read web content"
             risk = replace(risk, reason=f"{risk.reason}; {note}" if risk.reason else note)

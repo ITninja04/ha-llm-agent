@@ -14,7 +14,14 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
-from .const import MODE_ASK_ALL, MODE_ASK_RISKY, MODE_AUTOPILOT, MODE_READ_ONLY, MODE_REVIEWER
+from .const import (
+    MODE_ASK_ALL,
+    MODE_ASK_RISKY,
+    MODE_AUTOPILOT,
+    MODE_READ_ONLY,
+    MODE_REVIEWER,
+    MODE_YOLO,
+)
 
 
 class Level(IntEnum):
@@ -46,7 +53,7 @@ def needs_approval(mode: str, risk: Risk) -> bool:
         return False
     if mode in (MODE_ASK_ALL, MODE_READ_ONLY):  # read-only refuses before asking
         return True
-    if mode == MODE_AUTOPILOT:
+    if mode in (MODE_AUTOPILOT, MODE_YOLO):
         return False
     # MODE_ASK_RISKY and anything unknown fall back to the safe default. In reviewer
     # mode the same risky calls need approval; the reviewer gives it, or a person does.

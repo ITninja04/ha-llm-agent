@@ -26,6 +26,8 @@ def test_needs_approval_modes() -> None:
     assert not needs_approval("ask_risky", Risk.write())
     assert needs_approval("ask_risky", Risk.risky("x"))
     assert not needs_approval("autopilot", Risk.risky("x"))
+    assert not needs_approval("yolo", Risk.risky("x"))
+    assert not needs_approval("yolo", Risk.write())
 
 
 async def test_services_that_run_code_or_scripts_are_risky(hass: HomeAssistant) -> None:

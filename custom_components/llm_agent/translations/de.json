@@ -276,6 +276,7 @@
         "ask_risky": "Vor riskanten Aktionen fragen (empfohlen)",
         "reviewer": "Prüfer: Ein zweites KI-Modell entscheidet über riskante Aktionen und fragt dich bei Unsicherheit",
         "autopilot": "Autopilot: nie fragen",
+        "yolo": "YOLO: nie fragen, auch nicht nach dem Lesen von Webseiten oder Suchergebnissen",
         "read_only": "Nur lesen: kann nachsehen und erklären, ändert aber nie etwas"
       }
     },

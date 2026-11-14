@@ -276,6 +276,7 @@
         "ask_risky": "Demander avant les actions risquées (recommandé)",
         "reviewer": "Vérificateur : un second modèle d'IA décide des actions risquées et te demande en cas de doute",
         "autopilot": "Pilote automatique : ne jamais demander",
+        "yolo": "YOLO : ne jamais demander, même après avoir lu des pages web ou des résultats de recherche",
         "read_only": "Lecture seule : peut consulter et expliquer, mais ne modifie jamais rien"
       }
     },

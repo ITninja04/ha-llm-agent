@@ -782,6 +782,7 @@ var Ke = Ue(Ge), { I: qe } = Ne, Je = (e) => e, Ye = () => document.createCommen
 	mode_ask_risky: "Ask before risky actions",
 	mode_reviewer: "Reviewer decides risky actions",
 	mode_autopilot: "Autopilot",
+	mode_yolo: "YOLO",
 	mode_read_only: "Read only",
 	edit: "Edit",
 	retry: "Retry",
@@ -6181,6 +6182,7 @@ function sa(e) {
 		ask_risky: "mode_ask_risky",
 		reviewer: "mode_reviewer",
 		autopilot: "mode_autopilot",
+		yolo: "mode_yolo",
 		read_only: "mode_read_only"
 	}[e ?? ""];
 	return t ? N(t) : "";

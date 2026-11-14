@@ -65,6 +65,7 @@
   "mode_ask_risky": "高風險操作前詢問",
   "mode_reviewer": "由審查者決定高風險操作",
   "mode_autopilot": "自動駕駛",
+  "mode_yolo": "YOLO",
   "mode_read_only": "唯讀",
   "edit": "編輯",
   "retry": "重試",

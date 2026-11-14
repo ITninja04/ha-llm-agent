@@ -227,8 +227,9 @@ async def test_member_chat_gets_only_member_tools_and_no_admin_context(
     assert "Reference pages" not in provider.calls[0]["system"]
 
 
+@pytest.mark.parametrize("mode", ["autopilot", "yolo"])
 async def test_member_chat_asks_in_autopilot_and_risky_needs_an_admin(
-    hass: HomeAssistant,
+    hass: HomeAssistant, mode: str
 ) -> None:
     calls = async_mock_service(hass, "lock", "unlock")
     hass.states.async_set("lock.front", "locked")
@@ -239,7 +240,7 @@ async def test_member_chat_asks_in_autopilot_and_risky_needs_an_admin(
         [reply_tool("c1", "home_control", args), reply_text("Can't.")],
         member=True,
         user_id="kid",
-        approval_mode="autopilot",
+        approval_mode=mode,
     )
     assert not calls
     assert not [e for e in events if e["type"] == "approval"]

@@ -276,6 +276,7 @@
         "ask_risky": "Vragen vóór riskante acties (aanbevolen)",
         "reviewer": "Beoordelaar: een tweede AI-model beslist over riskante acties en vraagt het jou bij twijfel",
         "autopilot": "Automatische piloot: nooit vragen",
+        "yolo": "YOLO: nooit vragen, ook niet na het lezen van webpagina's of zoekresultaten",
         "read_only": "Alleen lezen: kan kijken en uitleggen, maar wijzigt nooit iets"
       }
     },

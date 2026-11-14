@@ -53,7 +53,19 @@ MODE_ASK_RISKY = "ask_risky"
 MODE_AUTOPILOT = "autopilot"
 MODE_REVIEWER = "reviewer"
 MODE_READ_ONLY = "read_only"  # 0.6: looks, never changes anything
-APPROVAL_MODES = [MODE_ASK_ALL, MODE_ASK_RISKY, MODE_REVIEWER, MODE_AUTOPILOT, MODE_READ_ONLY]
+# Autopilot that also ignores web content. Every other mode asks before any change once a
+# chat has read a web page or search result, because that text may be steering the model.
+# YOLO drops that one guard on purpose; deny and ask rules, members and unattended runs
+# still behave as in autopilot.
+MODE_YOLO = "yolo"
+APPROVAL_MODES = [
+    MODE_ASK_ALL,
+    MODE_ASK_RISKY,
+    MODE_REVIEWER,
+    MODE_AUTOPILOT,
+    MODE_YOLO,
+    MODE_READ_ONLY,
+]
 # 0.2.1 reviewer approval mode
 CONF_REVIEWER_PROVIDER = "reviewer_provider"  # provider id, or SAME_PROVIDER
 SAME_PROVIDER = "chat"

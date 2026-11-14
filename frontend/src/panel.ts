@@ -2019,6 +2019,7 @@ function modeName(mode?: string): string {
       ask_risky: "mode_ask_risky",
       reviewer: "mode_reviewer",
       autopilot: "mode_autopilot",
+      yolo: "mode_yolo",
       read_only: "mode_read_only",
     } as Record<string, Key>
   )[mode ?? ""];

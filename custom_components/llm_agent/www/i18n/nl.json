@@ -65,6 +65,7 @@
   "mode_ask_risky": "Vragen vóór riskante acties",
   "mode_reviewer": "Beoordelaar beslist over riskante acties",
   "mode_autopilot": "Automatische piloot",
+  "mode_yolo": "YOLO",
   "mode_read_only": "Alleen lezen",
   "edit": "Bewerken",
   "retry": "Opnieuw proberen",
