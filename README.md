@@ -497,6 +497,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.6.0 (released):** read-only mode.
 - **0.7.0 (released):** the panel and settings in ten more languages.
 - **0.7.1 (released):** security and reliability fixes from a community report and a bug hunt.
+- **0.8.0 (released):** YOLO approval mode, and settings export and restore for moving to a fresh install.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
