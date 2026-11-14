@@ -6,7 +6,11 @@
         "description": "LLM Agent geeft een AI-model beheerdersrechten in Home Assistant: het kan apparaten schakelen (ook sloten en alarmen als je dat goedkeurt), de configuratie bewerken en Home Assistant herstarten. AI-modellen maken fouten. De kosten van de provider zijn voor jou. Dit project is niet verbonden aan Home Assistant of Nabu Casa en wordt zonder garantie geleverd (Apache-2.0).",
         "data": {
           "type": "AI-provider",
-          "acknowledged_risks": "Ik begrijp en accepteer deze risico's"
+          "acknowledged_risks": "Ik begrijp en accepteer deze risico's",
+          "restore": "Instellingen herstellen uit een export (optioneel)"
+        },
+        "data_description": {
+          "restore": "Plak de tekst uit Configureren > Instellingen exporteren van je oude installatie, of laat leeg om een nieuwe provider in te stellen. Herstellen brengt alle providers, API-sleutels en instellingen terug. Een ChatGPT-provider moet opnieuw inloggen."
         }
       },
       "provider": {
@@ -28,7 +32,8 @@
     "error": {
       "must_acknowledge": "Accepteer de risico's om door te gaan.",
       "invalid_auth": "De provider heeft de API-sleutel geweigerd.",
-      "cannot_connect": "Kan de provider niet bereiken op die URL."
+      "cannot_connect": "Kan de provider niet bereiken op die URL.",
+      "bad_export": "Herstellen lukte niet: {why}."
     },
     "abort": {
       "single_instance_allowed": "LLM Agent is al ingesteld. Voeg meer providers toe via de opties.",
@@ -47,7 +52,8 @@
           "storage": "Opslag en uitgaven",
           "add_provider": "Een provider toevoegen",
           "edit_provider": "Een provider bewerken",
-          "remove_provider": "Een provider verwijderen"
+          "remove_provider": "Een provider verwijderen",
+          "export": "Instellingen exporteren"
         }
       },
       "settings": {
@@ -253,6 +259,13 @@
           "delete_older_days": "0 bewaart elke chat. Actieve chats worden nooit verwijderd.",
           "clear_undo": "Verwijdert alle herstelmomentopnamen. Eerdere wijzigingen kunnen daarna niet meer vanuit het paneel ongedaan worden gemaakt."
         }
+      },
+      "export": {
+        "title": "Instellingen exporteren",
+        "description": "Kopieer al deze tekst naar een bestand en bewaar het op een veilige plek, want het bevat je API-sleutels. Plak het bij het opnieuw toevoegen van LLM Agent in het instelformulier om te herstellen. Chats en huisnotities zitten er niet in: die blijven op deze Home Assistant als de integratie wordt verwijderd.",
+        "data": {
+          "settings": "Instellingen"
+        }
       }
     },
     "error": {
@@ -263,7 +276,8 @@
     },
     "abort": {
       "not_loaded": "LLM Agent is niet geladen. Herlaad de integratie en probeer het opnieuw.",
-      "chatgpt_failed": "Aanmelden bij ChatGPT is niet voltooid: de code is verlopen, is geweigerd of de aanmeldservice was niet bereikbaar. Probeer het opnieuw."
+      "chatgpt_failed": "Aanmelden bij ChatGPT is niet voltooid: de code is verlopen, is geweigerd of de aanmeldservice was niet bereikbaar. Probeer het opnieuw.",
+      "exported": "Er is niets gewijzigd."
     },
     "progress": {
       "chatgpt_login": "Open {url} op een willekeurig apparaat, meld je aan bij ChatGPT en voer deze code in:\n\n**{code}**\n\nDit venster gaat vanzelf verder zodra je de code hebt ingevoerd (deze verloopt na 15 minuten). Experimenteel: dit gebruikt de aanmelding van Codex CLI van OpenAI en kan stoppen met werken."

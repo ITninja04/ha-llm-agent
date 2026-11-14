@@ -6,7 +6,11 @@
         "description": "LLM Agent donne à un modèle d'IA le contrôle de Home Assistant avec des droits d'administrateur : il peut commander des appareils (y compris les serrures et les alarmes si tu l'approuves), modifier la configuration et redémarrer Home Assistant. Les modèles d'IA font des erreurs. Les frais du fournisseur sont à ta charge. Ce projet n'est affilié ni à Home Assistant ni à Nabu Casa et est fourni sans garantie (Apache-2.0).",
         "data": {
           "type": "Fournisseur d'IA",
-          "acknowledged_risks": "Je comprends et j'accepte ces risques"
+          "acknowledged_risks": "Je comprends et j'accepte ces risques",
+          "restore": "Restaurer les paramètres depuis un export (facultatif)"
+        },
+        "data_description": {
+          "restore": "Collez le texte de Configurer > Exporter les paramètres de votre ancienne installation, ou laissez vide pour configurer un nouveau fournisseur. La restauration rétablit tous les fournisseurs, clés d'API et paramètres. Un fournisseur ChatGPT doit se reconnecter."
         }
       },
       "provider": {
@@ -28,7 +32,8 @@
     "error": {
       "must_acknowledge": "Accepte les risques pour continuer.",
       "invalid_auth": "Le fournisseur a refusé la clé API.",
-      "cannot_connect": "Impossible de joindre le fournisseur à cette URL."
+      "cannot_connect": "Impossible de joindre le fournisseur à cette URL.",
+      "bad_export": "Restauration impossible : {why}."
     },
     "abort": {
       "single_instance_allowed": "LLM Agent est déjà configuré. Ajoute d'autres fournisseurs dans ses options.",
@@ -47,7 +52,8 @@
           "storage": "Stockage et dépenses",
           "add_provider": "Ajouter un fournisseur",
           "edit_provider": "Modifier un fournisseur",
-          "remove_provider": "Supprimer un fournisseur"
+          "remove_provider": "Supprimer un fournisseur",
+          "export": "Exporter les paramètres"
         }
       },
       "settings": {
@@ -253,6 +259,13 @@
           "delete_older_days": "0 conserve toutes les discussions. Les discussions en cours ne sont jamais supprimées.",
           "clear_undo": "Supprime tous les instantanés d'annulation. Les modifications déjà faites ne pourront alors plus être annulées depuis le panneau."
         }
+      },
+      "export": {
+        "title": "Exporter les paramètres",
+        "description": "Copiez tout ce texte dans un fichier et gardez-le en lieu sûr, car il contient vos clés d'API. Pour restaurer, collez-le dans le formulaire de configuration en ajoutant à nouveau LLM Agent. Les conversations et les notes de la maison n'y figurent pas : elles restent sur ce Home Assistant quand l'intégration est supprimée.",
+        "data": {
+          "settings": "Paramètres"
+        }
       }
     },
     "error": {
@@ -263,7 +276,8 @@
     },
     "abort": {
       "not_loaded": "LLM Agent n'est pas chargé. Recharge l'intégration et réessaie.",
-      "chatgpt_failed": "La connexion à ChatGPT n'a pas abouti : le code a expiré, a été refusé ou le service de connexion était injoignable. Réessaie."
+      "chatgpt_failed": "La connexion à ChatGPT n'a pas abouti : le code a expiré, a été refusé ou le service de connexion était injoignable. Réessaie.",
+      "exported": "Rien n'a été modifié."
     },
     "progress": {
       "chatgpt_login": "Ouvre {url} sur n'importe quel appareil, connecte-toi à ChatGPT et saisis ce code :\n\n**{code}**\n\nCette fenêtre continue toute seule une fois le code saisi (il expire après 15 minutes). Expérimental : ceci utilise la connexion de Codex CLI d'OpenAI et peut cesser de fonctionner."

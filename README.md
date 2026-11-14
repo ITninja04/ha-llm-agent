@@ -73,6 +73,22 @@ To update, repeat these steps. There is no build step; the panel ships pre-built
 > HACS treats LLM Agent as a custom repository because it isn't in the default HACS store
 > yet. A default store listing is planned for 1.0 (see the [roadmap](docs/ROADMAP.md)).
 
+### Moving your settings to a fresh install
+
+Switching where LLM Agent is downloaded from (another repository or a fork) means deleting
+the integration, and that deletes its settings. Export them first:
+
+1. **Settings > Devices & services > LLM Agent > Configure > Export settings.** Copy all
+   of the text into a file. It includes your API keys, so keep it somewhere safe.
+2. Delete the integration, install the new download and restart Home Assistant.
+3. Add LLM Agent again. On the first form, tick the risk box and paste the text into
+   **Restore settings from an export**. Setup skips the provider step and comes back with
+   every provider, key, rule and setting.
+
+Chats and home notes are not in the export and don't need to be: deleting the integration
+leaves them in place, and the new install picks them up. A ChatGPT sign-in is deleted with
+the integration, so a ChatGPT provider signs in again.
+
 ## What it can do
 
 | Ask for | What happens |

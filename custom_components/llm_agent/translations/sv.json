@@ -6,7 +6,11 @@
         "description": "LLM Agent ger en AI-modell administratörsbehörighet i Home Assistant: den kan styra enheter (även lås och larm om du godkänner det), ändra konfigurationen och starta om Home Assistant. AI-modeller gör misstag. Du står för leverantörens avgifter. Projektet är inte kopplat till Home Assistant eller Nabu Casa och levereras utan garanti (Apache-2.0).",
         "data": {
           "type": "AI-leverantör",
-          "acknowledged_risks": "Jag förstår och accepterar riskerna"
+          "acknowledged_risks": "Jag förstår och accepterar riskerna",
+          "restore": "Återställ inställningar från en export (valfritt)"
+        },
+        "data_description": {
+          "restore": "Klistra in texten från Konfigurera > Exportera inställningar i din gamla installation, eller lämna tomt för att lägga till en ny leverantör. Återställningen tar tillbaka alla leverantörer, API-nycklar och inställningar. En ChatGPT-leverantör behöver logga in igen."
         }
       },
       "provider": {
@@ -28,7 +32,8 @@
     "error": {
       "must_acknowledge": "Acceptera riskerna för att fortsätta.",
       "invalid_auth": "Leverantören avvisade API-nyckeln.",
-      "cannot_connect": "Kunde inte nå leverantören på den URL:en."
+      "cannot_connect": "Kunde inte nå leverantören på den URL:en.",
+      "bad_export": "Kunde inte återställa: {why}."
     },
     "abort": {
       "single_instance_allowed": "LLM Agent är redan konfigurerad. Lägg till fler leverantörer i dess alternativ.",
@@ -47,7 +52,8 @@
           "storage": "Lagring och utgifter",
           "add_provider": "Lägg till en leverantör",
           "edit_provider": "Redigera en leverantör",
-          "remove_provider": "Ta bort en leverantör"
+          "remove_provider": "Ta bort en leverantör",
+          "export": "Exportera inställningar"
         }
       },
       "settings": {
@@ -253,6 +259,13 @@
           "delete_older_days": "0 behåller alla chattar. Pågående chattar tas aldrig bort.",
           "clear_undo": "Tar bort alla ögonblicksbilder för ångring. Tidigare ändringar kan sedan inte längre ångras från panelen."
         }
+      },
+      "export": {
+        "title": "Exportera inställningar",
+        "description": "Kopiera all denna text till en fil och förvara den säkert, eftersom den innehåller dina API-nycklar. För att återställa, klistra in den i installationsformuläret när du lägger till LLM Agent igen. Chattar och hemanteckningar ingår inte: de stannar kvar i denna Home Assistant när integrationen tas bort.",
+        "data": {
+          "settings": "Inställningar"
+        }
       }
     },
     "error": {
@@ -263,7 +276,8 @@
     },
     "abort": {
       "not_loaded": "LLM Agent är inte inläst. Läs in integrationen igen och försök på nytt.",
-      "chatgpt_failed": "Inloggningen på ChatGPT slutfördes inte: koden gick ut, avvisades eller så gick det inte att nå inloggningstjänsten. Försök igen."
+      "chatgpt_failed": "Inloggningen på ChatGPT slutfördes inte: koden gick ut, avvisades eller så gick det inte att nå inloggningstjänsten. Försök igen.",
+      "exported": "Inget ändrades."
     },
     "progress": {
       "chatgpt_login": "Öppna {url} på valfri enhet, logga in på ChatGPT och ange den här koden:\n\n**{code}**\n\nDet här fönstret fortsätter automatiskt när du har angett koden (den går ut efter 15 minuter). Experimentellt: detta använder inloggningen i OpenAI:s Codex CLI och kan sluta fungera."

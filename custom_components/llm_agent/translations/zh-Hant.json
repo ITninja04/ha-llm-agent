@@ -6,7 +6,11 @@
         "description": "LLM Agent 讓 AI 模型以管理員權限控制 Home Assistant：它可以控制裝置（經你核准後，也包括門鎖和警報器）、編輯設定，以及重新啟動 Home Assistant。AI 模型會出錯。供應商的費用由你負擔。本專案與 Home Assistant 或 Nabu Casa 無關，且不提供任何擔保（Apache-2.0）。",
         "data": {
           "type": "AI 供應商",
-          "acknowledged_risks": "我理解並接受這些風險"
+          "acknowledged_risks": "我理解並接受這些風險",
+          "restore": "從匯出內容還原設定（選填）"
+        },
+        "data_description": {
+          "restore": "貼上舊安裝中「設定 > 匯出設定」的文字；留空則改為設定新的提供者。還原會帶回所有提供者、API 金鑰與設定。ChatGPT 提供者需要重新登入。"
         }
       },
       "provider": {
@@ -28,7 +32,8 @@
     "error": {
       "must_acknowledge": "請接受風險後繼續。",
       "invalid_auth": "供應商拒絕了此 API 金鑰。",
-      "cannot_connect": "無法透過該 URL 連線至供應商。"
+      "cannot_connect": "無法透過該 URL 連線至供應商。",
+      "bad_export": "無法還原：{why}。"
     },
     "abort": {
       "single_instance_allowed": "LLM Agent 已設定。請在其選項中新增更多供應商。",
@@ -47,7 +52,8 @@
           "storage": "儲存空間與支出",
           "add_provider": "新增供應商",
           "edit_provider": "編輯供應商",
-          "remove_provider": "移除供應商"
+          "remove_provider": "移除供應商",
+          "export": "匯出設定"
         }
       },
       "settings": {
@@ -253,6 +259,13 @@
           "delete_older_days": "0 表示保留所有對話。進行中的對話不會被刪除。",
           "clear_undo": "刪除所有復原快照。之後將無法從面板復原先前的修改。"
         }
+      },
+      "export": {
+        "title": "匯出設定",
+        "description": "將全部文字複製到檔案並妥善保存，因為其中包含你的 API 金鑰。還原時，在重新新增 LLM Agent 時將其貼到設定表單中。聊天與家庭筆記不在其中：移除整合後它們仍保留在此 Home Assistant 上。",
+        "data": {
+          "settings": "設定"
+        }
       }
     },
     "error": {
@@ -263,7 +276,8 @@
     },
     "abort": {
       "not_loaded": "LLM Agent 未載入。請重新載入整合後重試。",
-      "chatgpt_failed": "ChatGPT 登入未完成：驗證碼已過期、遭拒絕，或無法連線至登入服務。請重試。"
+      "chatgpt_failed": "ChatGPT 登入未完成：驗證碼已過期、遭拒絕，或無法連線至登入服務。請重試。",
+      "exported": "未做任何變更。"
     },
     "progress": {
       "chatgpt_login": "在任意裝置上開啟 {url}，登入 ChatGPT，然後輸入此驗證碼：\n\n**{code}**\n\n輸入驗證碼後，此視窗會自動繼續（驗證碼 15 分鐘後到期）。實驗性功能：使用 OpenAI 的 Codex CLI 登入方式，可能會失效。"

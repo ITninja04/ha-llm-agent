@@ -30,6 +30,7 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
+from homeassistant.loader import async_get_integration
 from homeassistant.util import dt as dt_util
 import probatio as vol
 
@@ -94,6 +95,7 @@ from .providers.models import (
     models_request,
     suggestions,
 )
+from .settings_export import BadExport, export_text, import_text
 from .tools.web import search_backend
 
 TYPE_SELECTOR = SelectSelector(
@@ -410,6 +412,11 @@ class _ChatGPTSignIn:
             self._login_task = None
 
 
+# The setup form's optional field: an export from Configure > Export settings. Filled
+# in, setup skips the provider step and starts with the exported settings instead.
+RESTORE = "restore"
+
+
 class LLMAgentConfigFlow(_ChatGPTSignIn, ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
@@ -418,9 +425,21 @@ class LLMAgentConfigFlow(_ChatGPTSignIn, ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
+        placeholders = {"why": ""}
         if user_input is not None:
+            restore = str(user_input.get(RESTORE) or "").strip()
             if not user_input.get(CONF_ACK):
                 errors[CONF_ACK] = "must_acknowledge"
+            elif restore:
+                try:
+                    options = import_text(restore)
+                except BadExport as err:
+                    errors[RESTORE] = "bad_export"
+                    placeholders["why"] = str(err)
+                else:
+                    return self.async_create_entry(
+                        title=NAME, data={CONF_ACK: True}, options=options
+                    )
             else:
                 self._type = user_input["type"]
                 return await self.async_step_provider()
@@ -430,9 +449,11 @@ class LLMAgentConfigFlow(_ChatGPTSignIn, ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required("type", default=self._type): TYPE_SELECTOR,
                     vol.Required(CONF_ACK, default=False): BooleanSelector(),
+                    vol.Optional(RESTORE): TextSelector(TextSelectorConfig(multiline=True)),
                 }
             ),
             errors=errors,
+            description_placeholders=placeholders,
         )
 
     async def async_step_provider(
@@ -486,7 +507,27 @@ class LLMAgentOptionsFlow(_ChatGPTSignIn, OptionsFlow):
         menu = ["settings", "storage", "add_provider"]
         if self._providers:
             menu += ["edit_provider", "remove_provider"]
+        menu.append("export")
         return self.async_show_menu(step_id="init", menu_options=menu)
+
+    async def async_step_export(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Show the settings as text to copy into a file. Submitting changes nothing:
+        a config flow can't hand the browser a download, and an edited copy in the box
+        is ignored rather than saved."""
+        if user_input is not None:
+            return self.async_abort(reason="exported")
+        integration = await async_get_integration(self.hass, DOMAIN)
+        text = export_text(dict(self.config_entry.options), str(integration.version))
+        return self.async_show_form(
+            step_id="export",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional("settings", description={"suggested_value": text}): (
+                        TextSelector(TextSelectorConfig(multiline=True))
+                    )
+                }
+            ),
+        )
 
     async def async_step_settings(
         self, user_input: dict[str, Any] | None = None

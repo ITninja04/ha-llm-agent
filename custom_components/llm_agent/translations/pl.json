@@ -6,7 +6,11 @@
         "description": "LLM Agent daje modelowi AI kontrolę nad Home Assistant na poziomie administratora: może sterować urządzeniami (w tym zamkami i alarmami, jeśli zatwierdzisz), edytować konfigurację i ponownie uruchamiać Home Assistant. Modele AI popełniają błędy. Opłaty dostawcy pokrywasz ty. Ten projekt nie jest powiązany z Home Assistant ani Nabu Casa i nie jest objęty gwarancją (Apache-2.0).",
         "data": {
           "type": "Dostawca AI",
-          "acknowledged_risks": "Rozumiem i akceptuję te zagrożenia"
+          "acknowledged_risks": "Rozumiem i akceptuję te zagrożenia",
+          "restore": "Przywróć ustawienia z eksportu (opcjonalnie)"
+        },
+        "data_description": {
+          "restore": "Wklej tekst z Konfiguruj > Eksportuj ustawienia ze starej instalacji albo zostaw puste, aby skonfigurować nowego dostawcę. Przywrócenie odtwarza wszystkich dostawców, klucze API i ustawienia. Dostawca ChatGPT musi zalogować się ponownie."
         }
       },
       "provider": {
@@ -28,7 +32,8 @@
     "error": {
       "must_acknowledge": "Zaakceptuj zagrożenia, aby kontynuować.",
       "invalid_auth": "Dostawca odrzucił klucz API.",
-      "cannot_connect": "Nie udało się połączyć z dostawcą pod tym adresem URL."
+      "cannot_connect": "Nie udało się połączyć z dostawcą pod tym adresem URL.",
+      "bad_export": "Nie udało się przywrócić: {why}."
     },
     "abort": {
       "single_instance_allowed": "LLM Agent jest już skonfigurowany. Dodaj kolejnych dostawców w jego opcjach.",
@@ -47,7 +52,8 @@
           "storage": "Przechowywanie i wydatki",
           "add_provider": "Dodaj dostawcę",
           "edit_provider": "Edytuj dostawcę",
-          "remove_provider": "Usuń dostawcę"
+          "remove_provider": "Usuń dostawcę",
+          "export": "Eksportuj ustawienia"
         }
       },
       "settings": {
@@ -253,6 +259,13 @@
           "delete_older_days": "0 zachowuje wszystkie czaty. Trwające czaty nigdy nie są usuwane.",
           "clear_undo": "Usuwa wszystkie migawki cofania. Dotychczasowych zmian nie będzie już można cofnąć z panelu."
         }
+      },
+      "export": {
+        "title": "Eksportuj ustawienia",
+        "description": "Skopiuj cały ten tekst do pliku i przechowuj go bezpiecznie, bo zawiera Twoje klucze API. Aby przywrócić, wklej go do formularza konfiguracji przy ponownym dodawaniu LLM Agent. Czaty i notatki domowe nie są w nim zawarte: zostają w tym Home Assistant po usunięciu integracji.",
+        "data": {
+          "settings": "Ustawienia"
+        }
       }
     },
     "error": {
@@ -263,7 +276,8 @@
     },
     "abort": {
       "not_loaded": "LLM Agent nie jest załadowany. Przeładuj integrację i spróbuj ponownie.",
-      "chatgpt_failed": "Logowanie do ChatGPT nie zostało ukończone: kod wygasł, został odrzucony lub usługa logowania była nieosiągalna. Spróbuj ponownie."
+      "chatgpt_failed": "Logowanie do ChatGPT nie zostało ukończone: kod wygasł, został odrzucony lub usługa logowania była nieosiągalna. Spróbuj ponownie.",
+      "exported": "Nic nie zostało zmienione."
     },
     "progress": {
       "chatgpt_login": "Otwórz {url} na dowolnym urządzeniu, zaloguj się do ChatGPT i wpisz ten kod:\n\n**{code}**\n\nTo okno przejdzie dalej automatycznie po wpisaniu kodu (wygasa po 15 minutach). Eksperymentalne: korzysta z logowania Codex CLI firmy OpenAI i może przestać działać."

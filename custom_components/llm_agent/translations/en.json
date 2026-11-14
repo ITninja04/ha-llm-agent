@@ -6,7 +6,11 @@
         "description": "LLM Agent gives an AI model admin-level control of Home Assistant: it can switch devices (including locks and alarms if you approve), edit configuration and restart Home Assistant. AI models make mistakes. Provider charges are yours. This project is not affiliated with Home Assistant or Nabu Casa and comes with no warranty (Apache-2.0).",
         "data": {
           "type": "AI provider",
-          "acknowledged_risks": "I understand and accept these risks"
+          "acknowledged_risks": "I understand and accept these risks",
+          "restore": "Restore settings from an export (optional)"
+        },
+        "data_description": {
+          "restore": "Paste the text from Configure > Export settings on your old install, and leave it empty to set up a new provider instead. Restoring brings back every provider, API key and setting. A ChatGPT provider needs to sign in again."
         }
       },
       "provider": {
@@ -28,7 +32,8 @@
     "error": {
       "must_acknowledge": "Please accept the risks to continue.",
       "invalid_auth": "The provider rejected the API key.",
-      "cannot_connect": "Could not reach the provider at that URL."
+      "cannot_connect": "Could not reach the provider at that URL.",
+      "bad_export": "Couldn't restore: {why}."
     },
     "abort": {
       "single_instance_allowed": "LLM Agent is already set up. Add more providers in its options.",
@@ -47,7 +52,8 @@
           "storage": "Storage and spend",
           "add_provider": "Add a provider",
           "edit_provider": "Edit a provider",
-          "remove_provider": "Remove a provider"
+          "remove_provider": "Remove a provider",
+          "export": "Export settings"
         }
       },
       "settings": {
@@ -253,6 +259,13 @@
           "delete_older_days": "0 keeps every chat. Chats that are running are never deleted.",
           "clear_undo": "Deletes every undo snapshot. Changes made so far can then no longer be undone from the panel."
         }
+      },
+      "export": {
+        "title": "Export settings",
+        "description": "Copy all of this text into a file and keep it somewhere safe, because it includes your API keys. To restore, paste it into the setup form when you add LLM Agent again. Chats and home notes aren't in it: they stay on this Home Assistant when the integration is removed.",
+        "data": {
+          "settings": "Settings"
+        }
       }
     },
     "error": {
@@ -263,7 +276,8 @@
     },
     "abort": {
       "not_loaded": "LLM Agent is not loaded. Reload the integration and try again.",
-      "chatgpt_failed": "ChatGPT sign-in didn't finish: the code expired, was refused, or the sign-in service couldn't be reached. Try again."
+      "chatgpt_failed": "ChatGPT sign-in didn't finish: the code expired, was refused, or the sign-in service couldn't be reached. Try again.",
+      "exported": "Nothing was changed."
     },
     "progress": {
       "chatgpt_login": "Open {url} on any device, sign in to ChatGPT and enter this code:\n\n**{code}**\n\nThis window continues by itself once you have entered the code (it expires after 15 minutes). Experimental: this uses the sign-in of OpenAI's Codex CLI and may stop working."

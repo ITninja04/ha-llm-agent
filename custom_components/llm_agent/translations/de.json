@@ -6,7 +6,11 @@
         "description": "LLM Agent gibt einem KI-Modell Administratorrechte in Home Assistant: Es kann Geräte schalten (mit deiner Genehmigung auch Schlösser und Alarmanlagen), die Konfiguration ändern und Home Assistant neu starten. KI-Modelle machen Fehler. Die Kosten des Anbieters trägst du. Dieses Projekt ist nicht mit Home Assistant oder Nabu Casa verbunden und kommt ohne Gewährleistung (Apache-2.0).",
         "data": {
           "type": "KI-Anbieter",
-          "acknowledged_risks": "Ich verstehe und akzeptiere diese Risiken"
+          "acknowledged_risks": "Ich verstehe und akzeptiere diese Risiken",
+          "restore": "Einstellungen aus einem Export wiederherstellen (optional)"
+        },
+        "data_description": {
+          "restore": "Füge den Text aus Konfigurieren > Einstellungen exportieren deiner alten Installation ein, oder lass das Feld leer, um einen neuen Anbieter einzurichten. Beim Wiederherstellen kommen alle Anbieter, API-Schlüssel und Einstellungen zurück. Ein ChatGPT-Anbieter muss sich erneut anmelden."
         }
       },
       "provider": {
@@ -28,7 +32,8 @@
     "error": {
       "must_acknowledge": "Bitte akzeptiere die Risiken, um fortzufahren.",
       "invalid_auth": "Der Anbieter hat den API-Schlüssel abgelehnt.",
-      "cannot_connect": "Der Anbieter konnte unter dieser URL nicht erreicht werden."
+      "cannot_connect": "Der Anbieter konnte unter dieser URL nicht erreicht werden.",
+      "bad_export": "Wiederherstellen nicht möglich: {why}."
     },
     "abort": {
       "single_instance_allowed": "LLM Agent ist bereits eingerichtet. Füge weitere Anbieter in den Optionen hinzu.",
@@ -47,7 +52,8 @@
           "storage": "Speicher und Ausgaben",
           "add_provider": "Anbieter hinzufügen",
           "edit_provider": "Anbieter bearbeiten",
-          "remove_provider": "Anbieter entfernen"
+          "remove_provider": "Anbieter entfernen",
+          "export": "Einstellungen exportieren"
         }
       },
       "settings": {
@@ -253,6 +259,13 @@
           "delete_older_days": "0 behält alle Chats. Laufende Chats werden nie gelöscht.",
           "clear_undo": "Löscht alle Rückgängig-Schnappschüsse. Bisherige Änderungen können dann nicht mehr über das Panel rückgängig gemacht werden."
         }
+      },
+      "export": {
+        "title": "Einstellungen exportieren",
+        "description": "Kopiere diesen ganzen Text in eine Datei und bewahre sie sicher auf, denn sie enthält deine API-Schlüssel. Zum Wiederherstellen füge ihn beim erneuten Hinzufügen von LLM Agent in das Einrichtungsformular ein. Chats und Hausnotizen sind nicht enthalten: Sie bleiben in diesem Home Assistant, wenn die Integration entfernt wird.",
+        "data": {
+          "settings": "Einstellungen"
+        }
       }
     },
     "error": {
@@ -263,7 +276,8 @@
     },
     "abort": {
       "not_loaded": "LLM Agent ist nicht geladen. Lade die Integration neu und versuche es erneut.",
-      "chatgpt_failed": "Die ChatGPT-Anmeldung wurde nicht abgeschlossen: Der Code ist abgelaufen, wurde abgelehnt oder der Anmeldedienst war nicht erreichbar. Versuche es erneut."
+      "chatgpt_failed": "Die ChatGPT-Anmeldung wurde nicht abgeschlossen: Der Code ist abgelaufen, wurde abgelehnt oder der Anmeldedienst war nicht erreichbar. Versuche es erneut.",
+      "exported": "Es wurde nichts geändert."
     },
     "progress": {
       "chatgpt_login": "Öffne {url} auf einem beliebigen Gerät, melde dich bei ChatGPT an und gib diesen Code ein:\n\n**{code}**\n\nDieses Fenster fährt automatisch fort, sobald du den Code eingegeben hast (er läuft nach 15 Minuten ab). Experimentell: Hier wird die Anmeldung von OpenAIs Codex CLI verwendet, die möglicherweise irgendwann nicht mehr funktioniert."
