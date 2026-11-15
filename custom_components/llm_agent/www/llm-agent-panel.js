@@ -4901,46 +4901,55 @@ var Ai = class extends wi.Editor {
 	}
 }, ji = (e) => e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), Mi = class {
 	#e;
-	#t = !1;
-	#n = "";
-	#r = !0;
+	#t;
+	#n = !1;
+	#r = "";
+	#i = !0;
 	constructor(e, t) {
-		if (this.source = e, !ki(e.getRootNode())) throw Error("this browser cannot read a caret inside a shadow root");
-		let n = document.createElement("div");
-		n.className = "box", n.setAttribute("role", "textbox"), n.setAttribute("aria-multiline", "true"), n.addEventListener("keydown", t.onKey), n.addEventListener("paste", (e) => {
+		this.source = e;
+		let n = e.getRootNode();
+		if (!ki(n)) throw Error("this browser cannot read a caret inside a shadow root");
+		let r = document.createElement("div");
+		r.className = "box", r.setAttribute("role", "textbox"), r.setAttribute("aria-multiline", "true"), r.addEventListener("keydown", t.onKey), r.addEventListener("paste", (e) => {
 			t.onPaste(e), e.defaultPrevented && e.stopImmediatePropagation();
-		}), n.addEventListener("blur", t.onBlur), n.addEventListener("focus", () => this.#r = !1), e.after(n);
+		}), r.addEventListener("blur", t.onBlur), r.addEventListener("focus", () => this.#i = !1);
+		let i = n instanceof ShadowRoot ? n.host : null;
+		i?.addEventListener("keydown", this.#a), this.#t = i, e.after(r);
 		try {
 			this.#e = new Ai({
 				textarea: e,
-				editor: n
+				editor: r
 			});
 		} catch (t) {
-			throw n.remove(), e.style.display = "", t;
+			throw r.remove(), i?.removeEventListener("keydown", this.#a), e.style.display = "", t;
 		}
-		this.el = n, this.setPlaceholder(e.placeholder), this.#e.addEventListener("change", () => {
-			this.#t || t.onChange();
+		this.el = r, this.setPlaceholder(e.placeholder), this.#e.addEventListener("change", () => {
+			this.#n || t.onChange();
 		});
 	}
+	#a = (e) => {
+		let t = e;
+		t.ctrlKey || t.altKey || t.metaKey || t.composedPath()[0] === this.el && t.stopPropagation();
+	};
 	get value() {
 		return this.#e.getContent();
 	}
 	set value(e) {
 		let t = this.el.getRootNode().activeElement === this.el;
-		this.#t = !0;
+		this.#n = !0;
 		try {
 			this.#e.setContent(e);
 		} finally {
-			this.#t = !1;
+			this.#n = !1;
 		}
-		t ? this.setSelectionRange(e.length, e.length) : this.#r = !0;
+		t ? this.setSelectionRange(e.length, e.length) : this.#i = !0;
 	}
-	#i(e) {
+	#o(e) {
 		let t = this.#e.lines, n = e.col;
 		for (let r = 0; r < e.row && r < t.length; r++) n += (t[r]?.length ?? 0) + 1;
 		return n;
 	}
-	#a(e) {
+	#s(e) {
 		let t = this.#e.lines, n = e;
 		for (let e = 0; e < t.length; e++) {
 			let r = t[e]?.length ?? 0;
@@ -4958,20 +4967,20 @@ var Ai = class extends wi.Editor {
 	}
 	get selectionStart() {
 		let e = this.#e.getSelection(!1), t = this.#e.getSelection(!0);
-		return e === null ? this.value.length : Math.min(this.#i(e), t === null ? Infinity : this.#i(t));
+		return e === null ? this.value.length : Math.min(this.#o(e), t === null ? Infinity : this.#o(t));
 	}
 	setSelectionRange(e, t) {
-		this.#e.setSelection(this.#a(t), this.#a(e));
+		this.#e.setSelection(this.#s(t), this.#s(e));
 	}
 	focus() {
-		let e = !this.#r && this.#e.getSelection() !== null;
-		this.el.focus(), this.#r = !1, e || this.setSelectionRange(this.value.length, this.value.length);
+		let e = !this.#i && this.#e.getSelection() !== null;
+		this.el.focus(), this.#i = !1, e || this.setSelectionRange(this.value.length, this.value.length);
 	}
 	fit() {}
 	setMentions(e) {
 		let t = e.join("\n");
-		if (t === this.#n) return;
-		this.#n = t;
+		if (t === this.#r) return;
+		this.#r = t;
 		let n = this.#e;
 		if (!e.length) {
 			n.customInlineGrammar = {}, n.mergedInlineGrammar = Ti.inlineGrammar;
@@ -4990,7 +4999,7 @@ var Ai = class extends wi.Editor {
 		this.el.getAttribute("data-placeholder") !== e && (this.el.setAttribute("data-placeholder", e), this.el.setAttribute("aria-label", e));
 	}
 	destroy() {
-		this.#e.destroy(), this.el.remove();
+		this.#t?.removeEventListener("keydown", this.#a), this.#e.destroy(), this.el.remove();
 	}
 }, Ni = /device_id:[0-9a-f]{32} \(([^()\n]+)\)|area_id:([a-z0-9_]+)|\b([a-z_]+\.[a-z0-9_]+)\b/g;
 function Pi(e, t, n, r) {

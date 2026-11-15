@@ -228,6 +228,7 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 class MarkdownBox implements ComposerBox {
   readonly el: HTMLDivElement;
   readonly #ed: ShadowEditor;
+  readonly #host: Element | null;
   #quiet = false;
   #labels = "";
   /** The text was replaced while the box was not focused: focusing puts the caret at
@@ -255,11 +256,21 @@ class MarkdownBox implements ComposerBox {
     // However the box got focus (a click, a tab, focus() below), the caret is now where
     // the person or focus() put it, so the next focus() must not move it to the end.
     el.addEventListener("focus", () => (this.#caretToEnd = false));
+    // Home Assistant runs single-key shortcuts from window ("e" opens entity search, "c"
+    // the command bar, "a" Assist) unless the key was pressed in an input or a textarea;
+    // it does not count an editable div as a text field. Seen in the e2e run on
+    // 2026-11-15: typing "@e2e" opened the entity search over the panel. Stopped at the
+    // panel's host, not on the box, so the panel's own Escape handler still sees them.
+    // Keys with Ctrl, Alt or Cmd pass, as they do from a textarea.
+    const host = root instanceof ShadowRoot ? root.host : null;
+    host?.addEventListener("keydown", this.#shield);
+    this.#host = host;
     source.after(el);
     try {
       this.#ed = new ShadowEditor({ textarea: source, editor: el });
     } catch (err) {
       el.remove();
+      host?.removeEventListener("keydown", this.#shield);
       source.style.display = "";
       throw err;
     }
@@ -269,6 +280,12 @@ class MarkdownBox implements ComposerBox {
       if (!this.#quiet) on.onChange();
     });
   }
+
+  readonly #shield = (ev: Event): void => {
+    const key = ev as KeyboardEvent;
+    if (key.ctrlKey || key.altKey || key.metaKey) return;
+    if (key.composedPath()[0] === this.el) key.stopPropagation();
+  };
 
   get value(): string {
     return this.#ed.getContent();
@@ -357,6 +374,7 @@ class MarkdownBox implements ComposerBox {
   }
 
   destroy(): void {
+    this.#host?.removeEventListener("keydown", this.#shield);
     this.#ed.destroy();
     this.el.remove();
   }
