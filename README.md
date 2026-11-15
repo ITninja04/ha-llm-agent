@@ -620,6 +620,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   devices, areas and entities show as names instead of ids.
 - **0.9.5 (released):** the chat box formats Markdown as you type (headings, lists, code, bold and
   italic), and @ picks show as pills.
+- **0.9.6 (released):** a Usage view: spend per day, totals, the daily cap, a breakdown by
+  provider and model (AI Task calls included), and the OpenRouter key's balance.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
