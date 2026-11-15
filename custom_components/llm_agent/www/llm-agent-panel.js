@@ -7071,7 +7071,7 @@ var ra = (e) => e.message ?? String(e), ia = class extends A {
 		}, this.gen = 0;
 	}
 	static {
-		this.styles = [Xi, s`:host{flex:1;min-height:0;height:auto;overflow-y:auto;background:none}
+		this.styles = [Xi, s`:host{flex:1;min-height:0;height:auto;overflow-y:auto;background:none;container-type:inline-size}
 .bar,.tot,p{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 20px;margin:0;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
 .bar button.small[aria-selected=true]:not(.ghost):not(.primary):not(.danger){background:var(--accent);color:var(--on-accent)}
 .tot{gap:12px 28px}.tot b{display:block;font-size:20px;font-weight:600;color:var(--text)}
@@ -7085,6 +7085,9 @@ th,td{padding:8px 20px 8px 0;text-align:end;white-space:nowrap;border-bottom:1px
 th:first-child,td:first-child{text-align:start;padding-inline-start:20px;white-space:normal;min-width:9rem;overflow-wrap:anywhere}
 th{font-weight:500;color:var(--muted)}tr:last-child td{border-bottom:0}
 td small{display:block;color:var(--muted)}
+/* a phone has room for model, in, out and cost; cached and calls give way, since cost is
+   what the view is for */
+@container (max-width:520px){th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}th,td{padding-inline-end:12px}}
 .err{color:var(--danger)}`];
 	}
 	connectedCallback() {

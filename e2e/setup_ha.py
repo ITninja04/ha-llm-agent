@@ -99,7 +99,8 @@ cam = call(
 if cam.get("type") != "create_entry":
     sys.exit(f"camera config flow failed: {cam}")
 
-# Price the stub model through the options flow so the cost estimate path is exercised.
+# Price the stub model through the options flow so the cost estimate path is exercised,
+# and set a daily cap.
 opt = call(
     "POST", "/api/config/config_entries/options/flow", {"handler": flow["result"]["entry_id"]}, tok
 )
@@ -112,7 +113,14 @@ opt = call(
 opt = call(
     "POST",
     f"/api/config/config_entries/options/flow/{opt['flow_id']}",
-    {"cost": {"price_overrides": {"stub-model": {"input": 1.0, "output": 2.0}}}},
+    {
+        "cost": {
+            "price_overrides": {"stub-model": {"input": 1.0, "output": 2.0}},
+            # Far above what the stub run spends; set so the Usage view shows a cap. A
+            # live run against a real model gets none, so it is never stopped by it.
+            "daily_spend_cap": 0.0 if "LLM_MODEL" in os.environ else 5.0,
+        }
+    },
     tok,
 )
 if opt.get("type") != "create_entry":

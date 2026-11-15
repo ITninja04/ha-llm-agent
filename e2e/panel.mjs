@@ -524,6 +524,7 @@ const usageView = panel.locator("llm-agent-usage");
 await usageView.locator(".tot").waitFor({ timeout: 10000 });
 const totals = await usageView.locator(".tot").innerText();
 if (!/Today\s*\$0\.\d*[1-9]/.test(totals)) fail(`no spend today in the Usage totals: ${totals}`);
+await usageView.getByText(/^Daily cap \$5\.00: \$0\.\d+ used today/).waitFor();
 const bars = usageView.locator("svg rect.b");
 if ((await bars.count()) !== 30) fail(`expected 30 day bars, got ${await bars.count()}`);
 const todayBar = usageView.locator("svg g").last();
@@ -559,6 +560,9 @@ const usageWidth = await usageView.evaluate((el) => ({
 }));
 if (usageWidth.right > 391 || usageWidth.overflow > 0)
   fail(`Usage view wider than the phone: ${JSON.stringify(usageWidth)}`);
+// the cost column must be on screen, not scrolled away inside the table
+const costCell = await usageView.locator("tr.task td").last().boundingBox();
+if (!costCell || costCell.x + costCell.width > 391) fail(`cost column off screen: ${JSON.stringify(costCell)}`);
 await page.screenshot({ path: `${shots}/llm-agent-10-usage-phone.png` });
 await page.setViewportSize({ width: 1280, height: 800 });
 await setTheme("light");
