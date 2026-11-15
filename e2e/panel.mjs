@@ -92,7 +92,7 @@ const layout = () =>
       const box = (sel) => row.querySelector(sel).getBoundingClientRect();
       const link = row.querySelector(".link");
       return {
-        t: box(".t"), w: box(".w"), o: box(".o"), row: row.getBoundingClientRect(),
+        t: box(".t"), u: box(".u"), w: box(".w"), o: box(".o"), row: row.getBoundingClientRect(),
         align: link ? getComputedStyle(link).textAlign : "start",
         clipped: row.querySelector(".what").scrollWidth > row.querySelector(".what").clientWidth + 1,
       };
@@ -102,7 +102,7 @@ let rows = await layout();
 const starts = rows.map((r) => Math.round(r.w.x));
 if (rows.length < 3 || new Set(starts).size !== 1) fail(`Changes columns do not line up: ${starts}`);
 for (const r of rows) {
-  if (r.w.width < 100) fail(`Changes column too narrow: ${r.w.width}px`);
+  if (r.w.width < 160) fail(`Changes column too narrow: ${r.w.width}px`);
   if (r.w.right > r.o.left + 1) fail(`Change and outcome columns overlap: ${r.w.right} > ${r.o.left}`);
   if (!["start", "left"].includes(r.align)) fail(`chat link text is ${r.align}, not left aligned`);
   if (r.clipped) fail("tool name is cut off");
@@ -114,6 +114,7 @@ await page.waitForTimeout(200);
 rows = await layout();
 for (const r of rows) {
   if (r.w.top < r.t.bottom) fail("Changes rows do not stack on a phone");
+  if (r.u.height > 24) fail(`person name wraps on a phone: ${r.u.height}px tall`);
   if (r.row.right > 391) fail(`Changes row wider than the phone: ${r.row.right}`);
 }
 await page.screenshot({ path: `${shots}/llm-agent-3c-changes-phone.png` });

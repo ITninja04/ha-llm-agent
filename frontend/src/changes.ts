@@ -56,17 +56,19 @@ class LlmAgentChanges extends LitElement {
 .bar>*{font:inherit;font-size:13px;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
 .bar>[type=search]{flex:1;min-width:140px}
 .row,.bar,.more{border-bottom:1px solid var(--line)}
-/* Every row uses the same fixed column template, so columns line up without the rows
-   sharing a grid. display and gap are set here because the panel's chat styles, which
+/* Every row uses the same column template, and the rows are the same width, so the
+   columns line up without the rows sharing a grid. Widths are shares (fr) over a
+   minimum, so the change column grows with the pane instead of getting only what fixed
+   columns leave. display and gap are set here because the panel's chat styles, which
    this view shares, make .row a flex row. */
-.row{display:grid;grid-template-columns:11.5rem minmax(5rem,10rem) minmax(4rem,7rem) minmax(8rem,1fr) minmax(9rem,16rem);grid-template-areas:"t c u w o";gap:4px 16px;align-items:start;padding:10px 20px;font-size:13px;color:var(--muted)}
+.row{display:grid;grid-template-columns:11.5rem minmax(5rem,1fr) minmax(4rem,.6fr) minmax(8rem,2fr) minmax(9rem,1.4fr);grid-template-areas:"t c u w o";gap:4px 16px;align-items:start;padding:10px 20px;font-size:13px;color:var(--muted)}
 .row>*,.link{min-width:0;text-align:start;overflow-wrap:anywhere}
-.t{grid-area:t;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.c{grid-area:c}.u{grid-area:u}
+.t{grid-area:t;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.c{grid-area:c}.u{grid-area:u;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .w{grid-area:w;display:flex;gap:6px;align-items:baseline}
 .o{grid-area:o;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 /* the minimums above add up to about 720px with padding; narrower panes (phones) put
    when, chat and person on one line and the change and outcome below */
-@container (max-width:720px){.row{grid-template-columns:auto auto minmax(0,1fr);grid-template-areas:"t c u" "w w w" "o o o"}}
+@container (max-width:720px){.row{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"t c u" "w w w" "o o o"}}
 b{color:var(--text);font-weight:500;flex:none}
 code{font:12px var(--mono);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .link{background:none;border:0;padding:0;font:inherit;color:var(--accent);cursor:pointer}
