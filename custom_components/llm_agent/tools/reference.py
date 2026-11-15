@@ -29,11 +29,6 @@ ORDER = (
     "blueprints",
     "packages",
     "scheduled-prompts",
-    "music-assistant",
-    "wled",
-    "alexa-media-player",
-    "frigate",
-    "camera-snapshots",
 )
 
 _pages: dict[str, str] | None = None

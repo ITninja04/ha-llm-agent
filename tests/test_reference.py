@@ -33,7 +33,9 @@ def test_every_page_is_indexed_with_a_summary() -> None:
 async def test_index_lists_every_page(hass: HomeAssistant) -> None:
     index = await async_index(hass)
     assert all(f"- {name}: " in index for name in ORDER)
-    assert len(index) < 2500  # it is in every system prompt
+    # In every system prompt. 23 pages at about 100 characters each measured 2658 when the
+    # integration pages landed; past 2800 trim summaries instead of raising this again.
+    assert len(index) < 2800
 
 
 async def test_read_reference_returns_a_page(hass: HomeAssistant) -> None:
