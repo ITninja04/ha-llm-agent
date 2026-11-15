@@ -131,9 +131,9 @@ await box.waitFor({ timeout: 30000 });
 await panel.getByRole("button", { name: "Conversations" }).click();
 await panel.locator(".conv").first().click();
 await page.getByText("Done, the test switch is on.").waitFor({ timeout: 15000 });
-const composer = await panel.locator(".composer").boundingBox();
-if (!composer || composer.x < 0 || composer.x + composer.width > 390 || composer.y + composer.height > 844)
-  fail(`composer is off screen on a phone: ${JSON.stringify(composer)}`);
+const phoneBox = await panel.locator(".composer").boundingBox();
+if (!phoneBox || phoneBox.x < 0 || phoneBox.x + phoneBox.width > 390 || phoneBox.y + phoneBox.height > 844)
+  fail(`composer is off screen on a phone: ${JSON.stringify(phoneBox)}`);
 await page.screenshot({ path: `${shots}/llm-agent-4-phone.png` });
 
 // 6. retry replaces the last turn instead of adding another one
