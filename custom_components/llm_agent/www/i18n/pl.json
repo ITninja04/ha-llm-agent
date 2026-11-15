@@ -63,7 +63,6 @@
   "use_current_model": "Użyj bieżącego modelu",
   "clear": "Wyczyść",
   "prefs_hint": "Te ustawienia są przechowywane w tej przeglądarce.",
-  "prefs_hint_admin": "Ustawienia agenta są w Ustawienia → Urządzenia oraz usługi → LLM Agent → Konfiguruj.",
   "greeting_morning": "Dzień dobry",
   "greeting_afternoon": "Dzień dobry",
   "greeting_evening": "Dobry wieczór",
@@ -249,5 +248,19 @@
   "balance_none": "{name} nie ma salda, które klucz API może odczytać.",
   "balance_local": "{name} działa lokalnie i nie ma salda.",
   "balance_error": "{name}: nie udało się odczytać salda ({error}).",
-  "billing_page": "Strona rozliczeń"
+  "billing_page": "Strona rozliczeń",
+  "integration_settings": "Ustawienia integracji",
+  "open_in_ha": "Otwórz w Home Assistant",
+  "close": "Zamknij",
+  "settings_loading": "Wczytywanie ustawień integracji.",
+  "settings_unsupported": "Tego kroku nie można tu wyświetlić. Otwórz go w Home Assistant, aby kontynuować.",
+  "settings_error": "Nie udało się otworzyć ustawień integracji: {error}",
+  "settings_menu": "Wróć do menu",
+  "settings_submit": "Wyślij",
+  "settings_reloading": "Zapisano. LLM Agent wczytuje się ponownie z nowymi ustawieniami.",
+  "settings_reloaded": "Zapisano. LLM Agent został ponownie wczytany z nowymi ustawieniami.",
+  "settings_saved": "Zapisano.",
+  "settings_reload_failed": "Zapisano, ale LLM Agent nie uruchomił się ponownie. Otwórz go w Home Assistant, aby sprawdzić dlaczego.",
+  "settings_back": "Wróć do czatu",
+  "settings_bad_json": "To nie jest poprawny JSON."
 }

@@ -63,7 +63,6 @@
   "use_current_model": "Utiliser le modèle actuel",
   "clear": "Effacer",
   "prefs_hint": "Ces paramètres sont conservés dans ce navigateur.",
-  "prefs_hint_admin": "Les paramètres de l'agent se trouvent dans Paramètres → Appareils et services → LLM Agent → Configurer.",
   "greeting_morning": "Bonjour",
   "greeting_afternoon": "Bon après-midi",
   "greeting_evening": "Bonsoir",
@@ -249,5 +248,19 @@
   "balance_none": "{name} n'a pas de solde lisible par une clé API.",
   "balance_local": "{name} fonctionne en local et n'a pas de solde.",
   "balance_error": "{name} : le solde n'a pas pu être lu ({error}).",
-  "billing_page": "Page de facturation"
+  "billing_page": "Page de facturation",
+  "integration_settings": "Paramètres de l'intégration",
+  "open_in_ha": "Ouvrir dans Home Assistant",
+  "close": "Fermer",
+  "settings_loading": "Chargement des paramètres de l'intégration.",
+  "settings_unsupported": "Cette étape ne peut pas être affichée ici. Ouvrez-la dans Home Assistant pour continuer.",
+  "settings_error": "Impossible d'ouvrir les paramètres de l'intégration : {error}",
+  "settings_menu": "Retour au menu",
+  "settings_submit": "Valider",
+  "settings_reloading": "Enregistré. LLM Agent se recharge avec les nouveaux paramètres.",
+  "settings_reloaded": "Enregistré. LLM Agent a été rechargé avec les nouveaux paramètres.",
+  "settings_saved": "Enregistré.",
+  "settings_reload_failed": "Enregistré, mais LLM Agent n'a pas redémarré. Ouvrez-le dans Home Assistant pour voir pourquoi.",
+  "settings_back": "Retour au chat",
+  "settings_bad_json": "Ce n'est pas du JSON valide."
 }

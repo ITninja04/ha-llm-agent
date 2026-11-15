@@ -63,7 +63,6 @@
   "use_current_model": "使用当前模型",
   "clear": "清除",
   "prefs_hint": "这些设置保存在此浏览器中。",
-  "prefs_hint_admin": "智能体设置位于 设置 → 设备与服务 → LLM Agent → 配置。",
   "greeting_morning": "早上好",
   "greeting_afternoon": "下午好",
   "greeting_evening": "晚上好",
@@ -249,5 +248,19 @@
   "balance_none": "{name} 没有 API 密钥可以读取的余额。",
   "balance_local": "{name} 在本地运行，没有余额。",
   "balance_error": "{name}：无法读取余额（{error}）。",
-  "billing_page": "账单页面"
+  "billing_page": "账单页面",
+  "integration_settings": "集成设置",
+  "open_in_ha": "在 Home Assistant 中打开",
+  "close": "关闭",
+  "settings_loading": "正在加载集成设置。",
+  "settings_unsupported": "此步骤无法在这里显示。请在 Home Assistant 中打开以继续。",
+  "settings_error": "无法打开集成设置：{error}",
+  "settings_menu": "返回菜单",
+  "settings_submit": "提交",
+  "settings_reloading": "已保存。LLM Agent 正在使用新设置重新加载。",
+  "settings_reloaded": "已保存。LLM Agent 已使用新设置重新加载。",
+  "settings_saved": "已保存。",
+  "settings_reload_failed": "已保存，但 LLM Agent 未能重新启动。请在 Home Assistant 中打开查看原因。",
+  "settings_back": "返回聊天",
+  "settings_bad_json": "这不是有效的 JSON。"
 }

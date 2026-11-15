@@ -63,7 +63,6 @@
   "use_current_model": "Aktuelles Modell verwenden",
   "clear": "Leeren",
   "prefs_hint": "Diese Einstellungen werden in diesem Browser gespeichert.",
-  "prefs_hint_admin": "Die Agent-Einstellungen findest du unter Einstellungen → Geräte & Dienste → LLM Agent → Konfigurieren.",
   "greeting_morning": "Guten Morgen",
   "greeting_afternoon": "Guten Tag",
   "greeting_evening": "Guten Abend",
@@ -249,5 +248,19 @@
   "balance_none": "{name} hat kein Guthaben, das ein API-Schlüssel lesen kann.",
   "balance_local": "{name} läuft lokal und hat kein Guthaben.",
   "balance_error": "{name}: Das Guthaben konnte nicht gelesen werden ({error}).",
-  "billing_page": "Abrechnungsseite"
+  "billing_page": "Abrechnungsseite",
+  "integration_settings": "Integrationseinstellungen",
+  "open_in_ha": "In Home Assistant öffnen",
+  "close": "Schließen",
+  "settings_loading": "Die Einstellungen der Integration werden geladen.",
+  "settings_unsupported": "Dieser Schritt kann hier nicht angezeigt werden. Öffne ihn in Home Assistant, um fortzufahren.",
+  "settings_error": "Die Einstellungen der Integration konnten nicht geöffnet werden: {error}",
+  "settings_menu": "Zurück zum Menü",
+  "settings_submit": "Senden",
+  "settings_reloading": "Gespeichert. LLM Agent wird mit den neuen Einstellungen neu geladen.",
+  "settings_reloaded": "Gespeichert. LLM Agent wurde mit den neuen Einstellungen neu geladen.",
+  "settings_saved": "Gespeichert.",
+  "settings_reload_failed": "Gespeichert, aber LLM Agent ist nicht wieder gestartet. Öffne es in Home Assistant, um den Grund zu sehen.",
+  "settings_back": "Zurück zum Chat",
+  "settings_bad_json": "Das ist kein gültiges JSON."
 }
