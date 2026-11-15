@@ -588,6 +588,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   zip files; a Changes view and change_history tool for everything the agent changed; AI Task
   entities for every provider; reference pages for Music Assistant, WLED, Alexa Media Player,
   Frigate, cameras, Matter, Thread, ESPHome, ZHA, Zigbee2MQTT and Z-Wave JS.
+- **0.9.1 (released):** a rewritten system prompt, and the agent must read the built-in
+  reference page before acting on an integration it covers or saving config.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
