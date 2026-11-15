@@ -2,14 +2,14 @@
   "domain": "llm_agent",
   "name": "LLM Agent",
   "after_dependencies": ["backup", "blueprint", "hassio", "recorder"],
-  "codeowners": ["@dondalby"],
+  "codeowners": ["@ITninja04"],
   "config_flow": true,
   "dependencies": ["conversation", "frontend", "http", "lovelace", "panel_custom", "websocket_api"],
-  "documentation": "https://github.com/nuedynamics/ha-llm-agent",
+  "documentation": "https://github.com/ITninja04/ha-llm-agent",
   "integration_type": "service",
   "iot_class": "cloud_push",
-  "issue_tracker": "https://github.com/nuedynamics/ha-llm-agent/issues",
+  "issue_tracker": "https://github.com/ITninja04/ha-llm-agent/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.8.0"
+  "version": "0.8.1"
 }

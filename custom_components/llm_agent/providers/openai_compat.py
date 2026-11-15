@@ -142,7 +142,7 @@ class OpenAICompatProvider(Provider):
             headers["authorization"] = f"Bearer {self.config.api_key}"
         if self.config.type == "openrouter":
             headers["x-title"] = "LLM Agent for Home Assistant"
-            headers["http-referer"] = "https://github.com/nuedynamics/ha-llm-agent"
+            headers["http-referer"] = "https://github.com/ITninja04/ha-llm-agent"
         url = self.config.base_url.rstrip("/") + "/chat/completions"
 
         usage = Usage()

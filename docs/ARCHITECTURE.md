@@ -3,7 +3,7 @@
 An AI-provider-agnostic Home Assistant custom integration (HACS) that adds an
 admin-only sidebar chat. The agent can control devices and edit Home Assistant
 itself (dashboards, automations, scripts, scenes, helpers, integrations, files,
-restart, HACS, optional shell). Apache-2.0. Repo: github.com/nuedynamics/ha-llm-agent.
+restart, HACS, optional shell). Apache-2.0. Repo: github.com/ITninja04/ha-llm-agent.
 Integration domain: `llm_agent`. Minimum HA: 2026.10.
 
 ## 1. Repo layout

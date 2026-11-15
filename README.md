@@ -1,7 +1,11 @@
 # LLM Agent for Home Assistant
 
-[![CI](https://github.com/nuedynamics/ha-llm-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/nuedynamics/ha-llm-agent/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/nuedynamics/ha-llm-agent)](https://github.com/nuedynamics/ha-llm-agent/releases)
+> Forked from [nuedynamics/ha-llm-agent](https://github.com/nuedynamics/ha-llm-agent). This fork
+> adds a YOLO approval mode and settings export and restore. Report problems with this fork
+> [here](https://github.com/ITninja04/ha-llm-agent/issues), not upstream.
+
+[![CI](https://github.com/ITninja04/ha-llm-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/ITninja04/ha-llm-agent/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ITninja04/ha-llm-agent)](https://github.com/ITninja04/ha-llm-agent/releases)
 [![HACS Custom](https://img.shields.io/badge/HACS-custom-orange.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -35,7 +39,7 @@ Requires Home Assistant **2026.10** or newer and an administrator account.
 If you have [HACS](https://hacs.xyz), click this button. It opens HACS on your own Home
 Assistant with this repository filled in:
 
-[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=nuedynamics&repository=ha-llm-agent&category=integration)
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ITninja04&repository=ha-llm-agent&category=integration)
 
 1. Click **Download**, then restart Home Assistant.
 2. Add the integration with this button, or from **Settings → Devices & services → Add
@@ -57,13 +61,13 @@ HACS tells you when an update is available.
 Use this if the button doesn't reach your Home Assistant.
 
 1. HACS → ⋮ menu → **Custom repositories**.
-2. Add `https://github.com/nuedynamics/ha-llm-agent` with type **Integration**.
+2. Add `https://github.com/ITninja04/ha-llm-agent` with type **Integration**.
 3. Find **LLM Agent**, click **Download**, and restart Home Assistant.
 4. **Settings → Devices & services → Add integration → LLM Agent**.
 
 ### Manual, without HACS
 
-1. Download `llm_agent.zip` from the [latest release](https://github.com/nuedynamics/ha-llm-agent/releases/latest).
+1. Download `llm_agent.zip` from the [latest release](https://github.com/ITninja04/ha-llm-agent/releases/latest).
 2. Unzip it into `/config/custom_components/llm_agent/` (that folder should then contain
    `manifest.json`).
 3. Restart Home Assistant and add the integration as above.
@@ -418,7 +422,7 @@ diagnostics**.
 - It leaves out API keys, credentials in URLs, your custom prompt, and all conversation
   text.
 
-**Reporting a bug.** [Open an issue](https://github.com/nuedynamics/ha-llm-agent/issues/new/choose)
+**Reporting a bug.** [Open an issue](https://github.com/ITninja04/ha-llm-agent/issues/new/choose)
 and attach the diagnostics file.
 
 ## How it is tested
@@ -466,7 +470,7 @@ e2e/run.sh                                # real HA container + stub model + Chr
 
 Issues and pull requests are welcome.
 
-- **Something wrong?** [Open an issue](https://github.com/nuedynamics/ha-llm-agent/issues/new/choose)
+- **Something wrong?** [Open an issue](https://github.com/ITninja04/ha-llm-agent/issues/new/choose)
   with what you asked, what it did, your model, and the diagnostics file (see
   [Troubleshooting](#troubleshooting)). A chat where it picked the wrong device or wrote
   a bad automation is as useful as a crash.
@@ -498,6 +502,7 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.7.0 (released):** the panel and settings in ten more languages.
 - **0.7.1 (released):** security and reliability fixes from a community report and a bug hunt.
 - **0.8.0 (released):** YOLO approval mode, and settings export and restore for moving to a fresh install.
+- **0.8.1 (released):** links, issues and credits point at this fork.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.

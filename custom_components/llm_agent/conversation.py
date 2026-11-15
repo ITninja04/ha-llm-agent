@@ -57,7 +57,7 @@ class LLMAgentConversationEntity(
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
             "name": NAME,
-            "manufacturer": "nuedynamics",
+            "manufacturer": "ITninja04",
             "entry_type": DeviceEntryType.SERVICE,
         }
 
