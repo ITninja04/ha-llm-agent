@@ -28,11 +28,14 @@ from .const import (
     CONF_HOUSEHOLD,
     CONF_PROTECT_SENSITIVE,
     DOMAIN,
+    KNOWLEDGE_BODY_MAX,
+    KNOWLEDGE_INDEX_MAX,
+    NOTE_MAX,
     NOTES_MAX,
     setting,
 )
 from .providers.models import PROVIDER_NAMES, suggestions
-from .store import Viewer
+from .store import Refused, Viewer
 from .tools import ToolContext, ToolError
 from .tools.camera import IMAGE_TYPES, MAX_IMAGE_BYTES
 from .tools.system import AlreadyUndone, restore_snapshot
@@ -74,7 +77,9 @@ def async_register(hass: HomeAssistant) -> None:
     for handler in (
         ws_info,
         ws_my_default,
-        ws_notes,
+        ws_home_notes,
+        ws_home_notes_save,
+        ws_home_notes_delete,
         ws_models,
         ws_list,
         ws_search,
@@ -127,8 +132,6 @@ def ws_info(
             ],
             "running": [c for c, run in agent.runs.items() if viewer and viewer.sees(run.conv)],
             "my_default": agent.store.user_default(connection.user.id),
-            "notes": agent.store.notes if admin else "",
-            "notes_max": NOTES_MAX,
         },
     )
 
@@ -158,38 +161,132 @@ def ws_my_default(
     connection.send_result(msg["id"], {"my_default": agent.store.user_default(connection.user.id)})
 
 
+def _home_notes(agent: Agent) -> dict[str, Any]:
+    """Everything the panel's Notes view shows, sent again after each change so the view
+    never has to work out the new room left itself."""
+    home = agent.store.home
+    return {
+        "notes": home.notes,
+        "knowledge": home.knowledge,
+        "room": home.room(),
+        "notes_max": NOTES_MAX,
+        "note_max": NOTE_MAX,
+        "index_room": home.index_room(),
+        "index_max": KNOWLEDGE_INDEX_MAX,
+    }
+
+
+@websocket_api.websocket_command({vol.Required("type"): "llm_agent/home_notes"})
+@websocket_api.require_admin
+@callback
+def ws_home_notes(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """The home notes and knowledge base, bodies included. Admin only, like the prompt
+    they go into."""
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    connection.send_result(msg["id"], _home_notes(agent))
+
+
+_KIND = vol.In(["note", "knowledge"])
+# A save or delete names the version the editor started from (the item's "updated"); a
+# change over a newer version (an approved AI suggestion, another window) is refused.
+_BASE = vol.Any(float, int)
+
+
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "llm_agent/notes",
-        vol.Required("notes"): vol.All(str, vol.Length(max=NOTES_MAX + 200)),
-        # The notes the editor started from; a save over newer notes is refused.
-        vol.Optional("base"): vol.All(str, vol.Length(max=NOTES_MAX + 200)),
+        vol.Required("type"): "llm_agent/home_notes/save",
+        vol.Required("kind"): _KIND,
+        vol.Optional("item_id"): str,
+        vol.Optional("base"): _BASE,
+        vol.Optional("enabled"): bool,
+        # Lengths are checked by the store with a message that says what is left; these
+        # only stop an absurd message from being processed at all.
+        vol.Optional("text"): vol.All(str, vol.Length(max=NOTE_MAX * 4)),
+        vol.Optional("title"): vol.All(str, vol.Length(max=1000)),
+        vol.Optional("summary"): vol.All(str, vol.Length(max=1000)),
+        vol.Optional("body"): vol.All(str, vol.Length(max=KNOWLEDGE_BODY_MAX * 2)),
     }
 )
 @websocket_api.require_admin
 @callback
-def ws_notes(
+def ws_home_notes_save(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Save the home notes the household edited in the panel."""
+    """Add (no id) or change a note or knowledge entry, as edited in the panel."""
     agent = _agent(hass)
     if agent is None:
         return _not_ready(connection, msg)
-    if len(msg["notes"].strip()) > NOTES_MAX:
-        connection.send_error(
-            msg["id"], "too_long", f"Keep home notes under {NOTES_MAX} characters"
-        )
+    home = agent.store.home
+    if _stale(connection, msg, agent):
         return
-    if "base" in msg and msg["base"].strip() != agent.store.notes:
-        connection.send_error(
-            msg["id"],
-            "changed",
-            "The notes were changed elsewhere since you opened them. Reopen them to see "
-            "the new text.",
-        )
+    who = {"by": "person", "user_id": connection.user.id}
+    try:
+        if msg["kind"] == "note":
+            home.save_note(msg.get("item_id"), msg.get("text"), msg.get("enabled"), **who)
+        else:
+            home.save_entry(
+                msg.get("item_id"),
+                msg.get("title"),
+                msg.get("summary"),
+                msg.get("body"),
+                msg.get("enabled"),
+                **who,
+            )
+    except Refused as err:
+        connection.send_error(msg["id"], "refused", str(err))
         return
-    agent.store.set_notes(msg["notes"])
-    connection.send_result(msg["id"], {"notes": agent.store.notes})
+    connection.send_result(msg["id"], _home_notes(agent))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "llm_agent/home_notes/delete",
+        vol.Required("kind"): _KIND,
+        vol.Required("item_id"): str,
+        vol.Optional("base"): _BASE,
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_home_notes_delete(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    if _stale(connection, msg, agent):
+        return
+    home = agent.store.home
+    try:
+        if msg["kind"] == "note":
+            home.remove_note(msg["item_id"])
+        else:
+            home.remove_entry(msg["item_id"])
+    except Refused as err:
+        connection.send_error(msg["id"], "refused", str(err))
+        return
+    connection.send_result(msg["id"], _home_notes(agent))
+
+
+def _stale(connection: websocket_api.ActiveConnection, msg: dict[str, Any], agent: Agent) -> bool:
+    """Refuse a change made from an outdated copy, and say so. True when refused."""
+    if "base" not in msg or not msg.get("item_id"):
+        return False
+    home = agent.store.home
+    item = home.note(msg["item_id"]) if msg["kind"] == "note" else home.entry(msg["item_id"])
+    if item is not None and item.get("updated") == msg["base"]:
+        return False
+    connection.send_error(
+        msg["id"],
+        "changed",
+        "This was changed or removed elsewhere since the view loaded it. The view now "
+        "shows the current version.",
+    )
+    return True
 
 
 @websocket_api.websocket_command(

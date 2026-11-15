@@ -368,17 +368,19 @@ async def test_household_members_get_their_own_limited_chat(
     entry = await _setup(hass, household_chat=True)
     assert hass.data["frontend_panels"][PANEL_URL].require_admin is False
     agent = entry.runtime_data
-    agent.store.set_notes("the safe code is in the drawer")
+    agent.store.home.save_note(None, "the safe code is in the drawer")
     admin_conv = await agent.store.create("p1", "gpt-5.4-mini", "", hass_admin_user.id)
     old_conv = await agent.store.create("p1", "gpt-5.4-mini", "")
 
     member = await hass_ws_client(hass, access_token=await _token(hass, hass_read_only_user))
     await member.send_json_auto_id({"type": "llm_agent/info"})
     info = (await member.receive_json())["result"]
-    assert info["is_admin"] is False and info["notes"] == ""
+    assert info["is_admin"] is False and "notes" not in info
 
     for blocked in (
-        {"type": "llm_agent/notes", "notes": "x"},
+        {"type": "llm_agent/home_notes"},
+        {"type": "llm_agent/home_notes/save", "kind": "note", "text": "x"},
+        {"type": "llm_agent/home_notes/delete", "kind": "note", "item_id": "x"},
         {"type": "llm_agent/models", "provider_id": "p1"},
         {"type": "llm_agent/my_default", "provider_id": None},
         {"type": "llm_agent/undo", "snapshot_id": "x"},

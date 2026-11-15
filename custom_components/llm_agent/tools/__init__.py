@@ -266,7 +266,8 @@ LEAN_TOOLS = frozenset(
         "save_config_item",
         "undo",
         "camera_snapshot",
-        "update_home_notes",
+        "change_home_note",
+        "read_knowledge",
     }
 )
 SMALL_CONTEXT = 16_384  # tokens; at or below this a model gets the lean set

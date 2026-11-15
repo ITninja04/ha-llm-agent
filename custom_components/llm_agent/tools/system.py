@@ -9,6 +9,7 @@ from homeassistant.helpers.check_config import async_check_ha_config_file
 
 from ..approval import Risk
 from ..const import DOMAIN
+from ..store import Refused
 from . import Tool, ToolContext, ToolError, ToolOutput, obj
 from .config_items import ids_in_text, remove_orphans
 from .debug import redact
@@ -122,14 +123,14 @@ class UndoTool(Tool):
         return Risk.write("restores a previous version") if args.get("snapshot_id") else Risk.read()
 
     async def needs_person(self, ctx: ToolContext, args: dict[str, Any]) -> bool:
-        # Restoring home notes changes what every chat follows, like writing them.
+        # Restoring notes or knowledge changes what every chat knows, like writing them.
         if not isinstance(args.get("snapshot_id"), str):
             return False
         try:
             snap = await ctx.snapshots.load(args["snapshot_id"])
         except Exception:  # noqa: BLE001 - unsure means a person decides
             return True
-        return bool(snap) and snap.get("kind") == "notes"
+        return bool(snap) and snap.get("kind") in ("notes", "knowledge")
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
         snap_id = args.get("snapshot_id")
@@ -225,11 +226,21 @@ async def _restore(ctx: ToolContext, snap: dict[str, Any]) -> tuple[dict[str, An
                 {"url_path": url_path, "config": snap["config"]},
             )
         return {"ok": True}, f"Restored dashboard {url_path or 'default'}"
-    if snap["kind"] == "notes":
+    if snap["kind"] in ("notes", "knowledge"):
         agent = hass.data.get(DOMAIN)
         if agent is None:
             raise ToolError("LLM Agent is not set up")
-        agent.store.set_notes(snap.get("notes") or "")
+        home = agent.store.home
+        try:
+            if snap["kind"] == "knowledge":
+                home.restore_entry(snap["item_id"], snap.get("item"))
+                return {"ok": True}, "Restored the knowledge entry"
+            if "item_id" in snap:
+                home.restore_note(snap["item_id"], snap.get("item"))
+            else:  # from before 0.10, when the notes were one text
+                home.replace_notes_text(snap.get("notes") or "")
+        except Refused as err:
+            raise ToolError(str(err)) from None
         return {"ok": True}, "Restored home notes"
     raise ToolError(f"Unknown snapshot kind {snap['kind']}")
 

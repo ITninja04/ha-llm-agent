@@ -71,12 +71,12 @@ async def test_flush_writes_pending_saves_and_deleted_chats_stay_deleted(
 ) -> None:
     store = ConversationStore(hass)
     await store.async_load()
-    store.set_notes("Saved just now.")
+    store.home.save_note(None, "Saved just now.")
     conv = await store.create("p", "m", "ctx")
     await store.flush()
     fresh = ConversationStore(hass)
     await fresh.async_load()
-    assert fresh.notes == "Saved just now."
+    assert [n["text"] for n in fresh.home.notes] == ["Saved just now."]
     assert await fresh.get(conv["id"]) is not None
     await store.delete(conv["id"])
     assert await store.get(conv["id"]) is None

@@ -105,16 +105,21 @@ async def test_allowing_one_cover_never_allows_another_in_the_same_websocket_cal
     assert match_rule(rules, groups, False) is None
 
 
-async def test_member_chat_gets_no_home_notes(hass: HomeAssistant) -> None:
+async def test_member_chat_gets_no_home_notes_or_knowledge(hass: HomeAssistant) -> None:
     agent = Agent(hass, entry_options())
     await agent.store.async_load()
-    agent.store.set_notes("The safe code is 1234")
+    agent.store.home.save_note(None, "The safe code is 1234")
+    agent.store.home.save_entry(None, "Safe", "Where the 5678 key is", "Under the mat")
     conv = await agent.store.create("p1", "gpt-5.4-mini", "", "kid")
     run = ChatRun(agent, conv, "kid", member=True)
     provider = ScriptedProvider([reply_text("Hi.")])
     with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
         await run.run("go")
     assert "1234" not in provider.calls[0]["system"]
+    assert "5678" not in provider.calls[0]["system"]
+    assert not {"read_knowledge", "change_knowledge", "change_home_note"} & {
+        t.name for t in provider.calls[0]["tools"]
+    }
 
 
 async def test_an_allow_rule_never_lets_a_member_skip_the_admin(hass: HomeAssistant) -> None:

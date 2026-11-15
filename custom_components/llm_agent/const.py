@@ -161,8 +161,19 @@ APPROVAL_TIMEOUT = 600  # seconds
 MAX_TOOL_RESULT_CHARS = 16000
 OLD_TOOL_RESULT_CHARS = 1500  # tool results from earlier turns are shortened to this
 MAX_CONVERSATIONS = 200
-# Home notes go into every request, so they stay short
+# Home notes go into every admin request, so they stay short: each note, and all enabled
+# notes together. Disabled notes cost nothing per request, so only their count is capped.
 NOTES_MAX = 2000
+NOTE_MAX = 300
+NOTES_COUNT_MAX = 100
+# The knowledge base: only the index (title and summary) goes into a request, and the
+# model reads a body on demand, so a body can be long. The index has a budget like the
+# notes, because it is sent every time.
+KNOWLEDGE_BODY_MAX = 20000
+KNOWLEDGE_TITLE_MAX = 80
+KNOWLEDGE_SUMMARY_MAX = 200
+KNOWLEDGE_INDEX_MAX = 3000
+KNOWLEDGE_COUNT_MAX = 100
 SNAPSHOT_KEEP = 50
 
 DATA_DIR = ".llm_agent"  # inside the HA config dir
