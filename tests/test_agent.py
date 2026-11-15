@@ -551,3 +551,13 @@ def test_cancel_repair_answers_a_reused_call_id() -> None:
     ]
     _close_open_calls(messages)
     assert messages[-1]["role"] == "tool" and messages[-1]["is_error"]
+
+
+def test_chat_title_skips_code_fences() -> None:
+    """A chat that opens with a code block was titled ``` in the chat list."""
+    from custom_components.llm_agent.agent import chat_title
+
+    assert chat_title("```\nyaml: 1\n```\nturn on") == "yaml: 1"
+    assert chat_title("```yaml\nkey: 1") == "key: 1"
+    assert chat_title("  \n```\n```") == "New chat"
+    assert chat_title("x" * 80) == "x" * 60

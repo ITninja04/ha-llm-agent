@@ -163,7 +163,7 @@ if (await cont.count()) fail("Continue stayed after continuing");
 await panel.locator("input.model").focus();
 await panel.locator('datalist option[value="stub-model"]').waitFor({ state: "attached", timeout: 15000 });
 
-// 9. typing @ suggests entities and inserts the exact entity id
+// 9. typing @ suggests entities; the box shows the name, and the id goes with the message
 await box.fill("");
 await box.pressSequentially("turn on @e2e_sw");
 const option = panel.locator("ul.mentions li", { hasText: "input_boolean.e2e_switch" });
@@ -171,7 +171,7 @@ await option.waitFor({ timeout: 10000 });
 await page.screenshot({ path: `${shots}/llm-agent-6-mention.png` });
 await box.press("Enter");
 const typed = await box.inputValue();
-if (typed !== "turn on input_boolean.e2e_switch ") fail(`mention not inserted: ${JSON.stringify(typed)}`);
+if (typed !== "turn on @E2E switch ") fail(`mention not inserted: ${JSON.stringify(typed)}`);
 if (await panel.locator("ul.mentions").count()) fail("suggestions stayed open after picking");
 
 // 10. panel settings: dark theme sticks after a reload; Ctrl+Enter mode keeps Enter as a new line
@@ -472,6 +472,31 @@ for (const sel of [".row.user .msg-actions", ".msg-actions.acts"]) {
 }
 await page.screenshot({ path: `${shots}/llm-agent-10b-editor-phone.png` });
 await page.setViewportSize({ width: 1280, height: 800 });
+
+// 19. a sent message renders its Markdown (a code block stays a code block) and shows a
+// picked entity as a chip with its name, while the model still gets the exact id
+await panel.getByRole("button", { name: "New chat" }).first().click();
+await box.fill("```\nyaml: 1\n```\nturn on @e2e_sw");
+await panel.locator("ul.mentions li", { hasText: "input_boolean.e2e_switch" }).click();
+if (!(await box.inputValue()).endsWith("turn on @E2E switch "))
+  fail(`picked name not shown: ${JSON.stringify(await box.inputValue())}`);
+await send.click();
+const sent = panel.locator(".msg.user").last();
+await sent.locator("pre code").waitFor({ timeout: 15000 });
+if ((await sent.locator("pre code").innerText()).trim() !== "yaml: 1")
+  fail("the code block in a sent message did not render as code");
+const chip = sent.locator(".chip");
+if ((await chip.innerText()) !== "E2E switch") fail("the picked entity is not a name chip");
+if ((await chip.getAttribute("title")) !== "input_boolean.e2e_switch")
+  fail("the chip lost the entity id");
+await replyDone();
+await page.screenshot({ path: `${shots}/llm-agent-11-markdown-chips.png` });
+// editing it puts the name back in the box, and sending sends the id again
+await box.fill("");
+await box.press("ArrowUp");
+if (!(await box.inputValue()).endsWith("turn on @E2E switch"))
+  fail(`editing did not show the name: ${JSON.stringify(await box.inputValue())}`);
+await panel.locator(".editing button", { hasText: "Cancel" }).click();
 
 // The panel follows the user's Home Assistant language.
 const de = JSON.parse(

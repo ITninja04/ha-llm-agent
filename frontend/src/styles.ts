@@ -438,7 +438,17 @@ export const styles = css`
     padding: 10px 16px;
     border-radius: 18px 18px 6px 18px;
     max-width: 78%;
-    white-space: pre-wrap;
+  }
+  /* A picked device, area or entity in a sent message: its name, with the id on hover. */
+  .md .chip {
+    display: inline-block;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    font-size: 0.92em;
+    line-height: 1.5;
+    white-space: nowrap;
   }
   .md :first-child {
     margin-top: 0;
