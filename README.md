@@ -577,6 +577,10 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.7.1 (released):** security and reliability fixes from a community report and a bug hunt.
 - **0.8.0 (released):** YOLO approval mode, and settings export and restore for moving to a fresh install.
 - **0.8.1 (released):** links, issues and credits point at this fork.
+- **0.9.0 (released):** the chat box grows as you type; attach text, logs, configs, PDF and
+  zip files; a Changes view and change_history tool for everything the agent changed; AI Task
+  entities for every provider; reference pages for Music Assistant, WLED, Alexa Media Player,
+  Frigate, cameras, Matter, Thread, ESPHome, ZHA, Zigbee2MQTT and Z-Wave JS.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
