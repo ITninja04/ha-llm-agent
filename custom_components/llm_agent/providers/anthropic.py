@@ -33,6 +33,14 @@ def _image(img: dict[str, str]) -> dict[str, Any]:
     }
 
 
+def _document(doc: dict[str, str]) -> dict[str, Any]:
+    return {
+        "type": "document",
+        "source": {"type": "base64", "media_type": doc["media_type"], "data": doc["data"]},
+        "title": doc.get("name") or "document",
+    }
+
+
 def to_anthropic_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Convert neutral messages to Anthropic content blocks.
 
@@ -42,8 +50,9 @@ def to_anthropic_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]
     for msg in messages:
         role = msg["role"]
         if role == "user":
-            # pictures first, then the text that refers to them
+            # pictures and PDFs first, then the text that refers to them
             blocks: list[dict[str, Any]] = [_image(img) for img in msg.get("images") or []]
+            blocks += [_document(doc) for doc in msg.get("documents") or []]
             blocks.append({"type": "text", "text": msg["content"] or " "})
             if out and out[-1]["role"] == "user":
                 out[-1]["content"].extend(blocks)

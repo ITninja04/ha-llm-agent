@@ -65,8 +65,21 @@ def _image(img: dict[str, str]) -> dict[str, Any]:
     return {"type": "input_image", "image_url": f"data:{img['media_type']};base64,{img['data']}"}
 
 
-def _user(text: str, images: list[dict[str, str]] | None) -> dict[str, Any]:
+def _file(doc: dict[str, str]) -> dict[str, Any]:
+    return {
+        "type": "input_file",
+        "filename": doc.get("name") or "document.pdf",
+        "file_data": f"data:{doc['media_type']};base64,{doc['data']}",
+    }
+
+
+def _user(
+    text: str,
+    images: list[dict[str, str]] | None,
+    documents: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
     content = [_image(img) for img in images or []]
+    content += [_file(doc) for doc in documents or []]
     content.append({"type": "input_text", "text": text or " "})
     return {"type": "message", "role": "user", "content": content}
 
@@ -84,7 +97,7 @@ def to_responses_input(system: str, messages: list[dict[str, Any]]) -> list[dict
     for msg in messages:
         role = msg["role"]
         if role == "user":
-            out.append(_user(msg["content"], msg.get("images")))
+            out.append(_user(msg["content"], msg.get("images"), msg.get("documents")))
         elif role == "assistant":
             raw = (msg.get("raw") or {}).get("chatgpt")
             if raw:

@@ -31,6 +31,15 @@ def _data_url(img: dict[str, str]) -> str:
     return f"data:{img['media_type']};base64,{img['data']}"
 
 
+def _file_part(doc: dict[str, str]) -> dict[str, Any]:
+    # Chat Completions' file content part. Ollama has none, so attachments.prepare
+    # never gives an Ollama chat a document; it gets the PDF's text instead.
+    return {
+        "type": "file",
+        "file": {"filename": doc.get("name") or "document.pdf", "file_data": _data_url(doc)},
+    }
+
+
 def to_openai_messages(system: str, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = [{"role": "system", "content": system}]
     pending: list[dict[str, str]] = []
@@ -55,15 +64,16 @@ def to_openai_messages(system: str, messages: list[dict[str, Any]]) -> list[dict
         if role != "tool":
             flush()
         if role == "user":
-            if msg.get("images"):
+            if msg.get("images") or msg.get("documents"):
                 out.append(
                     {
                         "role": "user",
                         "content": [
                             *(
                                 {"type": "image_url", "image_url": {"url": _data_url(i)}}
-                                for i in msg["images"]
+                                for i in msg.get("images") or []
                             ),
+                            *(_file_part(d) for d in msg.get("documents") or []),
                             {"type": "text", "text": msg["content"]},
                         ],
                     }
