@@ -85,6 +85,9 @@ if (!writeText.includes("undone")) fail(`write row does not show it was undone: 
 if (await changeRow("write file").getByRole("button", { name: "Undo" }).count()) fail("Undo offered for an undone change");
 if (!(await changeRow("call service").first().innerText()).includes("Automatic")) fail("switch change not shown as automatic");
 if (!(await changeRow("undo").count())) fail("the undo itself is not listed");
+// every row shares one set of columns: the change column starts at the same x
+const starts = await changes.locator(".row .w").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().x)));
+if (starts.length < 3 || new Set(starts).size !== 1) fail(`Changes columns do not line up: ${starts}`);
 await page.screenshot({ path: `${shots}/llm-agent-3b-changes.png` });
 await changeRow("write file").first().locator(".link").click();
 await page.getByText("I wrote").waitFor({ timeout: 15000 });
