@@ -338,6 +338,98 @@ for (let i = 0; i < 20 && !notesNow.includes("freezer plug"); i++) {
 if (!notesNow.includes("freezer plug")) fail(`suggested note not saved: ${notesNow}`);
 await page.keyboard.press("Escape");
 
+// 18. the editor: keys, Stop, per-chat drafts, editing an earlier message, copy
+await panel.getByRole("button", { name: "New chat" }).first().click();
+const send = panel.locator("button.send");
+const userTexts = () => panel.locator(".msg.user").allInnerTexts();
+const replyDone = () => panel.locator("button.send:not(.stop)").waitFor({ timeout: 15000 });
+const focused = () =>
+  page.evaluate(() => document.querySelector("llm-agent-panel").shadowRoot.activeElement?.tagName);
+if (!(await send.isDisabled())) fail("Send is clickable with an empty composer");
+await box.fill("first question");
+if (await send.isDisabled()) fail("Send stays disabled with text in the box");
+await box.press("Shift+Enter");
+if ((await box.inputValue()) !== "first question\n") fail("Shift+Enter did not add a new line");
+// Enter while an input method is still composing (Japanese, Chinese) picks a word, never sends
+await box.fill("first question");
+await box.evaluate((el) =>
+  el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing: true, bubbles: true, composed: true })),
+);
+await page.waitForTimeout(300);
+if ((await userTexts()).length) fail("Enter during IME composition sent the message");
+await box.press("Enter");
+await panel.locator(".msg.assistant", { hasText: "Hello from the stub model." }).waitFor({ timeout: 15000 });
+await replyDone();
+// sent with the button this time: focus still ends up back in the composer
+await box.fill("second question");
+await send.click();
+await panel.locator(".msg.assistant").nth(1).waitFor({ timeout: 15000 });
+await replyDone();
+if ((await focused()) !== "TEXTAREA") fail(`focus did not come back to the composer: ${await focused()}`);
+// Up arrow in an empty box takes the last message back for editing; Cancel puts it away
+await box.press("ArrowUp");
+if ((await box.inputValue()) !== "second question") fail("Up arrow did not load the last message");
+await panel.locator(".editing", { hasText: "Editing your last message" }).waitFor();
+await panel.locator(".editing button", { hasText: "Cancel" }).click();
+if ((await box.inputValue()) !== "") fail("Cancel left the edited text in the box");
+// a draft stays with its chat, across switching chats and a reload
+await box.fill("half-typed draft");
+await panel.locator(".conv", { hasText: "tell me a long story" }).click();
+await panel.locator(".msg.user", { hasText: "tell me a long story" }).waitFor({ timeout: 15000 });
+if ((await box.inputValue()) === "half-typed draft") fail("the draft followed into another chat");
+await panel.locator(".conv", { hasText: "first question" }).click();
+await panel.locator(".msg.user", { hasText: "second question" }).waitFor({ timeout: 15000 });
+if ((await box.inputValue()) !== "half-typed draft") fail("the draft was lost switching chats");
+await page.reload();
+await panel.locator(".msg.user", { hasText: "second question" }).waitFor({ timeout: 30000 });
+if ((await box.inputValue()) !== "half-typed draft") fail("the draft was lost on reload");
+// editing an earlier message replaces it and everything after it, on the server too
+await panel.locator(".row.user").first().getByRole("button", { name: "Edit" }).click();
+if ((await box.inputValue()) !== "first question") fail("Edit did not load the message");
+await panel.locator(".editing", { hasText: "not undone" }).waitFor();
+await page.screenshot({ path: `${shots}/llm-agent-10-editor.png` });
+await box.fill("edited question");
+await box.press("Enter");
+await panel.locator(".msg.user", { hasText: "edited question" }).waitFor({ timeout: 15000 });
+await replyDone();
+if (JSON.stringify(await userTexts()) !== JSON.stringify(["edited question"]))
+  fail(`edit did not replace the later turns: ${await userTexts()}`);
+if ((await box.inputValue()) !== "half-typed draft") fail("the draft did not come back after the edit");
+await page.reload();
+await panel.locator(".msg.user", { hasText: "edited question" }).waitFor({ timeout: 30000 });
+if (JSON.stringify(await userTexts()) !== JSON.stringify(["edited question"]))
+  fail(`the saved chat was not cut: ${await userTexts()}`);
+// Copy on a reply hands over its markdown source
+await page.evaluate(() => {
+  window.copied = [];
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: async (text) => void window.copied.push(text) },
+  });
+});
+await panel.locator(".msg-actions.acts button").last().click();
+const copied = await page.evaluate(() => window.copied);
+if (copied[0] !== "Hello from the stub model.") fail(`reply copy gave ${JSON.stringify(copied)}`);
+// Stop sits where Send was while a reply runs, and Esc stops it
+await box.fill("write file please");
+await box.press("Enter");
+await panel.getByRole("button", { name: "Approve" }).waitFor({ timeout: 30000 });
+await panel.locator("button.send.stop").waitFor();
+await box.press("Escape");
+await replyDone();
+await page.waitForTimeout(500);
+if (existsSync(`${configDir}/e2e_note.txt`)) fail("the file was written after Esc stopped the reply");
+// on a phone the edit and copy buttons are shown without hovering
+await page.setViewportSize({ width: 390, height: 844 });
+await page.reload();
+await panel.locator(".msg.user", { hasText: "edited question" }).waitFor({ timeout: 30000 });
+for (const sel of [".row.user .msg-actions", ".msg-actions.acts"]) {
+  const opacity = await panel.locator(sel).first().evaluate((el) => getComputedStyle(el).opacity);
+  if (opacity !== "1") fail(`${sel} is hidden until hover on a phone (opacity ${opacity})`);
+}
+await page.screenshot({ path: `${shots}/llm-agent-10b-editor-phone.png` });
+await page.setViewportSize({ width: 1280, height: 800 });
+
 // The panel follows the user's Home Assistant language.
 const de = JSON.parse(
   readFileSync(new URL("../custom_components/llm_agent/www/i18n/de.json", import.meta.url), "utf8"),
@@ -352,9 +444,10 @@ await german.goto(`${ha}/llm-agent`);
 const germanBox = german.locator("llm-agent-panel textarea");
 await germanBox.waitFor({ timeout: 60000 });
 const placeholder = () => germanBox.getAttribute("placeholder");
-for (let i = 0; i < 50 && (await placeholder()) !== de.composer_placeholder; i++)
-  await german.waitForTimeout(200);
-if ((await placeholder()) !== de.composer_placeholder)
+// the placeholder adds the send keys on a wide screen
+const inGerman = async () => (await placeholder())?.startsWith(de.composer_placeholder);
+for (let i = 0; i < 50 && !(await inGerman()); i++) await german.waitForTimeout(200);
+if (!(await inGerman()))
   fail(`panel not in German: placeholder is "${await placeholder()}"`);
 await german.close();
 
