@@ -400,7 +400,12 @@ async def test_long_prompt_bills_at_the_long_context_price(hass) -> None:
     conv = await agent.store.create("p1", "claude-haiku-5-5", "ctx")
     run = ChatRun(agent, conv, None)
     run.long_price = (100_000, (0.5, 2.5, 0.05))
-    run._add_usage(Usage(200_000, 0), price_for("anthropic", "claude-haiku-5-5"))
+    run._add_usage(
+        Usage(200_000, 0),
+        price_for("anthropic", "claude-haiku-5-5"),
+        agent.provider_config("p1"),
+        "claude-haiku-5-5",
+    )
     assert conv["usage"]["cost"] == 0.1  # 200k tokens at $0.50/M, not $0.10/M
 
 

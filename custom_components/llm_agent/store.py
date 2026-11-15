@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date, timedelta
 from pathlib import Path
 import secrets
 import time
@@ -33,6 +34,11 @@ VERSION = 1
 SAVE_DELAY = 2
 CACHE_SIZE = 5
 SPEND_DAYS = 31  # daily spend totals kept for the cap and the settings page
+USAGE_DAYS = 400  # per-day usage by provider and model, for the Usage view
+# What made a call, as the Usage view groups it. "task" is an AI Task action, which the
+# daily cap does not count; "review" is the reviewer model judging a tool call.
+USAGE_KINDS = ("chat", "review", "task")
+_USAGE_SUMS = ("input", "output", "cache_read", "cache_write", "calls", "unpriced")
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +78,7 @@ class ConversationStore:
         self._prefs: dict[str, dict[str, str]] = {}
         # Home notes and knowledge base: facts about this home the household keeps
         self.home = HomeNotes(hass, self._delay_save)
+        self.usage = UsageLog(hass, self._delay_save)
         self.cache_size = CACHE_SIZE
         self.max_chats = MAX_CONVERSATIONS
 
@@ -85,6 +92,7 @@ class ConversationStore:
         # once; saving the index again drops the old key.
         if await self.home.async_load(data.get("notes")):
             self._save_index()
+        await self.usage.async_load()
 
     def user_default(self, user_id: str) -> dict[str, str] | None:
         return self._prefs.get(user_id)
@@ -315,6 +323,96 @@ class ConversationStore:
             return total
 
         return {"chats": len(self._index), "bytes": await self.hass.async_add_executor_job(_size)}
+
+
+class UsageLog:
+    """Tokens, calls and estimated cost per local day, provider, model and kind.
+
+    It lives in its own Store file, not the chat index: the index is rewritten on every
+    chat save, and this keeps 400 days. A day holds one row per provider, model and kind
+    that was used, so a year is a few thousand small rows at most.
+
+    Costs are estimates from the same price table as the daily cap, not the provider's
+    bill. A call whose model has no known price adds its tokens and counts as unpriced
+    rather than as free, so the view can say a total is incomplete.
+    """
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        delay_save: Callable[[str, Store[dict[str, Any]], Callable[[], Any]], None],
+    ) -> None:
+        self._store: Store[dict[str, Any]] = Store(hass, VERSION, f"{DOMAIN}.usage")
+        self._delay_save = delay_save
+        # "YYYY-MM-DD" -> "provider_id|model|kind" -> row
+        self.days: dict[str, dict[str, dict[str, Any]]] = {}
+        # The first local day recorded. Nothing before it was tracked: there is no
+        # history from releases before this one, and the view says so.
+        self.since: str | None = None
+
+    async def async_load(self) -> None:
+        data = await self._store.async_load() or {}
+        self.days = data.get("days", {})
+        self.since = data.get("since")
+
+    def _changed(self) -> None:
+        self._delay_save("usage", self._store, lambda: {"since": self.since, "days": self.days})
+
+    def add(
+        self,
+        day: str,
+        provider_id: str,
+        provider_type: str,
+        model: str,
+        kind: str,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        cache_read: int = 0,
+        cache_write: int = 0,
+        cost: float | None = None,
+    ) -> None:
+        """Count one call. `cost` None means the model has no known price."""
+        rows = self.days.setdefault(day, {})
+        row = rows.setdefault(
+            f"{provider_id}|{model}|{kind}",
+            {
+                "provider_id": provider_id,
+                "provider_type": provider_type,
+                "model": model,
+                "kind": kind,
+                **dict.fromkeys(_USAGE_SUMS, 0),
+                "cost": 0.0,
+            },
+        )
+        row["input"] += input_tokens
+        row["output"] += output_tokens
+        row["cache_read"] += cache_read
+        row["cache_write"] += cache_write
+        row["calls"] += 1
+        if cost is None:
+            row["unpriced"] += 1
+        else:
+            row["cost"] = round(row["cost"] + cost, 6)
+        if self.since is None or day < self.since:
+            self.since = day
+        self._prune(day)
+        self._changed()
+
+    def _prune(self, today: str) -> None:
+        """Drop days older than USAGE_DAYS, counted in calendar days from `today` so a
+        quiet month does not stretch what is kept."""
+        cutoff = (date.fromisoformat(today) - timedelta(days=USAGE_DAYS - 1)).isoformat()
+        for old in [d for d in self.days if d < cutoff]:
+            del self.days[old]
+
+    def rows(self, first: str, last: str) -> list[dict[str, Any]]:
+        """Every row from day `first` to `last` inclusive, each with its "day"."""
+        return [
+            {"day": day, **row}
+            for day in sorted(self.days)
+            if first <= day <= last
+            for row in self.days[day].values()
+        ]
 
 
 class Refused(ValueError):
