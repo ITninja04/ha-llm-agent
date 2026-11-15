@@ -98,7 +98,10 @@ async def test_an_automation_needs_its_page_and_the_pages_of_what_it_calls(
         ],
     }
     provider = ScriptedProvider(
-        [reply_tool("c1", "save_config_item", {"kind": "automation", "config": config}), reply_text("ok")]
+        [
+            reply_tool("c1", "save_config_item", {"kind": "automation", "config": config}),
+            reply_text("ok"),
+        ]
     )
     conv, _ = await _run(hass, provider, "make it")
     refused = conv["messages"][2]
@@ -110,7 +113,9 @@ async def test_small_models_without_read_reference_are_not_refused(hass: HomeAss
     """The lean tool set has no read_reference, so the check would refuse forever."""
     calls: list[ServiceCall] = async_mock_service(hass, "light", "turn_on")
     strip = _wled_strip(hass)
-    provider = ScriptedProvider([reply_tool("c1", "call_service", _turn_on(strip)), reply_text("ok")])
+    provider = ScriptedProvider(
+        [reply_tool("c1", "call_service", _turn_on(strip)), reply_text("ok")]
+    )
     await _run(hass, provider, "on", providers=[{**PROVIDER, "context_window": 8192}])
     assert len(calls) == 1
 
@@ -128,7 +133,8 @@ async def test_pages_by_action_name_and_target(hass: HomeAssistant) -> None:
 async def test_helpers_and_websocket_actions_need_their_pages(hass: HomeAssistant) -> None:
     ws = _tool("ha_websocket")
     ctx = _ctx(hass)
-    assert ws.reference_pages(ctx, {"command": "input_boolean/create", "payload": {}}) == {"helpers"}
+    create = {"command": "input_boolean/create", "payload": {}}
+    assert ws.reference_pages(ctx, create) == {"helpers"}
     assert ws.reference_pages(ctx, {"command": "input_boolean/list"}) == set()
     service = {"command": "call_service", "payload": {"domain": "zha", "service": "permit"}}
     assert ws.reference_pages(ctx, service) == {"zha"}

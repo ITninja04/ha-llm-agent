@@ -81,7 +81,9 @@ HELPER_DOMAINS = frozenset(
 )
 
 
-def pages_for_service(hass: HomeAssistant, domain: str, service: str, entity_ids: list[str]) -> set[str]:
+def pages_for_service(
+    hass: HomeAssistant, domain: str, service: str, entity_ids: list[str]
+) -> set[str]:
     """The pages an action needs: by its own domain or name, and by the integration
     behind each entity it targets."""
     pages: set[str] = set()
