@@ -5,17 +5,22 @@ Standard library only. Replies depend on the last user message:
   "write file" -> write_file (risky, needs approval), then a confirmation
   "long story" -> a reply cut off at the length limit
   "remember"   -> update_home_notes (a note suggestion card), then a confirmation
-  "new dashboard" -> save_dashboard for the main dashboard (risky, shows a preview)
+  "new dashboard" -> save_dashboard for the main dashboard, which is refused until the
+                     dashboards reference is read; then read_reference, then the same
+                     save_dashboard again (risky, shows a preview)
   anything else -> a plain text reply
 """
 
 from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from itertools import count
 import json
 import sys
 
 SWITCH = "input_boolean.e2e_switch"
+# Call ids stay unique across a turn: the dashboard step calls save_dashboard twice.
+_ids = count()
 
 
 def tool_call(name: str, args: dict) -> list[dict]:
@@ -27,7 +32,7 @@ def tool_call(name: str, args: dict) -> list[dict]:
                         "tool_calls": [
                             {
                                 "index": 0,
-                                "id": f"call_{name}",
+                                "id": f"call_{name}_{next(_ids)}",
                                 "function": {"name": name, "arguments": ""},
                             }
                         ]
@@ -58,6 +63,29 @@ def text(words: str) -> list[dict]:
     return chunks
 
 
+def save_dashboard() -> list[dict]:
+    cards = [
+        {"type": "entities", "title": "E2E preview", "entities": [SWITCH]},
+        {"type": "iframe", "url": "https://example.invalid/"},
+        # all held back: they could fetch an address or run code before approval
+        {"type": "picture", "image": "//outside.invalid/pixel.png"},
+        {"type": "vertical-stack", "cards": [{"type": "markdown", "content": "hi"}]},
+        {"type": "custom:button-card", "entity": SWITCH},
+        {"type": "entities", "entities": [{"entity": SWITCH, "name": "{{ 1 }}"}]},
+        {"type": "tile", "entity": SWITCH, "card_mod": {"style": "ha-card {}"}},
+        {
+            "type": "gauge",
+            "entity": SWITCH,
+            "segments": [{"from": 0, "color": "u\\72l(https:\\2f\\2foutside.invalid/x.svg)"}],
+        },
+        {
+            "type": "horizontal-stack",
+            "cards": [{"type": "tile", "entity": SWITCH, "name": "E2E stack"}],
+        },
+    ]
+    return tool_call("save_dashboard", {"config": {"views": [{"title": "Home", "cards": cards}]}})
+
+
 def reply(messages: list[dict]) -> list[dict]:
     last = messages[-1]
     user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
@@ -67,6 +95,10 @@ def reply(messages: list[dict]) -> list[dict]:
     if isinstance(user, str) and "<file-" in user and last["role"] == "user":
         return text("I read the attached file.")
     if last["role"] == "tool":
+        if "new dashboard" in user and "Not run: read the reference page" in str(last["content"]):
+            return tool_call("read_reference", {"page": "dashboards"})
+        if "new dashboard" in user and "# Dashboards" in str(last["content"]):
+            return save_dashboard()
         if "denied" in last["content"]:
             return text("OK, I did not do that.")
         if "write file" in user:
@@ -89,28 +121,7 @@ def reply(messages: list[dict]) -> list[dict]:
             {"notes": "The office is upstairs.\nNever switch off the freezer plug."},
         )
     if "new dashboard" in user:
-        cards = [
-            {"type": "entities", "title": "E2E preview", "entities": [SWITCH]},
-            {"type": "iframe", "url": "https://example.invalid/"},
-            # all held back: they could fetch an address or run code before approval
-            {"type": "picture", "image": "//outside.invalid/pixel.png"},
-            {"type": "vertical-stack", "cards": [{"type": "markdown", "content": "hi"}]},
-            {"type": "custom:button-card", "entity": SWITCH},
-            {"type": "entities", "entities": [{"entity": SWITCH, "name": "{{ 1 }}"}]},
-            {"type": "tile", "entity": SWITCH, "card_mod": {"style": "ha-card {}"}},
-            {
-                "type": "gauge",
-                "entity": SWITCH,
-                "segments": [{"from": 0, "color": "u\\72l(https:\\2f\\2foutside.invalid/x.svg)"}],
-            },
-            {
-                "type": "horizontal-stack",
-                "cards": [{"type": "tile", "entity": SWITCH, "name": "E2E stack"}],
-            },
-        ]
-        return tool_call(
-            "save_dashboard", {"config": {"views": [{"title": "Home", "cards": cards}]}}
-        )
+        return save_dashboard()
     if user.endswith("long story"):
         chunks = text("Once upon a time")
         chunks[-1]["choices"][0]["finish_reason"] = "length"

@@ -429,6 +429,13 @@ as a conversation log.
 - **It can be wrong.** Small local models in particular can pick the wrong entity, or
   write an automation that doesn't do what you meant. Keep approvals on for anything that
   matters, and read the diff.
+- **It reads the built-in reference before some calls.** Before it acts on Music Assistant,
+  WLED, Alexa Media Player, Frigate, Matter, ESPHome, ZHA or Z-Wave JS, takes a camera
+  snapshot or recording, or saves an automation, script, scene, dashboard or helper, the
+  call is refused until the agent has read the matching reference page in that chat. The
+  first such request in a chat takes an extra step. Zigbee2MQTT, Thread and templates are
+  not checked this way, and models on the smaller tool set skip the check because they
+  can't read the pages.
 - **One approval phone.** Approvals by phone go to one notify action, not to each admin.
 - **Undo covers files and dashboards only.** Device actions (on/off) and registry changes
   (renames, areas) can't be undone, so ask it to change them back. Integration removal and

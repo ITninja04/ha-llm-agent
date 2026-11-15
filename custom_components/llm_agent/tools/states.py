@@ -18,6 +18,7 @@ import homeassistant.util.dt as dt_util
 
 from ..approval import Risk, classify_service, expand_members
 from . import Tool, ToolContext, ToolError, ToolOutput, list_arg, num_arg, obj, similar_entities
+from .reference import pages_for_service
 
 STATE_ATTR_SKIP = {
     "friendly_name",
@@ -509,6 +510,10 @@ class CallService(Tool):
             args.get("service", ""),
             self._entities(ctx, args),
         )
+
+    def reference_pages(self, ctx: ToolContext, args: dict[str, Any]) -> set[str]:
+        domain, service = _names(args)
+        return pages_for_service(ctx.hass, domain, service, self._entities(ctx, args))
 
     def review_keys(self, ctx: ToolContext, args: dict[str, Any]) -> list[str]:
         """domain.service, the same service named by each target's own domain (so

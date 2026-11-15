@@ -234,6 +234,10 @@ class Tool:
         """The names approval rules match, one group per thing the call acts on."""
         return [self.review_keys(ctx, args)]
 
+    def reference_pages(self, ctx: ToolContext, args: dict[str, Any]) -> set[str]:
+        """Reference pages this call needs read first in the chat (see tools/reference.py)."""
+        return set()
+
     async def preview(self, ctx: ToolContext, args: dict[str, Any]) -> Preview | None:
         return None
 
