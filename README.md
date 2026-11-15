@@ -618,6 +618,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   knowledge base the agent reads only when a question needs it.
 - **0.9.4 (released):** your messages render Markdown (code blocks stay code blocks), and picked
   devices, areas and entities show as names instead of ids.
+- **0.9.5 (released):** the chat box formats Markdown as you type (headings, lists, code, bold and
+  italic), and @ picks show as pills.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
