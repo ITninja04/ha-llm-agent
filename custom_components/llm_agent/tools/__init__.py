@@ -279,6 +279,7 @@ def uses_lean_tools(provider_type: str, context_window: int | None) -> bool:
 def build_tools(options: dict[str, Any]) -> list[Tool]:
     from . import (
         camera,
+        changes,
         config_items,
         dashboards,
         debug,
@@ -302,6 +303,7 @@ def build_tools(options: dict[str, Any]) -> list[Tool]:
         *integrations.TOOLS,
         *files.TOOLS,
         *system.TOOLS,
+        *changes.TOOLS,
         *notes.TOOLS,
         *websocket.TOOLS,
         *reference.TOOLS,

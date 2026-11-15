@@ -133,7 +133,14 @@ They default to on and apply in every approval mode, including autopilot:
   through the backup integration. This is configurable.
 - An audit log (`/config/.llm_agent/audit.jsonl`, rotated) records every tool
   call: time, user, tool, risk, approval decision, result status. Secrets are
-  never logged.
+  never logged. Changes also record their undo `snapshot_id`, and a change an
+  allow rule let through records the `rule`; older records lack both and show
+  without Undo, and as auto.
+- The panel's Changes view (admins only, `llm_agent/changes`) and the
+  `change_history` tool read this log back from the end, newest first, across
+  every chat. Undo there is the same `llm_agent/undo` as on a change card. Chat
+  titles and user names are looked up when shown, so a deleted chat has no title.
+  Successful read-only calls are never logged, so they never appear.
 
 ## 7. Security model
 

@@ -19,6 +19,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import Unauthorized
 import probatio as vol
 
+from . import history
 from .agent import STOP_TEXT, Agent, ChatRun, Emit, home_context, rewind_last_turn
 from .attachments import MAX_FILE_BYTES, MAX_FILES, MAX_TEXT_CHARS, AttachmentError, prepare
 from .const import (
@@ -85,6 +86,7 @@ def async_register(hass: HomeAssistant) -> None:
         ws_approve,
         ws_cancel,
         ws_undo,
+        ws_changes,
     ):
         websocket_api.async_register_command(hass, handler)
 
@@ -651,9 +653,57 @@ async def ws_undo(
         {
             "user": connection.user.id,
             "tool": "undo",
+            # so the Changes view can link this undo to its chat; omitted when unknown
+            **({"conversation": msg["conversation_id"]} if msg.get("conversation_id") else {}),
             "args": msg["snapshot_id"],
             "ok": True,
             "detail": summary,
         }
     )
     connection.send_result(msg["id"], {"summary": summary})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "llm_agent/changes",
+        vol.Optional("since"): vol.Any(None, vol.Coerce(float)),
+        vol.Optional("until"): vol.Any(None, vol.Coerce(float)),
+        vol.Optional("conversation_id"): vol.Any(None, str),
+        vol.Optional("user_id"): vol.Any(None, str),
+        vol.Optional("text", default=""): vol.All(str, vol.Length(max=200)),
+        vol.Optional("limit", default=50): vol.All(int, vol.Range(min=1, max=history.MAX_PAGE)),
+        vol.Optional("cursor"): vol.Any(None, vol.All(str, vol.Length(max=64))),
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_changes(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """One page of the agent's changes across every chat, newest first.
+
+    Admin only, like undo: the log holds every user's changes, and a household member
+    must not see what others asked for. Also lists the chats and users seen, for the
+    view's filter menus.
+    """
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    conv_id = msg.get("conversation_id")
+    user_id = msg.get("user_id")
+    filters = history.Filters(
+        since=msg.get("since"),
+        until=msg.get("until"),
+        conversations=frozenset({conv_id}) if conv_id else None,
+        users=frozenset({user_id}) if user_id else None,
+        text=msg["text"].strip(),
+    )
+    page = await history.query(hass, filters, msg["limit"], msg.get("cursor"))
+    if not msg.get("cursor"):  # the menus only change on a fresh query, not per page
+        page["users"] = [
+            {"id": uid, "name": name} for uid, name in (filters.names or {}).items() if name
+        ]
+        page["chats"] = [
+            {"id": cid, "title": title} for cid, title in (filters.titles or {}).items()
+        ]
+    connection.send_result(msg["id"], page)
