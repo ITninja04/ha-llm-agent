@@ -64,6 +64,8 @@ def reply(messages: list[dict]) -> list[dict]:
     if isinstance(user, list):  # a message with photos
         seen = sum(1 for part in user if part.get("type") == "image_url")
         return text(f"I can see {seen} photo.")
+    if isinstance(user, str) and "<file-" in user and last["role"] == "user":
+        return text("I read the attached file.")
     if last["role"] == "tool":
         if "denied" in last["content"]:
             return text("OK, I did not do that.")

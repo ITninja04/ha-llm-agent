@@ -110,6 +110,7 @@ the integration, so a ChatGPT provider signs in again.
 | "How do I pair this Aqara sensor with ZHA?" | Reads the Home Assistant docs, searches the HA forum and GitHub issues (free, no key), and cites the pages. |
 | "Is the garage door open?" (with a camera) | Takes a camera snapshot and looks at it. Needs a model that can see images. |
 | "What is this device?" (with a photo) | Attach or paste up to three photos; it looks at them. Needs a model that can see images. |
+| "Why is this log full of errors?" (with a file) | Attach, drop or paste files: logs, YAML, JSON, CSV, code, PDF, or a zip of them. Text is read inside the chat; PDFs go to providers that read them. |
 | "Undo that" | Puts the file or dashboard back the way it was. |
 
 It also adds an **Assist conversation agent** for each provider, so you can use the same
@@ -369,6 +370,11 @@ as a conversation log.
 - **Pictures need a vision model.** Camera snapshots and photos only work with models
   that can see images (Claude, GPT-4o and later, Gemini, or a vision model in Ollama).
   Pictures are sent with that turn only and are not kept in the chat.
+- **Attached files make changes ask.** A file can carry instructions written by someone
+  else, so once a file is attached, every change in that chat asks first, in every mode
+  except YOLO. Up to 10 files of 2 MB each per message. Zips are read in memory; archives
+  inside archives, tar, 7z, rar and Office files are not opened (save as PDF, CSV or text).
+  Ollama gets PDF text only from simple PDFs.
 - **Small local models can't build reliably.** See [Which model to use](#which-model-to-use).
   Ollama models also need tool calling; a model without it can chat but can't act.
 - **Not in the default HACS store yet** (see [Install](#install)).
@@ -381,7 +387,9 @@ backend. Free search sends the query to community.home-assistant.io, api.github.
 Wikipedia; turn search off under Web research if you'd rather it didn't. When the AI
 looks at a camera or a photo you attach, the picture goes to the provider too (the panel
 removes photo metadata such as location first); turn **Camera snapshots** off
-under Safety if you'd rather it couldn't. Nothing goes anywhere else, and there is no
+under Safety if you'd rather it couldn't. Files you attach go to the provider as text (or as the PDF itself). While
+**Protect sensitive data** is on, secrets.yaml, auth storage, keys and databases inside a
+zip are skipped. Large file text is sent for that turn only and not saved with the chat. Nothing goes anywhere else, and there is no
 telemetry.
 
 | Data | Where | Limit |
