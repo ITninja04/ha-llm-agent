@@ -17,6 +17,7 @@ from homeassistant.helpers.json import json_dumps
 
 from ..approval import Risk
 from . import Tool, ToolContext, ToolError, ToolOutput, obj
+from .reference import HELPER_DOMAINS, pages_in_config
 from .states import CallService
 
 _LOGGER = logging.getLogger(__name__)
@@ -174,6 +175,17 @@ class WebSocketTool(Tool):
             "target": payload.get("target") or {},
             "data": payload.get("service_data") or {},
         }
+
+    def reference_pages(self, ctx: ToolContext, args: dict[str, Any]) -> set[str]:
+        command = str(args.get("command", ""))
+        if (service := self._as_service(args)) is not None:
+            return SERVICE_TOOL.reference_pages(ctx, service)
+        if command == "execute_script":
+            return pages_in_config(ctx.hass, (args.get("payload") or {}).get("sequence"))
+        domain, _, verb = command.partition("/")
+        if domain in HELPER_DOMAINS and verb in ("create", "update"):
+            return {"helpers"}
+        return set()
 
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         command = str(args.get("command", ""))

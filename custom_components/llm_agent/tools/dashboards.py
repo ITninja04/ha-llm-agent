@@ -104,6 +104,10 @@ class SaveDashboard(Tool):
             )
         return args
 
+    def reference_pages(self, ctx: ToolContext, args: dict[str, Any]) -> set[str]:
+        # Only the dashboards page: a card that shows a WLED light does not act on it.
+        return {"dashboards"}
+
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         if not args.get("url_path"):
             return Risk.risky("replaces your main dashboard")

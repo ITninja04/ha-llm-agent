@@ -21,6 +21,7 @@ import yaml
 from ..approval import Level, Risk, classify_service
 from . import Preview, Tool, ToolContext, ToolError, ToolOutput, obj
 from .files import FileAccess
+from .reference import KIND_PAGES, pages_in_config
 from .states import expand_target
 from .util import FILE_LOCK, diff_text, load_inert, read_text, retag, text_hash, to_yaml, write_text
 
@@ -323,6 +324,12 @@ class SaveItem(Tool):
             config = {"alias": config["name"], **{k: v for k, v in config.items() if k != "name"}}
             args = {**args, "config": config}
         return args
+
+    def reference_pages(self, ctx: ToolContext, args: dict[str, Any]) -> set[str]:
+        pages = pages_in_config(ctx.hass, args.get("config"))
+        if page := KIND_PAGES.get(str(args.get("kind", ""))):
+            pages.add(page)
+        return pages
 
     def classify(self, ctx: ToolContext, args: dict[str, Any]) -> Risk:
         if args.get("kind") in ("automation", "script"):
