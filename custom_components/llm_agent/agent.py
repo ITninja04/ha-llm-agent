@@ -29,6 +29,7 @@ from .approval import (
     summarize_args,
 )
 from .attachments import Prepared
+from .balance import Balances
 from .chatgpt_auth import get_auth
 from .const import (
     APPROVAL_TIMEOUT,
@@ -290,6 +291,30 @@ def _today() -> str:
     return dt_util.now().strftime("%Y-%m-%d")
 
 
+def _count(
+    store: ConversationStore,
+    pconf: ProviderConfig,
+    model: str,
+    kind: str,
+    usage: Usage | None,
+    cost: float | None,
+) -> None:
+    """Add one call to the per-day usage record the Usage view reads."""
+    usage = usage or Usage()
+    store.usage.add(
+        _today(),
+        pconf.id,
+        pconf.type,
+        model,
+        kind,
+        usage.input_tokens,
+        usage.output_tokens,
+        usage.cache_read_tokens,
+        usage.cache_write_tokens,
+        cost,
+    )
+
+
 def home_context(hass: HomeAssistant) -> str:
     areas = ", ".join(f"{a.name} ({a.id})" for a in ar.async_get(hass).async_list_areas()) or "none"
     counts: dict[str, int] = {}
@@ -337,6 +362,7 @@ class Agent:
         self._model_cache: dict[str, tuple[float, list[str]]] = {}
         # provider id -> prices the provider published with its model list
         self.live_prices: dict[str, dict[str, Price]] = {}
+        self.balances = Balances(lambda: async_get_clientsession(hass))
         self._apply_limits()
 
     def _apply_limits(self) -> None:
@@ -383,6 +409,32 @@ class Agent:
             return merge_models(pconf.type, fallback), f"Couldn't fetch models ({err})"
         self._model_cache[pconf.id] = (time.monotonic(), ids)
         return merge_models(pconf.type, ids), None
+
+    async def count_task(self, pconf: ProviderConfig, model: str, usage: Usage | None) -> None:
+        """Record an AI Task call in the usage record, priced like a chat call.
+
+        It is deliberately not added to the daily spend: the cap stops panel chats, and
+        an automation's AI Task never stopped at it, so counting it there would change
+        when chats stop. `usage` None is a call that reported no tokens (a generated
+        picture); it counts as a call without a price."""
+        cost = None
+        if usage is not None:
+            overrides = self.options.get(CONF_PRICE_OVERRIDES) or {}
+            if pconf.type == "openrouter" and pconf.id not in self.live_prices:
+                await self.models(pconf.id)  # OpenRouter publishes prices with its models
+            price = price_for(pconf.type, model, overrides, self.live_prices.get(pconf.id))
+            long = None if model in overrides else LONG_PROMPT_PRICES.get(model)
+            prompt = usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens
+            if price is not None and long and prompt > long[0]:
+                price = long[1]
+            cost = estimate_cost(
+                price,
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.cache_read_tokens,
+                usage.cache_write_tokens,
+            )
+        _count(self.store, pconf, model, "task", usage, cost)
 
     @property
     def tools(self) -> list[Tool]:
@@ -657,7 +709,7 @@ class ChatRun:
                 conv["messages"].append(assistant)
                 self.text_so_far = ""
                 streaming = False
-                self._add_usage(usage, price)
+                self._add_usage(usage, price, pconf, model)
                 _LOGGER.debug(
                     "Response in %.1fs: stop=%s, %d tool calls, tokens in=%d out=%d "
                     "cache_read=%d cache_write=%d",
@@ -689,7 +741,10 @@ class ChatRun:
                 # Stopped mid-reply: the provider still bills what it read and wrote,
                 # and stopping must not be a way around a spend limit.
                 self._add_usage(
-                    _estimate_usage(usage, system, conv["messages"], text_parts, calls), price
+                    _estimate_usage(usage, system, conv["messages"], text_parts, calls),
+                    price,
+                    pconf,
+                    model,
                 )
                 self._keep_partial(text_parts, model)
             self._stopped("cancelled")
@@ -698,7 +753,10 @@ class ChatRun:
             if streaming and (text_parts or calls or usage.input_tokens or usage.output_tokens):
                 # failed after the reply had started: that was billed too
                 self._add_usage(
-                    _estimate_usage(usage, system, conv["messages"], text_parts, calls), price
+                    _estimate_usage(usage, system, conv["messages"], text_parts, calls),
+                    price,
+                    pconf,
+                    model,
                 )
                 self._keep_partial(text_parts, model)
             message = scrub(
@@ -741,7 +799,9 @@ class ChatRun:
         self.conv["stopped"] = reason
         self.emit({"type": "notice", "text": text or STOP_TEXT[reason], "stop": reason})
 
-    def _add_usage(self, usage: Usage, price: Price | None) -> None:
+    def _add_usage(
+        self, usage: Usage, price: Price | None, pconf: ProviderConfig, model: str
+    ) -> None:
         total = self.conv["usage"]
         prompt = usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens
         if price is not None and self.long_price and prompt > self.long_price[0]:
@@ -759,6 +819,7 @@ class ChatRun:
         )
         if cost is not None:
             self.agent.store.add_spend(_today(), cost, self.user_id)
+        _count(self.agent.store, pconf, model, "chat", usage, cost)
         if cost is None:
             total["cost"] = None
         elif total.get("cost") is not None:
@@ -1216,11 +1277,13 @@ class ChatRun:
             if pconf.type == "openrouter" and pconf.id not in agent.live_prices:
                 await agent.models(pconf.id)  # OpenRouter publishes prices with its models
             price = price_for(pconf.type, model, overrides, agent.live_prices.get(pconf.id))
-            self._add_review_usage(verdict.usage, price)
+            self._add_review_usage(verdict.usage, price, pconf, model)
         self.emit({"type": "review", "call_id": call.id, **_review_meta(verdict)})
         return verdict
 
-    def _add_review_usage(self, usage: Usage, price: Price | None) -> None:
+    def _add_review_usage(
+        self, usage: Usage, price: Price | None, pconf: ProviderConfig, model: str
+    ) -> None:
         total = self.conv["usage"]
         rev = total.setdefault("review", {"input": 0, "output": 0, "cost": 0.0})
         rev["input"] += usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens
@@ -1234,6 +1297,7 @@ class ChatRun:
         )
         if cost is not None:
             self.agent.store.add_spend(_today(), cost, self.user_id)
+        _count(self.agent.store, pconf, model, "review", usage, cost)
         if cost is None:
             rev["cost"] = None
         elif rev.get("cost") is not None:

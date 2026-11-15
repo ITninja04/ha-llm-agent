@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import binascii
 from collections.abc import Callable
+from datetime import date, timedelta
 from functools import partial, wraps
 from typing import Any
 
@@ -20,10 +21,20 @@ from homeassistant.exceptions import Unauthorized
 import probatio as vol
 
 from . import history
-from .agent import STOP_TEXT, Agent, ChatRun, Emit, home_context, rewind_last_turn, rewind_to
+from .agent import (
+    STOP_TEXT,
+    Agent,
+    ChatRun,
+    Emit,
+    _today,
+    home_context,
+    rewind_last_turn,
+    rewind_to,
+)
 from .attachments import MAX_FILE_BYTES, MAX_FILES, MAX_TEXT_CHARS, AttachmentError, prepare
 from .const import (
     CONF_APPROVAL_MODE,
+    CONF_DAILY_CAP,
     CONF_HOME_SUMMARY,
     CONF_HOUSEHOLD,
     CONF_PROTECT_SENSITIVE,
@@ -93,6 +104,8 @@ def async_register(hass: HomeAssistant) -> None:
         ws_cancel,
         ws_undo,
         ws_changes,
+        ws_usage,
+        ws_balance,
     ):
         websocket_api.async_register_command(hass, handler)
 
@@ -848,3 +861,89 @@ async def ws_changes(
             {"id": cid, "title": title} for cid, title in (filters.titles or {}).items()
         ]
     connection.send_result(msg["id"], page)
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "llm_agent/usage", vol.Optional("days", default=30): vol.In([7, 30, 90])}
+)
+@websocket_api.require_admin
+@callback
+def ws_usage(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Spend per day for the chart, totals, and tokens by provider, model and kind.
+
+    Admin only: it covers every user's chats. Days are local days, the same days the
+    daily cap counts, and a day with no calls is sent as zero so the chart has a bar
+    position for it.
+    """
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    today = date.fromisoformat(_today())
+    days = msg["days"]
+    first = (today - timedelta(days=max(days, 30) - 1)).isoformat()
+    rows = agent.store.usage.rows(first, today.isoformat())
+    per_day: dict[str, float] = {}
+    for row in rows:
+        per_day[row["day"]] = per_day.get(row["day"], 0.0) + row["cost"]
+
+    def since(n: int) -> str:
+        return (today - timedelta(days=n - 1)).isoformat()
+
+    def total(n: int) -> float:
+        start = since(n)
+        return round(sum(c for d, c in per_day.items() if d >= start), 6)
+
+    start = since(days)
+    groups: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in rows:
+        if row["day"] < start:
+            continue
+        key = (row["provider_id"], row["model"], row["kind"])
+        group = groups.setdefault(
+            key,
+            {k: row[k] for k in ("provider_id", "provider_type", "model", "kind")}
+            | dict.fromkeys(
+                ("input", "output", "cache_read", "cache_write", "calls", "unpriced"), 0
+            )
+            | {"cost": 0.0},
+        )
+        for k in ("input", "output", "cache_read", "cache_write", "calls", "unpriced"):
+            group[k] += row[k]
+        group["cost"] = round(group["cost"] + row["cost"], 6)
+    names = {p.id: p.name for p in agent.providers()}
+    connection.send_result(
+        msg["id"],
+        {
+            "today": today.isoformat(),
+            "since": agent.store.usage.since,
+            "series": [
+                {"day": d, "cost": round(per_day.get(d, 0.0), 6)}
+                for d in (since(days - i) for i in range(days))
+            ],
+            "totals": {"today": total(1), "week": total(7), "month": total(30)},
+            # The cap counts chats and reviews only (store.spent), never AI Tasks, so it
+            # is sent as the cap sees it rather than taken from the totals above.
+            "cap": setting(agent.options, CONF_DAILY_CAP),
+            "cap_used": round(agent.store.spent(today.isoformat()), 6),
+            "breakdown": [
+                {**g, "provider_name": names.get(g["provider_id"])}
+                for g in sorted(groups.values(), key=lambda g: g["cost"], reverse=True)
+            ],
+        },
+    )
+
+
+@websocket_api.websocket_command({vol.Required("type"): "llm_agent/balance"})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_balance(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """What is left on each provider, where its API lets the configured key read it.
+    Asked for once when the Usage view opens; see balance.py for the five minute cache."""
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    connection.send_result(msg["id"], {"providers": await agent.balances.get(agent.providers())})

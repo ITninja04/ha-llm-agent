@@ -35,7 +35,7 @@ import probatio
 
 from .const import DOMAIN, NAME
 from .providers import ProviderConfig, ProviderError, make_provider
-from .providers.base import Done, Provider, TextDelta, image_model_for
+from .providers.base import Done, Provider, TextDelta, Usage, image_model_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -125,6 +125,9 @@ class LLMAgentTaskEntity(ai_task.AITaskEntity):
             )
         except ProviderError as err:
             raise HomeAssistantError(str(err)) from err
+        # The image adapters report no token counts, so this counts the call without a
+        # price rather than guessing one.
+        await self._count(image.model, None)
         chat_log.async_add_assistant_content_without_tools(
             conversation.AssistantContent(agent_id=self.entity_id, content=image.text)
         )
@@ -135,6 +138,13 @@ class LLMAgentTaskEntity(ai_task.AITaskEntity):
             model=image.model,
             revised_prompt=image.revised_prompt,
         )
+
+    async def _count(self, model: str, usage: Usage | None) -> None:
+        """Add this call to the Usage view's record. Not to the daily cap: see
+        Agent.count_task."""
+        agent = self.hass.data.get(DOMAIN)
+        if agent is not None:
+            await agent.count_task(self.provider_config, model, usage)
 
     async def _prompt(self, chat_log: conversation.ChatLog) -> tuple[str, dict[str, Any]]:
         """The system prompt HA built for the task, and the task as a neutral user message."""
@@ -157,8 +167,10 @@ class LLMAgentTaskEntity(ai_task.AITaskEntity):
     ) -> str:
         parts: list[str] = []
         stop: str | None = None
+        usage = Usage()
+        model = self.provider_config.default_model
         async for event in provider.stream(
-            model=self.provider_config.default_model,
+            model=model,
             system=system,
             messages=messages,
             tools=[],
@@ -167,8 +179,12 @@ class LLMAgentTaskEntity(ai_task.AITaskEntity):
         ):
             if isinstance(event, TextDelta):
                 parts.append(event.text)
+            elif isinstance(event, Usage):
+                usage = event
             elif isinstance(event, Done):
                 stop = event.stop_reason
+        # Counted before the checks below: a refused or cut off reply is still billed.
+        await self._count(model, usage)
         text = "".join(parts)
         name = self.provider_config.name
         if stop == "refusal":
