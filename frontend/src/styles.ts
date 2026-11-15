@@ -1090,6 +1090,12 @@ export const styles = css`
     max-height: 40dvh;
     overflow-y: auto;
   }
+  .composer.dragging {
+    border-color: var(--accent);
+    box-shadow:
+      var(--shadow),
+      0 0 0 3px var(--ring);
+  }
   .toolbar {
     display: flex;
     align-items: center;
@@ -1155,6 +1161,51 @@ export const styles = css`
   .photos img {
     width: 120px;
     height: 120px;
+  }
+  .files {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .attached.files {
+    margin-bottom: 0;
+  }
+  .file {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    min-width: 0;
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    white-space: nowrap;
+    --mdc-icon-size: 18px;
+  }
+  .file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+    min-width: 0;
+  }
+  .file-meta {
+    color: var(--muted);
+    font-size: 12px;
+    flex: none;
+  }
+  .file button.icon {
+    padding: 2px;
+    margin-right: -4px;
+    --mdc-icon-size: 14px;
+  }
+  @media (max-width: 600px) {
+    .file-name {
+      max-width: 40vw;
+    }
   }
   .photo-note {
     display: flex;

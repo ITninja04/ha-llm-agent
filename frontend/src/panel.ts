@@ -28,6 +28,7 @@ import type {
   StoredMessage,
   Usage,
   Photo,
+  AttachedFile,
 } from "./types";
 
 // Arguments a preview diff shows in full (same list as the server's phone text).
@@ -63,8 +64,12 @@ class LlmAgentPanel extends LitElement {
   @state() private editing = false;
   /** Photos waiting to go with the next message. */
   @state() private photos: Photo[] = [];
-  /** Bumped whenever the draft photos are cleared, so a photo still being encoded
-   * then is thrown away instead of reappearing. */
+  /** Files other than pictures waiting to go with the next message. */
+  @state() private files: AttachedFile[] = [];
+  /** Files are being dragged over the panel. */
+  @state() private dragging = false;
+  /** Bumped whenever the draft attachments are cleared, so a photo or file still being
+   * read then is thrown away instead of reappearing. */
   private photoGen = 0;
   @state() private providerId = "";
   @state() private model = "";
@@ -254,14 +259,15 @@ class LlmAgentPanel extends LitElement {
     return gen;
   }
 
-  private clearPhotos(): void {
+  private clearAttachments(): void {
     this.photos = [];
+    this.files = [];
     this.photoGen++;
   }
 
   private newChat(): void {
     this.editing = false;
-    this.clearPhotos();
+    this.clearAttachments();
     void this.detach();
     this.convId = null;
     rememberConv(null);
@@ -279,7 +285,7 @@ class LlmAgentPanel extends LitElement {
     if (gen !== this.gen) return; // a newer open started while the old one ended
     this.showList = false;
     this.editing = false;
-    this.clearPhotos();
+    this.clearAttachments();
     const conv = await this.ws.sendMessagePromise<Conversation>({
       type: "llm_agent/conversations/get",
       conversation_id: id,
@@ -369,13 +375,21 @@ class LlmAgentPanel extends LitElement {
       retry !== undefined
         ? (prev?.kind === "user" && prev.images) || []
         : this.photos;
+    const files =
+      retry !== undefined ? (prev?.kind === "user" && prev.files) || [] : this.files;
     let text = retry ?? this.input?.value.trim();
+    // the server needs some text; file names make a better chat title than a placeholder
+    if (!text && files.length) text = `(${files.map((f) => f.name).join(", ")})`;
     if (!text && photos.length) text = "(photo)";
     if (!text || this.running) return;
-    if (retry !== undefined && prev?.kind === "user" && prev.photos && !prev.images) {
-      // its photos weren't kept: let the person attach them again rather than
-      // silently replacing the answer with one that never saw them
-      this.editLast(prev.text, undefined, prev.photos);
+    if (
+      retry !== undefined &&
+      prev?.kind === "user" &&
+      ((prev.photos && !prev.images) || prev.files?.some((f) => !f.data))
+    ) {
+      // its photos or files weren't kept: let the person attach them again rather
+      // than silently replacing the answer with one that never saw them
+      this.editLast(prev.text, undefined, prev.photos, prev.files);
       return;
     }
     // to put back if the server refuses the message
@@ -383,11 +397,12 @@ class LlmAgentPanel extends LitElement {
       items: this.items,
       draft: this.input?.value ?? "",
       photos: this.photos,
+      files: this.files,
       editing: this.editing,
     };
     if (retry === undefined) {
       this.input!.value = "";
-      this.clearPhotos();
+      this.clearAttachments();
       this.autosize();
     }
     this.editing = false;
@@ -395,7 +410,12 @@ class LlmAgentPanel extends LitElement {
       rewind && lastUser >= 0 ? this.items.slice(0, lastUser) : this.items;
     this.items = [
       ...kept,
-      { kind: "user", text, images: photos.length ? photos : undefined },
+      {
+        kind: "user",
+        text,
+        images: photos.length ? photos : undefined,
+        files: files.length ? files : undefined,
+      },
       { kind: "assistant", text: "" },
     ];
     this.running = true;
@@ -431,6 +451,9 @@ class LlmAgentPanel extends LitElement {
           images: photos.length
             ? photos.map(({ media_type, data }) => ({ media_type, data }))
             : undefined,
+          files: files.length
+            ? files.map(({ name, data }) => ({ name, data }))
+            : undefined,
         },
         // a reconnect must never send the message again
         { resubscribe: false },
@@ -445,6 +468,7 @@ class LlmAgentPanel extends LitElement {
         if (retry === undefined && this.input) {
           this.input.value = before.draft;
           this.photos = before.photos;
+          this.files = before.files;
           this.autosize();
         }
       }
@@ -664,11 +688,19 @@ class LlmAgentPanel extends LitElement {
     void this.send(undefined, overCap);
   }
 
-  private editLast(text: string, images?: Photo[], kept?: number): void {
+  private editLast(
+    text: string,
+    images?: Photo[],
+    kept?: number,
+    files?: AttachedFile[],
+  ): void {
     this.editing = true;
-    this.clearPhotos();
+    this.clearAttachments();
     this.photos = images ?? [];
+    this.files = (files ?? []).filter((f) => f.data);
     if (kept && !images) this.photosNotKept();
+    if (files?.some((f) => !f.data))
+      this.push({ kind: "notice", text: t("files_not_kept") });
     this.input!.value = text;
     this.autosize();
     this.input!.focus();
@@ -676,24 +708,92 @@ class LlmAgentPanel extends LitElement {
 
   private cancelEdit(): void {
     this.editing = false;
-    this.clearPhotos();
+    this.clearAttachments();
     this.input!.value = "";
     this.autosize();
   }
 
   private async onPick(ev: Event): Promise<void> {
     const input = ev.target as HTMLInputElement;
-    await this.addPhotos([...(input.files ?? [])]);
+    const picked = [...(input.files ?? [])];
     input.value = "";
+    await this.addFiles(picked);
   }
 
   private async onPaste(ev: ClipboardEvent): Promise<void> {
-    const files = [...(ev.clipboardData?.files ?? [])].filter((f) =>
-      f.type.startsWith("image/"),
-    );
+    const files = [...(ev.clipboardData?.files ?? [])];
     if (!files.length) return;
     ev.preventDefault();
-    await this.addPhotos(files);
+    await this.addFiles(files);
+  }
+
+  // Dropping a file anywhere on the panel attaches it. Without preventDefault on
+  // dragover the browser would open the dropped file in place of Home Assistant.
+  private onDragOver(ev: DragEvent): void {
+    if (!ev.dataTransfer?.types.includes("Files")) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = this.running ? "none" : "copy";
+    this.dragging = !this.running;
+  }
+
+  private onDragLeave(ev: DragEvent): void {
+    // leaving for a child element is not leaving the panel
+    const to = ev.relatedTarget as Node | null;
+    if (to && (ev.currentTarget as Node).contains(to)) return;
+    this.dragging = false;
+  }
+
+  private async onDrop(ev: DragEvent): Promise<void> {
+    if (!ev.dataTransfer?.types.includes("Files")) return;
+    ev.preventDefault();
+    this.dragging = false;
+    if (!this.running) await this.addFiles([...ev.dataTransfer.files]);
+  }
+
+  /** Pictures go the photo way (re-encoded, metadata dropped); everything else is
+   * checked here and read as it is. The server decides again from the bytes. */
+  private async addFiles(list: File[]): Promise<void> {
+    const pictures = list.filter(isPicture);
+    if (pictures.length) await this.addPhotos(pictures);
+    const gen = this.photoGen;
+    for (const file of list.filter((f) => !isPicture(f))) {
+      const name = file.name || t("that_file");
+      const error = (key: Key, vars: Record<string, string | number> = {}) =>
+        this.push({ kind: "notice", text: t(key, { name, ...vars }), error: true });
+      if (this.files.length >= MAX_FILES) {
+        error("too_many_files", { count: MAX_FILES });
+        return;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        error("file_too_large", { limit: fmtBytes(MAX_FILE_BYTES) });
+        continue;
+      }
+      if (this.payload() + base64Length(file.size) > PAYLOAD_BUDGET) {
+        error("files_over_total");
+        continue;
+      }
+      let read: AttachedFile | null;
+      try {
+        read = await readFile(file);
+      } catch {
+        error("file_unreadable");
+        continue;
+      }
+      // cleared, sent or switched chats while reading: drop it
+      if (gen !== this.photoGen) return;
+      if (!read) error("file_unsupported");
+      else if (this.payload() + (read.data?.length ?? 0) > PAYLOAD_BUDGET)
+        error("files_over_total");
+      else this.files = [...this.files, read];
+    }
+  }
+
+  /** Base64 characters already attached, photos included. */
+  private payload(): number {
+    return (
+      this.photos.reduce((n, p) => n + p.data.length, 0) +
+      this.files.reduce((n, f) => n + (f.data?.length ?? 0), 0)
+    );
   }
 
   private photosNotKept(): void {
@@ -833,7 +933,11 @@ class LlmAgentPanel extends LitElement {
         }}
       >
         ${listOpen ? this.renderList() : nothing}
-        <main>
+        <main
+          @dragover=${this.onDragOver}
+          @dragleave=${this.onDragLeave}
+          @drop=${this.onDrop}
+        >
           <header>
             <ha-menu-button
               .hass=${this.hass}
@@ -1242,7 +1346,8 @@ class LlmAgentPanel extends LitElement {
                     class="icon"
                     title=${t("edit")}
                     aria-label=${t("edit")}
-                    @click=${() => this.editLast(item.text, item.images, item.photos)}
+                    @click=${() =>
+                      this.editLast(item.text, item.images, item.photos, item.files)}
                   >
                     <ha-icon icon="mdi:pencil-outline"></ha-icon>
                   </button>
@@ -1485,21 +1590,45 @@ class LlmAgentPanel extends LitElement {
     </div>`;
   }
 
-  /** Photos on a sent message. The bubble keeps whitespace, so this adds none. */
+  /** Photos and files on a sent message. The bubble keeps whitespace, so this adds none. */
   private renderPhotos(item: Item): TemplateResult | typeof nothing {
     if (item.kind !== "user") return nothing;
+    const files = item.files?.length
+      ? html`<div class="files">${item.files.map((f) => this.renderFile(f))}</div>`
+      : nothing;
     if (item.images?.length)
-      return html`<div class="photos">${item.images.map((p) => html`<img src=${p.url} alt=${t("your_photo")} />`)}</div>`;
+      return html`<div class="photos">${item.images.map((p) => html`<img src=${p.url} alt=${t("your_photo")} />`)}</div>${files}`;
     if (item.photos)
-      return html`<div class="photo-note"><ha-icon icon="mdi:image-outline"></ha-icon>${photoCount(item.photos)} ${t("not_kept")}</div>`;
-    return nothing;
+      return html`<div class="photo-note"><ha-icon icon="mdi:image-outline"></ha-icon>${photoCount(item.photos)} ${t("not_kept")}</div>${files}`;
+    return files;
+  }
+
+  /** A file chip: kind, name and size, with a remove button while it is a draft. */
+  private renderFile(f: AttachedFile, remove?: () => void): TemplateResult {
+    return html`<span class="file" title=${f.name}>
+      <ha-icon icon=${FILE_ICONS[f.kind]}></ha-icon>
+      <span class="file-name">${f.name}</span>
+      <span class="file-meta">${fileLabel(f)}, ${fmtBytes(f.size)}</span>
+      ${
+        remove
+          ? html`<button
+              class="icon"
+              title=${t("remove_file")}
+              aria-label=${`${t("remove_file")}: ${f.name}`}
+              @click=${remove}
+            >
+              <ha-icon icon="mdi:close"></ha-icon>
+            </button>`
+          : nothing
+      }
+    </span>`;
   }
 
   private renderComposer(): TemplateResult {
     const p = this.provider;
     const listId = "models";
     return html`<footer>
-      <div class="composer">
+      <div class="composer ${this.dragging ? "dragging" : ""}">
         <textarea
           rows="1"
           placeholder=${t("composer_placeholder")}
@@ -1556,18 +1685,30 @@ class LlmAgentPanel extends LitElement {
               </div>`
             : nothing
         }
+        ${
+          this.files.length
+            ? html`<div class="attached files">
+                ${this.files.map((f, i) =>
+                  this.renderFile(f, () => {
+                    this.files = this.files.filter((_, j) => j !== i);
+                  }),
+                )}
+              </div>`
+            : nothing
+        }
         <div class="toolbar">
           <label
             class="attach icon"
-            title=${t("add_photo_title")}
-            ?hidden=${this.photos.length >= MAX_PHOTOS}
+            title=${t("attach_title")}
+            ?hidden=${this.photos.length >= MAX_PHOTOS && this.files.length >= MAX_FILES}
           >
-            <ha-icon icon="mdi:image-plus-outline"></ha-icon>
+            <ha-icon icon="mdi:paperclip"></ha-icon>
+            <!-- No accept filter: HA files often have no extension (.storage/*,
+                 home-assistant.log.1), and the type is decided from the bytes. -->
             <input
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
               multiple
-              aria-label=${t("add_photo")}
+              aria-label=${t("attach")}
               ?disabled=${this.running}
               @change=${this.onPick}
             />
@@ -1821,7 +1962,11 @@ export function toMarkdown(title: string, items: Item[]): string {
   for (const item of items) {
     if (item.kind === "user") {
       const n = item.images?.length || item.photos || 0;
-      const note = n ? ` _(${photoCount(n)})_` : "";
+      const parts = [
+        ...(n ? [photoCount(n)] : []),
+        ...(item.files ?? []).map((f) => f.name),
+      ];
+      const note = parts.length ? ` _(${parts.join(", ")})_` : "";
       out.push(`**${t("you")}:** ${item.text}${note}`, "");
     }
     else if (item.kind === "assistant" && item.text) out.push(item.text, "");
@@ -1856,7 +2001,7 @@ function toItems(messages: StoredMessage[]): Item[] {
   >();
   for (const m of messages) {
     if (m.role === "user")
-      items.push({ kind: "user", text: m.content, photos: m.photos });
+      items.push({ kind: "user", text: m.content, photos: m.photos, files: m.files });
     else if (m.role === "assistant") {
       if (m.content) items.push({ kind: "assistant", text: m.content });
       for (const c of m.tool_calls)
@@ -2037,6 +2182,71 @@ if (!customElements.get("llm-agent-panel")) {
 }
 
 const MAX_PHOTOS = 3;
+// Same limits as the server's attachments.py.
+const MAX_FILES = 10;
+const MAX_FILE_BYTES = 2 * 1024 * 1024;
+// Base64 characters for photos and files together. Home Assistant drops WebSocket
+// messages over 4 MiB; this leaves room for the text (up to 100k characters) and JSON.
+const PAYLOAD_BUDGET = 3_500_000;
+
+const FILE_ICONS: Record<AttachedFile["kind"], string> = {
+  text: "mdi:file-document-outline",
+  pdf: "mdi:file-pdf-box",
+  zip: "mdi:folder-zip-outline",
+  gzip: "mdi:folder-zip-outline",
+};
+
+/** Pictures the photo path can re-encode. SVG is text and goes as a file. */
+function isPicture(f: File): boolean {
+  return f.type.startsWith("image/") && f.type !== "image/svg+xml";
+}
+
+function base64Length(bytes: number): number {
+  return Math.ceil(bytes / 3) * 4;
+}
+
+function fmtBytes(n: number): string {
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n >= 1024) return `${Math.round(n / 1024)} KB`;
+  return `${n} B`;
+}
+
+/** The extension for text files (YAML, LOG, CSV), else the kind. */
+function fileLabel(f: AttachedFile): string {
+  if (f.kind !== "text") return f.kind.toUpperCase();
+  const dot = f.name.lastIndexOf(".");
+  const ext = dot > 0 ? f.name.slice(dot + 1) : "";
+  return ext && ext.length <= 5 ? ext.toUpperCase() : t("file_text");
+}
+
+/** What the file is, judged from its first bytes with the server's rules, or null
+ * for a binary the server would refuse. Checked here so the person hears at once. */
+function sniff(b: Uint8Array): AttachedFile["kind"] | null {
+  const starts = (...sig: number[]) => sig.every((v, i) => b[i] === v);
+  if (starts(0x50, 0x4b, 0x03, 0x04) || starts(0x50, 0x4b, 0x05, 0x06)) return "zip";
+  if (starts(0x1f, 0x8b)) return "gzip";
+  if (starts(0x25, 0x50, 0x44, 0x46, 0x2d)) return "pdf";
+  if (starts(0xff, 0xfe) || starts(0xfe, 0xff)) return "text"; // UTF-16
+  let control = 0;
+  for (const x of b) {
+    if (x === 0) return null;
+    if (x < 32 && x !== 9 && x !== 10 && x !== 12 && x !== 13 && x !== 27) control++;
+  }
+  return b.length && control / b.length > 0.02 ? null : "text";
+}
+
+/** The file as base64, or null when it is not a type the server reads. */
+async function readFile(file: File): Promise<AttachedFile | null> {
+  const kind = sniff(new Uint8Array(await file.slice(0, 8192).arrayBuffer()));
+  if (!kind) return null;
+  const url = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+  return { name: file.name || "file", size: file.size, kind, data: url.slice(url.indexOf(",") + 1) };
+}
 const PHOTO_SIDE = 1568; // larger pictures cost more tokens without helping the model
 // Base64 characters per photo: three of them plus the text stay well under Home
 // Assistant's 4 MiB WebSocket message limit, even for noisy pictures.
