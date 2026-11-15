@@ -84,7 +84,8 @@ class LlmAgentSettings extends LitElement {
 .body{flex:1;overflow-y:auto;padding:20px max(16px,calc((100% - 680px)/2)) 32px}
 .body>*+*{margin-top:14px}
 .d,.note{color:var(--muted);font-size:13px;line-height:1.5}.d p{margin:4px 0}.d :is(a,strong){color:var(--text)}
-.menu{display:grid;gap:8px}.menu button{justify-content:space-between;padding:12px 14px;font-size:14px}
+.menu{display:grid;gap:8px}.menu button{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;color:var(--text);background:var(--surface);border-color:var(--line);border-radius:12px;text-align:start}.menu button:hover{background:var(--hover)}
+form>*+*{margin-top:16px}.r label{align-items:flex-start}.r input{margin-top:3px}
 .f{display:flex;flex-direction:column;gap:6px}
 .f>label,.r label{display:flex;align-items:center;gap:10px;font-size:14px}
 .f :is(input:not([type=checkbox]):not([type=radio]),select,textarea){width:100%;box-sizing:border-box;font:inherit;font-size:14px}
