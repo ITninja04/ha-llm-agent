@@ -34,9 +34,17 @@ ORDER = (
 _pages: dict[str, str] | None = None
 
 
+def _page_names() -> list[str]:
+    """Every page on disk, ORDER first. The tool's enum must list pages that are not in ORDER
+    too, or the model could not ask for them (a schema enum is checked before run())."""
+    found = {p.stem for p in REFERENCE_DIR.glob("*.md")}
+    return [name for name in (*ORDER, *sorted(found)) if name in found]
+
+
 def _read_pages() -> dict[str, str]:
-    found = {p.stem: p.read_text(encoding="utf-8") for p in REFERENCE_DIR.glob("*.md")}
-    return {name: found[name] for name in (*ORDER, *sorted(found)) if name in found}
+    return {
+        name: (REFERENCE_DIR / f"{name}.md").read_text(encoding="utf-8") for name in _page_names()
+    }
 
 
 async def async_pages(hass: HomeAssistant) -> dict[str, str]:
@@ -70,7 +78,7 @@ class ReadReference(Tool):
             "read_reference",
             "Read a built-in Home Assistant reference page (see the list in your "
             "instructions), with examples of the exact config shape.",
-            obj({"page": {"type": "string", "enum": list(ORDER)}}, ["page"]),
+            obj({"page": {"type": "string", "enum": _page_names()}}, ["page"]),
         )
 
     async def run(self, ctx: ToolContext, args: dict[str, Any]) -> ToolOutput:
