@@ -25,7 +25,7 @@ def _blocks(page: str, lang: str) -> list[str]:
 
 
 def test_every_page_is_indexed_with_a_summary() -> None:
-    assert list(PAGES) == list(ORDER)
+    assert list(PAGES)[: len(ORDER)] == list(ORDER)  # pages beyond ORDER follow, sorted
     for name, text in PAGES.items():
         assert text.startswith("# ") and summary(text), name
 
