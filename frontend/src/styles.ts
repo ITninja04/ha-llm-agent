@@ -280,6 +280,10 @@ export const styles = css`
     flex-direction: column;
     min-width: 0;
   }
+  /* the Changes view takes the place of the chat; the chat keeps its state underneath */
+  main.changes > :not(header):not(llm-agent-changes) {
+    display: none;
+  }
   header {
     position: relative;
     z-index: 6; /* popovers open above the messages */
