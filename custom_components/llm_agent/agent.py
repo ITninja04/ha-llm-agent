@@ -275,6 +275,16 @@ PHONE_DELAY = 60
 UNATTENDED_PHONE_TIMEOUT = 240
 
 
+def chat_title(text: str) -> str:
+    """The first line that says something. Messages render Markdown now, so a message that
+    opens with a code block would otherwise be titled ``` in the chat list."""
+    for line in text.splitlines():
+        line = line.strip()
+        if line and not line.startswith(("```", "~~~")):  # a fence, with or without a language
+            return line[:60]
+    return "New chat"
+
+
 def _today() -> str:
     """The local date, which is what a daily cap means to the user."""
     return dt_util.now().strftime("%Y-%m-%d")
@@ -554,7 +564,7 @@ class ChatRun:
         conv["messages"].append(user)
         conv.pop("stopped", None)
         if conv["title"] == "New chat":
-            conv["title"] = (text.strip().splitlines() or ["New chat"])[0][:60]
+            conv["title"] = chat_title(text)
         max_steps = int(options.get(CONF_MAX_STEPS, 25))
         steps = 0
         overrides = options.get(CONF_PRICE_OVERRIDES) or {}
