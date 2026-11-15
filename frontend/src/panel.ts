@@ -62,7 +62,10 @@ class LlmAgentPanel extends LitElement {
   @state() private running = false;
   /** Read out by screen readers: replies finished, approvals waiting, errors. */
   @state() private announce = "";
-  @state() private editing = false;
+  /** Index in `items` of the sent message being edited, or -1. */
+  @state() private editAt = -1;
+  /** The composer has text: Send is disabled without it (or an attachment). */
+  @state() private hasText = false;
   /** Photos waiting to go with the next message. */
   @state() private photos: Photo[] = [];
   /** Files other than pictures waiting to go with the next message. */
@@ -174,16 +177,20 @@ class LlmAgentPanel extends LitElement {
       btn.textContent = t("copy");
       btn.addEventListener("click", async () => {
         const code = pre.querySelector("code") ?? pre;
-        try {
-          await navigator.clipboard.writeText(code.textContent ?? "");
-          btn.textContent = t("copied");
-        } catch {
-          btn.textContent = t("copy_failed");
-        }
+        btn.textContent = t((await copyText(code.textContent ?? "")) ? "copied" : "copy_failed");
         setTimeout(() => (btn.textContent = t("copy")), 1500);
       });
       pre.prepend(btn);
     }
+  }
+
+  /** Copy a reply's markdown source; the button shows a tick (or a warning) for a moment. */
+  private async copy(text: string, btn: HTMLElement): Promise<void> {
+    const ok = await copyText(text);
+    const icon = btn.querySelector("ha-icon");
+    icon?.setAttribute("icon", ok ? "mdi:check" : "mdi:alert-circle-outline");
+    this.announce = t(ok ? "copied" : "copy_failed");
+    setTimeout(() => icon?.setAttribute("icon", "mdi:content-copy"), 1500);
   }
 
   /** After the socket reconnects, subscriptions are gone (sends are never resent), so
@@ -226,12 +233,44 @@ class LlmAgentPanel extends LitElement {
         rememberConv(null);
       }
     }
+    if (!this.convId) {
+      await this.updateComplete;
+      this.setText(loadDraft(this.draftKey, null));
+    }
   }
 
   private async refreshList(): Promise<void> {
     this.convs = await this.ws.sendMessagePromise<ConvSummary[]>({
       type: "llm_agent/conversations/list",
     });
+    pruneDrafts(this.draftKey, this.convs);
+  }
+
+  /** Drafts are kept per Home Assistant user, so people sharing a browser don't see
+   * (or prune) each other's. */
+  private get draftKey(): string {
+    return `llm-agent-drafts-${this.hass?.user?.id ?? ""}`;
+  }
+
+  /** Put text in the composer. It is saved as this chat's draft, except while a sent
+   * message is being edited: Cancel then brings the real draft back. */
+  private setText(text: string): void {
+    const ta = this.input;
+    if (!ta) return;
+    ta.value = text;
+    this.hasText = !!text.trim();
+    this.autosize();
+    if (this.editAt < 0) saveDraft(this.draftKey, this.convId, text);
+  }
+
+  /** Back to the composer after sending and when a reply ends. Not on touch screens,
+   * where focusing opens the keyboard over the reply, and not away from another field
+   * (an approval note) the person is typing in. */
+  private focusComposer(): void {
+    const active = (this.renderRoot as ShadowRoot).activeElement;
+    if (matchMedia("(pointer: coarse)").matches) return;
+    if (active && active !== this.input && active.tagName !== "BUTTON") return;
+    this.input?.focus();
   }
 
   /** A household member (not an admin): a simpler panel, the server enforces the limits. */
@@ -269,7 +308,7 @@ class LlmAgentPanel extends LitElement {
 
   private newChat(): void {
     this.showChanges = false;
-    this.editing = false;
+    this.editAt = -1;
     this.clearAttachments();
     void this.detach();
     this.convId = null;
@@ -280,6 +319,7 @@ class LlmAgentPanel extends LitElement {
     this.running = false;
     this.showList = false;
     this.startModel();
+    this.setText(loadDraft(this.draftKey, null));
     this.input?.focus();
   }
 
@@ -288,7 +328,7 @@ class LlmAgentPanel extends LitElement {
     const gen = await this.detach();
     if (gen !== this.gen) return; // a newer open started while the old one ended
     this.showList = false;
-    this.editing = false;
+    this.editAt = -1;
     this.clearAttachments();
     const conv = await this.ws.sendMessagePromise<Conversation>({
       type: "llm_agent/conversations/get",
@@ -297,6 +337,7 @@ class LlmAgentPanel extends LitElement {
     if (gen !== this.gen) return; // another chat was opened meanwhile
     this.convId = conv.id;
     rememberConv(conv.id);
+    this.setText(loadDraft(this.draftKey, conv.id));
     this.chatTitle = conv.title;
     this.usage = conv.usage;
     this.providerId = conv.provider_id;
@@ -369,11 +410,14 @@ class LlmAgentPanel extends LitElement {
     return -1;
   }
 
-  /** Send the composer text, or `retry` to run the last message again. Editing or retrying
-   * replaces the last message and its reply in the saved conversation. */
+  /** Send the composer text, or `retry` to run the last message again. Retrying or
+   * editing the last message replaces it and its reply; editing an earlier one first
+   * cuts the saved chat there (llm_agent/conversations/truncate). */
   private async send(retry?: string, overCap = false): Promise<void> {
-    const rewind = retry !== undefined || this.editing;
     const lastUser = this.lastUserIndex();
+    const at = retry !== undefined ? lastUser : this.editAt;
+    // the chat command rewinds the last message itself, in the same step as the send
+    const rewind = at >= 0 && at === lastUser;
     const prev = this.items[lastUser];
     const photos =
       retry !== undefined
@@ -393,25 +437,40 @@ class LlmAgentPanel extends LitElement {
     ) {
       // its photos or files weren't kept: let the person attach them again rather
       // than silently replacing the answer with one that never saw them
-      this.editLast(prev.text, undefined, prev.photos, prev.files);
+      this.edit(lastUser);
       return;
     }
-    // to put back if the server refuses the message
+    const gen = this.gen;
+    const kept = at >= 0 ? this.items.slice(0, at) : this.items;
+    if (at >= 0 && !rewind) {
+      try {
+        await this.ws.sendMessagePromise({
+          type: "llm_agent/conversations/truncate",
+          conversation_id: this.convId,
+          index: kept.filter((i) => i.kind === "user").length,
+        });
+      } catch (err) {
+        this.push({ kind: "notice", text: errText(err), error: true });
+        return;
+      }
+      if (gen !== this.gen) return;
+    }
+    // to put back if the server refuses the message; a cut chat stays cut
     const before = {
-      items: this.items,
+      items: at >= 0 && !rewind ? kept : this.items,
       draft: this.input?.value ?? "",
       photos: this.photos,
       files: this.files,
-      editing: this.editing,
+      editAt: rewind ? this.editAt : -1,
     };
+    const wasEditing = this.editAt >= 0;
+    this.editAt = -1;
     if (retry === undefined) {
-      this.input!.value = "";
       this.clearAttachments();
-      this.autosize();
+      // after an edit, the draft typed before it comes back
+      this.setText(wasEditing ? loadDraft(this.draftKey, this.convId) : "");
+      this.focusComposer();
     }
-    this.editing = false;
-    const kept =
-      rewind && lastUser >= 0 ? this.items.slice(0, lastUser) : this.items;
     this.items = [
       ...kept,
       {
@@ -425,7 +484,6 @@ class LlmAgentPanel extends LitElement {
     this.running = true;
     this.announce = "";
     this.stickToBottom = true;
-    const gen = this.gen;
     try {
       const unsub = await this.ws.subscribeMessage<
         ChatEvent | { type: "conversation"; conversation_id: string; title: string }
@@ -466,15 +524,12 @@ class LlmAgentPanel extends LitElement {
     } catch (err) {
       if (gen !== this.gen) return; // the user has moved on; this chat isn't shown
       this.running = false;
-      {
-        this.items = before.items;
-        this.editing = before.editing;
-        if (retry === undefined && this.input) {
-          this.input.value = before.draft;
-          this.photos = before.photos;
-          this.files = before.files;
-          this.autosize();
-        }
+      this.items = before.items;
+      this.editAt = before.editAt;
+      if (retry === undefined) {
+        this.setText(before.draft);
+        this.photos = before.photos;
+        this.files = before.files;
       }
       this.push({ kind: "notice", text: errText(err), error: true });
       return;
@@ -569,6 +624,7 @@ class LlmAgentPanel extends LitElement {
         this.items = this.items.filter(
           (i) => !(i.kind === "assistant" && !i.text),
         );
+        void this.updateComplete.then(() => this.focusComposer());
         void this.detach();
         void this.refreshList().then(() => {
           this.chatTitle =
@@ -688,33 +744,30 @@ class LlmAgentPanel extends LitElement {
 
   /** Pick up after a reply that was cut off, stopped, or hit the tool limit. */
   private continueTurn(overCap = false): void {
-    this.input!.value = t("continue_message");
+    this.setText(t("continue_message"));
     void this.send(undefined, overCap);
   }
 
-  private editLast(
-    text: string,
-    images?: Photo[],
-    kept?: number,
-    files?: AttachedFile[],
-  ): void {
-    this.editing = true;
+  /** Put a sent message (index in `items`) back in the composer. Sending it replaces
+   * that message and everything after it. */
+  private edit(at: number): void {
+    const item = this.items[at];
+    if (item?.kind !== "user") return;
+    this.editAt = at;
     this.clearAttachments();
-    this.photos = images ?? [];
-    this.files = (files ?? []).filter((f) => f.data);
-    if (kept && !images) this.photosNotKept();
-    if (files?.some((f) => !f.data))
+    this.photos = item.images ?? [];
+    this.files = (item.files ?? []).filter((f) => f.data);
+    if (item.photos && !item.images) this.photosNotKept();
+    if (item.files?.some((f) => !f.data))
       this.push({ kind: "notice", text: t("files_not_kept") });
-    this.input!.value = text;
-    this.autosize();
+    this.setText(item.text);
     this.input!.focus();
   }
 
   private cancelEdit(): void {
-    this.editing = false;
+    this.editAt = -1;
     this.clearAttachments();
-    this.input!.value = "";
-    this.autosize();
+    this.setText(loadDraft(this.draftKey, this.convId));
   }
 
   private async onPick(ev: Event): Promise<void> {
@@ -848,9 +901,19 @@ class LlmAgentPanel extends LitElement {
         return;
       }
     }
-    if (ev.key === "Escape" && this.running && !ev.isComposing) {
-      ev.preventDefault();
-      void this.stop();
+    if (
+      ev.key === "ArrowUp" &&
+      !ev.isComposing &&
+      !this.input?.value &&
+      !this.running &&
+      this.editAt < 0 &&
+      this.convId
+    ) {
+      const last = this.lastUserIndex();
+      if (last >= 0) {
+        ev.preventDefault();
+        this.edit(last);
+      }
       return;
     }
     if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
@@ -862,7 +925,7 @@ class LlmAgentPanel extends LitElement {
   }
 
   private onInput(): void {
-    this.autosize();
+    this.setText(this.input!.value);
     this.updateMentions();
   }
 
@@ -886,13 +949,13 @@ class LlmAgentPanel extends LitElement {
     const ta = this.input!;
     const end = ta.selectionStart ?? ta.value.length;
     const value = ta.value;
-    ta.value =
-      value.slice(0, this.mentionStart) + item.insert + " " + value.slice(end);
+    this.setText(
+      value.slice(0, this.mentionStart) + item.insert + " " + value.slice(end),
+    );
     const pos = this.mentionStart + item.insert.length + 1;
     ta.setSelectionRange(pos, pos);
     this.mentions = [];
     ta.focus();
-    this.autosize();
   }
 
   /** Fit the box to its text. The cap lives in CSS (a share of the visible viewport,
@@ -933,6 +996,10 @@ class LlmAgentPanel extends LitElement {
         @click=${this.closePrefsOutside}
         @keydown=${(e: KeyboardEvent) => {
           if (e.key === "Escape") {
+            // Esc stops a reply from anywhere in the panel, unless it closed a popover
+            // or the @ list (those prevent the default) first
+            if (this.running && !e.defaultPrevented && !e.isComposing && !this.showPrefs && !this.showNotes)
+              void this.stop();
             this.showPrefs = false;
             this.showNotes = false;
           }
@@ -1052,6 +1119,7 @@ class LlmAgentPanel extends LitElement {
                   item.kind !== "user" &&
                     item.kind !== "notice" &&
                     (idx === 0 || this.items[idx - 1].kind === "user"),
+                  idx,
                 ),
             )}
           </div>
@@ -1340,9 +1408,8 @@ class LlmAgentPanel extends LitElement {
             html`<button
               class="tip"
               @click=${() => {
-                this.input!.value = tip.text;
+                this.setText(tip.text);
                 this.input!.focus();
-                this.autosize();
               }}
             >
               <ha-icon icon=${tip.icon}></ha-icon>
@@ -1358,6 +1425,7 @@ class LlmAgentPanel extends LitElement {
     last: boolean,
     lastUser = false,
     replyStart = false,
+    idx = -1,
   ): TemplateResult | typeof nothing {
     const avatar = replyStart
       ? html`<div class="avatar" aria-hidden="true">
@@ -1366,27 +1434,30 @@ class LlmAgentPanel extends LitElement {
       : nothing;
     switch (item.kind) {
       case "user":
-        return html`<div class="row user">
+        return html`<div class="row user ${idx === this.editAt ? "edited" : ""}">
           ${
-            lastUser && !this.running
+            this.convId && !this.running
               ? html`<div class="msg-actions">
                   <button
                     class="icon"
                     title=${t("edit")}
                     aria-label=${t("edit")}
-                    @click=${() =>
-                      this.editLast(item.text, item.images, item.photos, item.files)}
+                    @click=${() => this.edit(idx)}
                   >
                     <ha-icon icon="mdi:pencil-outline"></ha-icon>
                   </button>
-                  <button
-                    class="icon"
-                    title=${t("retry")}
-                    aria-label=${t("retry")}
-                    @click=${() => this.send(item.text)}
-                  >
-                    <ha-icon icon="mdi:refresh"></ha-icon>
-                  </button>
+                  ${
+                    lastUser
+                      ? html`<button
+                          class="icon"
+                          title=${t("retry")}
+                          aria-label=${t("retry")}
+                          @click=${() => this.send(item.text)}
+                        >
+                          <ha-icon icon="mdi:refresh"></ha-icon>
+                        </button>`
+                      : nothing
+                  }
                 </div>`
               : nothing
           }
@@ -1408,6 +1479,21 @@ class LlmAgentPanel extends LitElement {
           <div class="msg assistant md">
             ${unsafeHTML(renderMarkdown(item.text, !(last && this.running)))}
           </div>
+          ${
+            last && this.running
+              ? nothing
+              : html`<div class="msg-actions acts">
+                  <button
+                    class="icon"
+                    title=${t("copy")}
+                    aria-label=${t("copy")}
+                    @click=${(e: Event) =>
+                      this.copy(item.text, e.currentTarget as HTMLElement)}
+                  >
+                    <ha-icon icon="mdi:content-copy"></ha-icon>
+                  </button>
+                </div>`
+          }
         </div>`;
       case "notice":
         return html`<div class="notice ${item.error ? "error" : ""}">
@@ -1659,7 +1745,11 @@ class LlmAgentPanel extends LitElement {
       <div class="composer ${this.dragging ? "dragging" : ""}">
         <textarea
           rows="1"
-          placeholder=${t("composer_placeholder")}
+          placeholder=${
+            this.narrow
+              ? t("composer_placeholder")
+              : `${t("composer_placeholder")} (${t(this.prefs.send === "ctrl" ? "keys_ctrl" : "keys_enter")})`
+          }
           @keydown=${this.onKey}
           @input=${this.onInput}
           @paste=${this.onPaste}
@@ -1797,6 +1887,7 @@ class LlmAgentPanel extends LitElement {
                   class="send"
                   title=${t("send")}
                   aria-label=${t("send")}
+                  ?disabled=${!this.hasText && !this.photos.length && !this.files.length}
                   @click=${() => this.send()}
                 >
                   <ha-icon icon="mdi:arrow-up"></ha-icon>
@@ -1806,9 +1897,9 @@ class LlmAgentPanel extends LitElement {
       </div>
       <div class="meta">
         ${
-          this.editing
+          this.editAt >= 0
             ? html`<span class="editing"
-                >${t("editing_last")}
+                >${t(this.editAt === this.lastUserIndex() ? "editing_last" : "editing_earlier")}
                 <button class="small ghost" @click=${this.cancelEdit}>
                   ${t("cancel")}
                 </button></span
@@ -1844,6 +1935,66 @@ class LlmAgentPanel extends LitElement {
 // ---- helpers ----------------------------------------------------------------
 
 const PREFS_KEY = "llm-agent-prefs";
+
+/** Copy to the clipboard. The Clipboard API only exists on https and localhost, and many
+ * Home Assistant installs are plain http on the LAN, so fall back to the older copy
+ * command there instead of failing. */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.append(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  }
+}
+
+/** Unsent drafts by chat id ("" is a new chat), in one entry per Home Assistant user. */
+function drafts(key: string): Record<string, string> {
+  try {
+    const d = JSON.parse(localStorage.getItem(key) ?? "{}");
+    return d && typeof d === "object" ? d : {};
+  } catch {
+    return {};
+  }
+}
+
+function storeDrafts(key: string, d: Record<string, string>): void {
+  try {
+    if (Object.keys(d).length) localStorage.setItem(key, JSON.stringify(d));
+    else localStorage.removeItem(key);
+  } catch {
+    // private mode or storage full: the draft lasts until the page reloads
+  }
+}
+
+function loadDraft(key: string, id: string | null): string {
+  const text = drafts(key)[id ?? ""];
+  return typeof text === "string" ? text : "";
+}
+
+function saveDraft(key: string, id: string | null, text: string): void {
+  const d = drafts(key);
+  const k = id ?? "";
+  if (text.trim()) d[k] = text;
+  else if (k in d) delete d[k];
+  else return;
+  storeDrafts(key, d);
+}
+
+/** Forget drafts of chats that are gone (deleted here, elsewhere, or by retention). */
+function pruneDrafts(key: string, convs: ConvSummary[]): void {
+  const d = drafts(key);
+  const ids = new Set(convs.map((c) => c.id));
+  const gone = Object.keys(d).filter((id) => id && !ids.has(id));
+  for (const id of gone) delete d[id];
+  if (gone.length) storeDrafts(key, d);
+}
 const LAST_CONV_KEY = "llm-agent-last-chat";
 
 function lastConv(): string | null {

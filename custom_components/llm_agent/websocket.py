@@ -20,7 +20,7 @@ from homeassistant.exceptions import Unauthorized
 import probatio as vol
 
 from . import history
-from .agent import STOP_TEXT, Agent, ChatRun, Emit, home_context, rewind_last_turn
+from .agent import STOP_TEXT, Agent, ChatRun, Emit, home_context, rewind_last_turn, rewind_to
 from .attachments import MAX_FILE_BYTES, MAX_FILES, MAX_TEXT_CHARS, AttachmentError, prepare
 from .const import (
     CONF_APPROVAL_MODE,
@@ -81,6 +81,7 @@ def async_register(hass: HomeAssistant) -> None:
         ws_get,
         ws_delete,
         ws_rename,
+        ws_truncate,
         ws_chat,
         ws_attach,
         ws_approve,
@@ -360,6 +361,49 @@ async def ws_rename(
     connection.send_result(msg["id"])
 
 
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "llm_agent/conversations/truncate",
+        vol.Required("conversation_id"): str,
+        # Which user message to drop, counting user messages from 0; it goes with
+        # everything after it.
+        vol.Required("index"): vol.All(int, vol.Range(min=0)),
+    }
+)
+@_household
+@websocket_api.async_response
+async def ws_truncate(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Cut a conversation at one of the user's messages, for editing an earlier message.
+
+    Only the saved chat changes. Device changes, undo snapshots and the audit log stay as
+    they are: what the dropped turns did really happened, so the model is told about it
+    with the next message instead of being left to redo it.
+    """
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    conv = await _own(hass, connection, msg["conversation_id"])
+    if conv is None:
+        connection.send_error(msg["id"], "not_found", "Conversation not found")
+        return
+    if conv["id"] in agent.runs:
+        # the running turn would keep appending to the list being cut
+        connection.send_error(msg["id"], "busy", "Stop the reply before editing a message")
+        return
+    if msg["index"] >= sum(1 for m in conv["messages"] if m["role"] == "user"):
+        connection.send_error(msg["id"], "not_found", "That message is no longer in the chat")
+        return
+    note = rewind_to(conv, msg["index"])
+    if note:
+        # kept on the chat until the next message, which carries it to the model
+        conv["rewind_note"] = conv.get("rewind_note", "") + note
+    conv.pop("stopped", None)
+    agent.store.save(conv)
+    connection.send_result(msg["id"])
+
+
 MAX_PHOTOS = 3
 _SIGNATURES = {
     "image/jpeg": (b"\xff\xd8\xff",),
@@ -503,7 +547,7 @@ async def ws_chat(
         connection.send_error(msg["id"], "busy", "Wait for your other chat's reply to finish first")
         return
 
-    note = rewind_last_turn(conv) if msg["rewind"] else ""
+    note = conv.pop("rewind_note", "") + (rewind_last_turn(conv) if msg["rewind"] else "")
     run = ChatRun(agent, conv, user.id, member=member)
     agent.runs[conv["id"]] = run
     run.listeners.add(_listen(connection, msg["id"], run))

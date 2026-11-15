@@ -1455,16 +1455,30 @@ def rewind_last_turn(conv: dict[str, Any]) -> str:
     Actions from the dropped turn already happened, so they are returned as a note for
     the next message; the model then knows about them instead of redoing them.
     """
+    users = sum(1 for m in conv["messages"] if m["role"] == "user")
+    return rewind_to(conv, users - 1) if users else ""
+
+
+def rewind_to(conv: dict[str, Any], user_index: int) -> str:
+    """Drop the user message at `user_index` (0 is the first user message) and everything
+    after it, for editing an earlier message. Returns the same note as rewind_last_turn.
+
+    Counting user messages instead of raw positions: the panel only sees user messages
+    one to one, and tool results and assistant rows in between differ by provider.
+    """
     messages = conv["messages"]
-    idx = next((i for i in range(len(messages) - 1, -1, -1) if messages[i]["role"] == "user"), None)
-    if idx is None:
+    users = [i for i, m in enumerate(messages) if m["role"] == "user"]
+    if not 0 <= user_index < len(users):
         return ""
+    idx = users[user_index]
     done = [
         m.get("summary") or m.get("name", "")
         for m in messages[idx:]
         if m["role"] == "tool" and not m.get("is_error") and m.get("summary")
     ]
     del messages[idx:]
+    if conv.get("compacted_upto", 0) > idx:
+        conv["compacted_upto"] = idx
     if not done:
         return ""
     return (

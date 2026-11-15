@@ -12,7 +12,7 @@ export interface HassConnection {
 
 export interface Hass {
   connection: HassConnection;
-  user?: { is_admin: boolean; name: string };
+  user?: { id: string; is_admin: boolean; name: string };
   themes?: { darkMode?: boolean };
   locale?: { language: string };
   states?: Record<string, { entity_id: string; attributes: { friendly_name?: string } }>;

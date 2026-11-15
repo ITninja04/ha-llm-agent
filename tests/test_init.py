@@ -217,3 +217,90 @@ def test_saved_conversations_never_hold_pictures() -> None:
     saved = _without_images(conv)
     assert saved["messages"][0] == {"role": "user", "content": "x", "photos": 1}
     assert conv["messages"][0]["images"] == [1]  # the running turn keeps them
+
+
+async def test_ws_truncate_cuts_at_an_earlier_message_and_tells_the_model(
+    hass: HomeAssistant, hass_ws_client
+) -> None:
+    """Editing an earlier message in the panel: the chat is cut there, a running reply
+    can't be cut under it, and the next message tells the model what the dropped turns
+    already did, so it does not switch the lamp on a second time."""
+    entry = await _setup(hass)
+    agent = entry.runtime_data
+    conv = await agent.store.create("p1", "gpt-5.4-mini", "")
+    conv["messages"] = [
+        {"role": "user", "content": "first"},
+        {"role": "assistant", "content": "ok"},
+        {"role": "user", "content": "turn on the lamp"},
+        {"role": "assistant", "content": "", "tool_calls": [{"id": "c1", "name": "x"}]},
+        {
+            "role": "tool",
+            "tool_call_id": "c1",
+            "name": "call_service",
+            "content": "ok",
+            "summary": "Called light.turn_on",
+        },
+        {"role": "assistant", "content": "Done"},
+    ]
+    conv["stopped"] = "length"
+    client = await hass_ws_client(hass)
+
+    agent.runs[conv["id"]] = object()  # a reply is running
+    await client.send_json_auto_id(
+        {"type": "llm_agent/conversations/truncate", "conversation_id": conv["id"], "index": 1}
+    )
+    assert (await client.receive_json())["error"]["code"] == "busy"
+    assert len(conv["messages"]) == 6
+    agent.runs.pop(conv["id"])
+
+    await client.send_json_auto_id(
+        {"type": "llm_agent/conversations/truncate", "conversation_id": conv["id"], "index": 5}
+    )
+    assert (await client.receive_json())["error"]["code"] == "not_found"
+
+    await client.send_json_auto_id(
+        {"type": "llm_agent/conversations/truncate", "conversation_id": conv["id"], "index": 1}
+    )
+    assert (await client.receive_json())["success"]
+    await client.send_json_auto_id(
+        {"type": "llm_agent/conversations/get", "conversation_id": conv["id"]}
+    )
+    got = (await client.receive_json())["result"]
+    assert [m["content"] for m in got["messages"]] == ["first", "ok"]
+    assert got["stopped"] is None  # the cut-off notice belonged to a dropped turn
+
+    provider = ScriptedProvider([reply_text("Lamp is dimmed")])
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        await client.send_json_auto_id(
+            {"type": "llm_agent/chat", "conversation_id": conv["id"], "text": "dim the lamp"}
+        )
+        assert (await client.receive_json())["success"]
+        while (await client.receive_json())["event"]["type"] != "done":
+            pass
+    sent = provider.calls[0]["messages"][-1]
+    assert "Called light.turn_on" in str(sent) and "dim the lamp" in str(sent)
+    assert "rewind_note" not in conv  # carried once, not on every later message
+    # the panel shows what was typed, not the note
+    await client.send_json_auto_id(
+        {"type": "llm_agent/conversations/get", "conversation_id": conv["id"]}
+    )
+    got = (await client.receive_json())["result"]
+    assert [m["content"] for m in got["messages"] if m["role"] == "user"] == [
+        "first",
+        "dim the lamp",
+    ]
+
+
+async def test_ws_truncate_is_admin_only(
+    hass: HomeAssistant, hass_ws_client, hass_admin_user
+) -> None:
+    entry = await _setup(hass)
+    conv = await entry.runtime_data.store.create("p1", "gpt-5.4-mini", "")
+    conv["messages"] = [{"role": "user", "content": "first"}]
+    hass_admin_user.groups = []
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {"type": "llm_agent/conversations/truncate", "conversation_id": conv["id"], "index": 0}
+    )
+    assert (await client.receive_json())["error"]["code"] == "unauthorized"
+    assert conv["messages"] == [{"role": "user", "content": "first"}]

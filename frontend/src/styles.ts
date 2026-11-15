@@ -512,14 +512,29 @@ export const styles = css`
     transition: opacity 0.12s;
     --mdc-icon-size: 17px;
   }
-  .row.user:hover .msg-actions,
+  .row:hover .msg-actions,
   .msg-actions:focus-within {
     opacity: 1;
+  }
+  .row.reply {
+    flex-wrap: wrap;
+  }
+  .msg-actions.acts {
+    flex-basis: 100%;
+    margin: -10px 0 0 -5px;
+  }
+  .row.edited .msg.user {
+    outline: 2px solid var(--accent);
   }
   @media (hover: none) {
     .msg-actions {
       opacity: 1;
     }
+  }
+  /* a phone-width window may still report hover (a desktop browser, a tablet with a
+     mouse); on the narrow layout the buttons never wait for it */
+  .narrow .msg-actions {
+    opacity: 1;
   }
   .msg-actions button.icon {
     padding: 5px;
@@ -1284,6 +1299,11 @@ export const styles = css`
   }
   button.send:hover {
     filter: brightness(1.1);
+  }
+  button.send:disabled {
+    opacity: 0.4;
+    filter: none;
+    cursor: default;
   }
   button.send.stop {
     background: var(--text);
