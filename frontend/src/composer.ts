@@ -252,6 +252,9 @@ class MarkdownBox implements ComposerBox {
       if (ev.defaultPrevented) ev.stopImmediatePropagation();
     });
     el.addEventListener("blur", on.onBlur);
+    // However the box got focus (a click, a tab, focus() below), the caret is now where
+    // the person or focus() put it, so the next focus() must not move it to the end.
+    el.addEventListener("focus", () => (this.#caretToEnd = false));
     source.after(el);
     try {
       this.#ed = new ShadowEditor({ textarea: source, editor: el });

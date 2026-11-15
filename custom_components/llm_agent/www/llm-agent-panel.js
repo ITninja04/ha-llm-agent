@@ -4909,7 +4909,7 @@ var Ai = class extends wi.Editor {
 		let n = document.createElement("div");
 		n.className = "box", n.setAttribute("role", "textbox"), n.setAttribute("aria-multiline", "true"), n.addEventListener("keydown", t.onKey), n.addEventListener("paste", (e) => {
 			t.onPaste(e), e.defaultPrevented && e.stopImmediatePropagation();
-		}), n.addEventListener("blur", t.onBlur), e.after(n);
+		}), n.addEventListener("blur", t.onBlur), n.addEventListener("focus", () => this.#r = !1), e.after(n);
 		try {
 			this.#e = new Ai({
 				textarea: e,
