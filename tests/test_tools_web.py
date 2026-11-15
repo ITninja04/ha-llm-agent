@@ -126,7 +126,10 @@ def test_main_content_wins_and_hidden_parts_go() -> None:
 
 
 @pytest.fixture
-async def site(unused_tcp_port, socket_enabled):
+async def site(socket_enabled, unused_tcp_port):
+    # socket_enabled first: unused_tcp_port opens a socket to find a free port, and
+    # pytest-socket refuses that until sockets are enabled. Pytest sets fixtures up in
+    # argument order, so the other order failed whenever nothing else had enabled them.
     async def page(request: web.Request) -> web.Response:
         body = "<html><title>Manual</title><body><p>" + "word " * 5000 + "</p></body></html>"
         return web.Response(text=body, content_type="text/html")
