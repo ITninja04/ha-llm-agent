@@ -1076,6 +1076,20 @@ export const styles = css`
     max-height: 240px;
     padding: 6px 2px 4px;
   }
+  /* The composer is a column flexbox with no set height. flex: 1 on the box gives it
+     a flex-basis of 0 there, which lets the engine size it from its one-row minimum
+     instead of the height autosize() sets. Reported as "effectively one line"; the
+     cause is from reading this CSS, not reproduced in a browser. flex: none makes the
+     inline height the size. The cap is a share of the visible viewport: dvh shrinks
+     when a phone keyboard opens, so the box never pushes the chat off screen. */
+  .composer textarea {
+    flex: none;
+    box-sizing: border-box;
+    min-height: calc(1.5em + 10px);
+    max-height: 40vh;
+    max-height: 40dvh;
+    overflow-y: auto;
+  }
   .toolbar {
     display: flex;
     align-items: center;

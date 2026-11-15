@@ -789,11 +789,13 @@ class LlmAgentPanel extends LitElement {
     this.autosize();
   }
 
+  /** Fit the box to its text. The cap lives in CSS (a share of the visible viewport,
+   * which shrinks when a phone keyboard opens); past it the box scrolls inside. */
   private autosize(): void {
     const ta = this.input;
     if (!ta) return;
     ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, 240)}px`;
+    ta.style.height = `${ta.scrollHeight}px`;
   }
 
   private onScroll(): void {
