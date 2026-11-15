@@ -32,7 +32,7 @@ from .const import (
 )
 from .services import async_setup_services
 
-PLATFORMS = [Platform.CONVERSATION]
+PLATFORMS = [Platform.AI_TASK, Platform.CONVERSATION]
 _REGISTERED = f"{DOMAIN}_registered"
 
 type LLMAgentConfigEntry = ConfigEntry[Agent]

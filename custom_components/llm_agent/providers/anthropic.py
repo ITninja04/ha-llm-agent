@@ -103,6 +103,46 @@ def to_anthropic_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]
     return out
 
 
+# Structured outputs reject these keywords. Anthropic's SDK (`anthropic.transform_schema`,
+# which HA core runs on its schemas) moves them into the description instead, so the model
+# still reads the limit; the caller checks the value against the original schema after.
+_UNSUPPORTED = (
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "multipleOf",
+    "minLength",
+    "maxLength",
+    "minItems",
+    "maxItems",
+)
+
+
+def output_format_schema(schema: Any) -> Any:
+    """A copy of a JSON Schema that Anthropic's structured outputs accept."""
+    if isinstance(schema, list):
+        return [output_format_schema(s) for s in schema]
+    if not isinstance(schema, dict):
+        return schema
+    out: dict[str, Any] = {}
+    moved: list[str] = []
+    for key, value in schema.items():
+        if key in _UNSUPPORTED:
+            moved.append(f"{key}: {value}")
+        elif key in ("properties", "$defs", "definitions") and isinstance(value, dict):
+            out[key] = {k: output_format_schema(v) for k, v in value.items()}
+        else:
+            out[key] = output_format_schema(value)
+    if out.get("type") == "object":
+        # the API requires every object to be closed
+        out["additionalProperties"] = False
+    if moved:
+        desc = out.get("description")
+        out["description"] = (f"{desc} " if desc else "") + f"({', '.join(moved)})"
+    return out
+
+
 class AnthropicProvider(Provider):
     async def stream(
         self,
@@ -112,6 +152,7 @@ class AnthropicProvider(Provider):
         messages: list[dict[str, Any]],
         tools: list[ToolSpec],
         max_tokens: int = 4096,
+        output_schema: dict[str, Any] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         tool_defs = [
             {
@@ -133,6 +174,10 @@ class AnthropicProvider(Provider):
         }
         if tool_defs:
             body["tools"] = tool_defs
+        if output_schema:
+            body["output_config"] = {
+                "format": {"type": "json_schema", "schema": output_format_schema(output_schema)}
+            }
         headers = {
             "x-api-key": self.config.api_key or "",
             "anthropic-version": API_VERSION,

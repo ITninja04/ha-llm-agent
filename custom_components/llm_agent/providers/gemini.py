@@ -6,6 +6,7 @@ responses only, not against the live service.
 
 from __future__ import annotations
 
+import base64
 from collections.abc import AsyncIterator
 import json
 from typing import Any
@@ -15,6 +16,7 @@ import aiohttp
 
 from .base import (
     Done,
+    GeneratedImage,
     Provider,
     ProviderError,
     StreamEvent,
@@ -22,8 +24,10 @@ from .base import (
     ToolCall,
     ToolSpec,
     Usage,
+    image_model_for,
     iter_sse,
     open_stream,
+    post_json,
 )
 
 # Gemini 3 wants the thought signature of each function call sent back with it. Calls
@@ -126,11 +130,17 @@ class GeminiProvider(Provider):
         messages: list[dict[str, Any]],
         tools: list[ToolSpec],
         max_tokens: int = 4096,
+        output_schema: dict[str, Any] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         body: dict[str, Any] = {
             "contents": to_gemini_contents(messages),
             "generationConfig": {"maxOutputTokens": max_tokens},
         }
+        if output_schema:
+            # responseJsonSchema takes plain JSON Schema; the older responseSchema field
+            # (what HA core's SDK path fills) wants Google's OpenAPI subset instead.
+            body["generationConfig"]["responseMimeType"] = "application/json"
+            body["generationConfig"]["responseJsonSchema"] = output_schema
         if system:
             body["systemInstruction"] = {"parts": [{"text": system}]}
         if tools:
@@ -232,3 +242,45 @@ class GeminiProvider(Provider):
             yield call
         yield usage
         yield Done(stop_reason, raw={"gemini": parts} if parts else None)
+
+    async def generate_image(self, *, prompt: str, images: list[dict[str, str]]) -> GeneratedImage:
+        # Same request as HA core's Gemini AI Task (google_generative_ai_conversation/
+        # ai_task.py:140-148): one generateContent call asking for text and image back.
+        model = (image_model_for(self.config) or "").removeprefix("models/")
+        parts = [_inline(img) for img in images]
+        parts.append({"text": prompt})
+        payload = await post_json(
+            self._session,
+            f"{self.config.base_url.rstrip('/')}/v1beta/models/{model}:generateContent",
+            {
+                "contents": [{"role": "user", "parts": parts}],
+                "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
+            },
+            {"x-goog-api-key": self.config.api_key or "", "content-type": "application/json"},
+            "Gemini",
+            self.config.timeout,
+            self.config.retries,
+        )
+        if reason := _obj(payload.get("promptFeedback")).get("blockReason"):
+            raise ProviderError(f"Gemini: the request was blocked ({reason}).")
+        candidates = payload.get("candidates")
+        cand = _obj(candidates[0]) if isinstance(candidates, list) and candidates else {}
+        found = _obj(cand.get("content")).get("parts")
+        text = ""
+        for part in found if isinstance(found, list) else []:
+            part = _obj(part)
+            inline = _obj(part.get("inlineData"))
+            mime = inline.get("mimeType")
+            if isinstance(mime, str) and mime.startswith("image/") and inline.get("data"):
+                try:
+                    data = base64.b64decode(str(inline["data"]), validate=True)
+                except ValueError as err:
+                    raise ProviderError("Gemini: the picture in the reply was not valid.") from err
+                return GeneratedImage(data=data, mime_type=mime, model=model, text=text)
+            if isinstance(part.get("text"), str) and not part.get("thought"):
+                text += part["text"]
+        if cand.get("finishReason") in _REFUSALS:
+            raise ProviderError(f"Gemini: the picture was blocked ({cand['finishReason']}).")
+        raise ProviderError(
+            f"Gemini: the reply had no picture in it. {model} may not make pictures."
+        )

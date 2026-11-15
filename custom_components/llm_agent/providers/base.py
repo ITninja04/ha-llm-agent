@@ -25,7 +25,15 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class ProviderError(Exception):
-    """Raised when a provider returns an error or an unusable stream."""
+    """Raised when a provider returns an error or an unusable stream.
+
+    `status` is the HTTP status when the provider rejected the request, so a caller can
+    tell "this request shape was refused" (400) from a failure worth reporting as is.
+    """
+
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 MAX_ERROR_BODY = 64 * 1024
@@ -77,6 +85,15 @@ StreamEvent = TextDelta | ToolCall | Usage | Done
 
 
 @dataclass(slots=True)
+class GeneratedImage:
+    data: bytes
+    mime_type: str
+    model: str
+    text: str = ""  # any words the model returned alongside the picture
+    revised_prompt: str | None = None  # the prompt the provider rewrote and used, if any
+
+
+@dataclass(slots=True)
 class ToolSpec:
     name: str
     description: str
@@ -98,6 +115,33 @@ class ProviderConfig:
     auth: Callable[[], Awaitable[tuple[str, str]]] | None = field(default=None, repr=False)
 
 
+def image_model_for(config: ProviderConfig) -> str | None:
+    """The model that makes pictures for this provider, or None when it can't.
+
+    A default model that is itself an image model is used as is (HA core's Gemini AI Task
+    does the same with "-image" in the model name). Otherwise each provider gets the image
+    model HA core recommends for it: OpenAI from openai_conversation/const.py, and the
+    Gemini image model, which OpenRouter also serves, from
+    google_generative_ai_conversation/const.py.
+
+    None for the rest: Anthropic has no image generation API, Ollama's OpenAI-compatible
+    endpoint has no images route, and the ChatGPT sign-in backend is undocumented, with no
+    image request seen working on it."""
+    model = config.default_model
+    if config.type == "openai":
+        return model if model.startswith(("gpt-image", "dall-e")) else OPENAI_IMAGE_MODEL
+    if config.type == "openrouter":
+        return model if "image" in model else OPENROUTER_IMAGE_MODEL
+    if config.type == "gemini":
+        return model if "-image" in model else GEMINI_IMAGE_MODEL
+    return None
+
+
+OPENAI_IMAGE_MODEL = "gpt-image-2.5-flare"
+GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image"
+OPENROUTER_IMAGE_MODEL = "google/gemini-2.5-flash-image"
+
+
 class Provider:
     """Base adapter. Subclasses implement `stream`."""
 
@@ -113,9 +157,20 @@ class Provider:
         messages: list[dict[str, Any]],
         tools: list[ToolSpec],
         max_tokens: int = 4096,
+        output_schema: dict[str, Any] | None = None,
     ) -> AsyncIterator[StreamEvent]:
+        """Stream one reply.
+
+        `output_schema` is a JSON Schema for the reply text. Adapters send it in the
+        provider's native structured output field; the caller still parses and checks the
+        text, because not every model behind a compatible endpoint honours that field.
+        """
         raise NotImplementedError
         yield  # pragma: no cover
+
+    async def generate_image(self, *, prompt: str, images: list[dict[str, str]]) -> GeneratedImage:
+        """Only adapters listed in `providers.image_model` implement this."""
+        raise NotImplementedError
 
 
 async def iter_sse(
@@ -243,7 +298,35 @@ async def raise_for_status(resp: aiohttp.ClientResponse, provider: str) -> None:
         "the provider had a server error. Try again shortly." if resp.status >= 500 else ""
     )
     prefix = f"{provider}: {hint} " if hint else f"{provider}: "
-    raise ProviderError(f"{prefix}(HTTP {resp.status}: {detail})")
+    raise ProviderError(f"{prefix}(HTTP {resp.status}: {detail})", resp.status)
+
+
+async def post_json(
+    session: aiohttp.ClientSession,
+    url: str,
+    body: dict[str, Any],
+    headers: dict[str, str],
+    provider: str,
+    read_timeout: float = 300.0,
+    retries: int = 3,
+) -> dict[str, Any]:
+    """A non-streaming request with the same retries and error messages as `open_stream`.
+
+    Image endpoints answer with one JSON document rather than a stream."""
+    try:
+        async with open_stream(
+            session, url, body, headers, provider, read_timeout, retries
+        ) as resp:
+            text = await resp.text()
+    except aiohttp.ClientError as err:
+        raise ProviderError(f"{provider} connection error: {err}") from err
+    try:
+        payload = json.loads(text)
+    except ValueError as err:
+        raise ProviderError(f"{provider}: the reply was not JSON.") from err
+    if not isinstance(payload, dict):
+        raise ProviderError(f"{provider}: the reply was not in the expected form.")
+    return payload
 
 
 def parse_args(raw: str) -> dict[str, Any]:

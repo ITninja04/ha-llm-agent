@@ -159,6 +159,7 @@ class ChatGPTProvider(Provider):
         messages: list[dict[str, Any]],
         tools: list[ToolSpec],
         max_tokens: int = 4096,
+        output_schema: dict[str, Any] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         if self.config.auth is None:
             raise ProviderError("ChatGPT: not signed in")
@@ -184,6 +185,17 @@ class ChatGPTProvider(Provider):
             "stream": True,
             "include": ["reasoning.encrypted_content"],
         }
+        if output_schema:
+            # The Responses API puts structured output under text.format. Non-strict for
+            # the same reason as the Chat Completions adapter.
+            body["text"] = {
+                "format": {
+                    "type": "json_schema",
+                    "name": "result",
+                    "schema": output_schema,
+                    "strict": False,
+                }
+            }
         headers = {
             "authorization": f"Bearer {token}",
             "content-type": "application/json",

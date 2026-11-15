@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from collections.abc import AsyncIterator
 from difflib import get_close_matches
 import json
@@ -12,6 +13,7 @@ import aiohttp
 
 from .base import (
     Done,
+    GeneratedImage,
     Provider,
     ProviderError,
     StreamEvent,
@@ -19,9 +21,11 @@ from .base import (
     ToolCall,
     ToolSpec,
     Usage,
+    image_model_for,
     iter_sse,
     open_stream,
     parse_args,
+    post_json,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -125,6 +129,7 @@ class OpenAICompatProvider(Provider):
         messages: list[dict[str, Any]],
         tools: list[ToolSpec],
         max_tokens: int = 4096,
+        output_schema: dict[str, Any] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         body: dict[str, Any] = {
             "model": model,
@@ -147,12 +152,16 @@ class OpenAICompatProvider(Provider):
                 }
                 for t in tools
             ]
-        headers = {"content-type": "application/json"}
-        if self.config.api_key:
-            headers["authorization"] = f"Bearer {self.config.api_key}"
-        if self.config.type == "openrouter":
-            headers["x-title"] = "LLM Agent for Home Assistant"
-            headers["http-referer"] = "https://github.com/ITninja04/ha-llm-agent"
+        if output_schema:
+            # strict mode would need every field required and optional ones made
+            # nullable (HA core's openai_conversation/schema.py rewrites schemas for
+            # that). Non-strict keeps the schema as the user wrote it, and the caller
+            # checks the reply against it either way.
+            body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "result", "schema": output_schema, "strict": False},
+            }
+        headers = self._headers()
         url = self.config.base_url.rstrip("/") + "/chat/completions"
 
         usage = Usage()
@@ -234,6 +243,105 @@ class OpenAICompatProvider(Provider):
             finish = "tool_calls"
         yield usage
         yield Done(finish)
+
+    def _headers(self) -> dict[str, str]:
+        headers = {"content-type": "application/json"}
+        if self.config.api_key:
+            headers["authorization"] = f"Bearer {self.config.api_key}"
+        if self.config.type == "openrouter":
+            headers["x-title"] = "LLM Agent for Home Assistant"
+            headers["http-referer"] = "https://github.com/ITninja04/ha-llm-agent"
+        return headers
+
+    async def generate_image(self, *, prompt: str, images: list[dict[str, str]]) -> GeneratedImage:
+        model = image_model_for(self.config)
+        if model is None:
+            raise ProviderError(f"{self.config.name}: this provider cannot make pictures.")
+        base = self.config.base_url.rstrip("/")
+        if self.config.type == "openai":
+            return await self._openai_image(base, model, prompt, images)
+        return await self._openrouter_image(base, model, prompt, images)
+
+    async def _openai_image(
+        self, base: str, model: str, prompt: str, images: list[dict[str, str]]
+    ) -> GeneratedImage:
+        # The Images API takes reference pictures only on /images/edits as a multipart
+        # upload; that path is not built, so say so instead of dropping them.
+        if images:
+            raise ProviderError(
+                "OpenAI: pictures can't be attached to an image request here. Remove the "
+                "attachments, or use a Gemini or OpenRouter provider."
+            )
+        payload = await post_json(
+            self._session,
+            f"{base}/images/generations",
+            {"model": model, "prompt": prompt, "n": 1},
+            self._headers(),
+            self.config.name,
+            self.config.timeout,
+            self.config.retries,
+        )
+        data = payload.get("data")
+        first = data[0] if isinstance(data, list) and data and isinstance(data[0], dict) else {}
+        b64 = first.get("b64_json")
+        if not isinstance(b64, str) or not b64:
+            raise ProviderError(f"{self.config.name}: the reply had no picture in it.")
+        fmt = payload.get("output_format")
+        return GeneratedImage(
+            data=_decode(b64, self.config.name),
+            mime_type=f"image/{fmt}" if isinstance(fmt, str) and fmt else "image/png",
+            model=model,
+            revised_prompt=first.get("revised_prompt") or None,
+        )
+
+    async def _openrouter_image(
+        self, base: str, model: str, prompt: str, images: list[dict[str, str]]
+    ) -> GeneratedImage:
+        # OpenRouter makes pictures through chat completions: ask for the image modality
+        # and the reply message carries them as data URLs under "images".
+        payload = await post_json(
+            self._session,
+            f"{base}/chat/completions",
+            {
+                "model": model,
+                "messages": to_openai_messages(
+                    "", [{"role": "user", "content": prompt, "images": images}]
+                )[1:],
+                "modalities": ["image", "text"],
+                "stream": False,
+            },
+            self._headers(),
+            self.config.name,
+            self.config.timeout,
+            self.config.retries,
+        )
+        choices = payload.get("choices")
+        choice = choices[0] if isinstance(choices, list) and choices else {}
+        message = choice.get("message") if isinstance(choice, dict) else None
+        message = message if isinstance(message, dict) else {}
+        for item in message.get("images") or []:
+            url = (
+                ((item or {}).get("image_url") or {}).get("url") if isinstance(item, dict) else None
+            )
+            if isinstance(url, str) and url.startswith("data:") and ";base64," in url:
+                head, _, b64 = url.partition(";base64,")
+                return GeneratedImage(
+                    data=_decode(b64, self.config.name),
+                    mime_type=head.removeprefix("data:") or "image/png",
+                    model=model,
+                    text=str(message.get("content") or ""),
+                )
+        raise ProviderError(
+            f"{self.config.name}: the reply had no picture in it. The model may not make "
+            "pictures; pick one that lists image output on openrouter.ai."
+        )
+
+
+def _decode(b64: str, provider: str) -> bytes:
+    try:
+        return base64.b64decode(b64, validate=True)
+    except ValueError as err:
+        raise ProviderError(f"{provider}: the picture in the reply was not valid base64.") from err
 
 
 def text_tool_call(text: str, tools: list[ToolSpec]) -> ToolCall | None:
