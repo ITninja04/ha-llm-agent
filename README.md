@@ -564,7 +564,7 @@ right tool was used and the answer is grounded.
 pip install -r requirements-test.txt
 pytest --cov=custom_components/llm_agent && ruff check .
 cd frontend && npm ci && npm run build   # rebuilds custom_components/llm_agent/www/
-e2e/run.sh                                # real HA container + stub model + Chromium
+e2e/run.sh                                # real HA container + stub model + Chromium and WebKit
 ```
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how the pieces fit together.

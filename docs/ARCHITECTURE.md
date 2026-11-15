@@ -183,7 +183,10 @@ doing less:
 
 Lit + TypeScript, built by Vite into one ES module (`www/agent-panel.js`, about
 60 KB target). Small dependencies only: `lit`, `marked` and `dompurify` for safe
-Markdown rendering.
+Markdown rendering, and `tiny-markdown-editor` (its `lib/` files only, which carry no
+polyfills) so the chat box formats Markdown as it is typed. `composer.ts` wraps it to
+read the caret inside Home Assistant's shadow roots, and falls back to a plain textarea
+where the browser cannot.
 
 Features:
 - conversation list (new, rename, delete)

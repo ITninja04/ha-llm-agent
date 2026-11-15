@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { deflateSync, crc32 } from "node:zlib";
 import { chromium } from "playwright";
+import { composer, formattingSteps } from "./composer.mjs";
 
 const [ha, tokenFile, configDir, shots = "/tmp"] = process.argv.slice(2);
 const tokens = JSON.parse(readFileSync(tokenFile, "utf8"));
@@ -35,12 +36,12 @@ await page.addInitScript((t) => localStorage.setItem("hassTokens", JSON.stringif
 
 await page.goto(`${ha}/llm-agent`);
 const panel = page.locator("llm-agent-panel");
-const box = panel.locator("textarea");
+const { box, value, fill } = composer(page, panel);
 await box.waitFor({ timeout: 60000 });
 await panel.locator(".welcome h2").waitFor();
 
 // 1. device control runs without approval in the default mode
-await box.fill("please switch on the test switch");
+await fill("please switch on the test switch");
 await box.press("Enter");
 await page.getByText("Done, the test switch is on.").waitFor({ timeout: 30000 });
 if ((await state("input_boolean.e2e_switch")) !== "on") fail("switch did not turn on");
@@ -48,7 +49,7 @@ if (!(await panel.locator(".usage").innerText()).includes("~$")) fail("no cost e
 await page.screenshot({ path: `${shots}/llm-agent-1-control.png` });
 
 // 2. a risky change waits for approval and shows a diff
-await box.fill("write file please");
+await fill("write file please");
 await box.press("Enter");
 const approve = panel.getByRole("button", { name: "Approve" });
 await approve.waitFor({ timeout: 30000 });
@@ -130,9 +131,9 @@ await box.waitFor({ timeout: 30000 });
 await panel.getByRole("button", { name: "Conversations" }).click();
 await panel.locator(".conv").first().click();
 await page.getByText("Done, the test switch is on.").waitFor({ timeout: 15000 });
-const composer = await panel.locator(".composer").boundingBox();
-if (!composer || composer.x < 0 || composer.x + composer.width > 390 || composer.y + composer.height > 844)
-  fail(`composer is off screen on a phone: ${JSON.stringify(composer)}`);
+const phoneBox = await panel.locator(".composer").boundingBox();
+if (!phoneBox || phoneBox.x < 0 || phoneBox.x + phoneBox.width > 390 || phoneBox.y + phoneBox.height > 844)
+  fail(`composer is off screen on a phone: ${JSON.stringify(phoneBox)}`);
 await page.screenshot({ path: `${shots}/llm-agent-4-phone.png` });
 
 // 6. retry replaces the last turn instead of adding another one
@@ -148,7 +149,7 @@ await page.screenshot({ path: `${shots}/llm-agent-5-retry.png` });
 
 // 7. a cut-off reply says why and offers Continue, also after reopening the chat
 await panel.getByRole("button", { name: "New chat" }).first().click();
-await box.fill("tell me a long story");
+await fill("tell me a long story");
 await box.press("Enter");
 const cont = panel.getByRole("button", { name: "Continue" });
 await cont.waitFor({ timeout: 15000 });
@@ -164,13 +165,13 @@ await panel.locator("input.model").focus();
 await panel.locator('datalist option[value="stub-model"]').waitFor({ state: "attached", timeout: 15000 });
 
 // 9. typing @ suggests entities; the box shows the name, and the id goes with the message
-await box.fill("");
+await fill("");
 await box.pressSequentially("turn on @e2e_sw");
 const option = panel.locator("ul.mentions li", { hasText: "input_boolean.e2e_switch" });
 await option.waitFor({ timeout: 10000 });
 await page.screenshot({ path: `${shots}/llm-agent-6-mention.png` });
 await box.press("Enter");
-const typed = await box.inputValue();
+const typed = await value();
 if (typed !== "turn on @E2E switch ") fail(`mention not inserted: ${JSON.stringify(typed)}`);
 if (await panel.locator("ul.mentions").count()) fail("suggestions stayed open after picking");
 
@@ -185,13 +186,13 @@ if ((await host.getAttribute("data-theme")) !== "dark") fail("dark theme not app
 await page.reload();
 await box.waitFor({ timeout: 30000 });
 if ((await host.getAttribute("data-theme")) !== "dark") fail("theme not kept after reload");
-await box.fill("line one");
+await fill("line one");
 await box.press("Enter");
-if ((await box.inputValue()) !== "line one\n") fail("Enter sent the message in Ctrl+Enter mode");
+if ((await value()) !== "line one\n") fail("Enter sent the message in Ctrl+Enter mode");
 await panel.getByRole("button", { name: "Panel settings" }).click();
 await panel.getByLabel("Send with").selectOption("enter");
 // the welcome screen in both explicit themes (screenshots only)
-await box.fill("");
+await fill("");
 await panel.getByRole("button", { name: "New chat" }).first().click();
 for (const theme of ["dark", "light"]) {
   if (!(await panel.locator(".prefs").count()))
@@ -208,12 +209,12 @@ await box.press("Escape");
 
 // 10b. the composer grows with its text, stops at its cap and scrolls, then shrinks back
 await panel.getByRole("button", { name: "New chat" }).first().click();
-await box.fill("");
+await fill("");
 const oneLine = (await box.boundingBox()).height;
-await box.fill("one\ntwo\nthree\nfour");
+await fill("one\ntwo\nthree\nfour");
 const fourLines = (await box.boundingBox()).height;
 if (fourLines < oneLine * 2) fail(`composer did not grow: ${oneLine}px for one line, ${fourLines}px for four`);
-await box.fill(Array.from({ length: 200 }, (_, i) => `line ${i}`).join("\n"));
+await fill(Array.from({ length: 200 }, (_, i) => `line ${i}`).join("\n"));
 const capped = await box.evaluate((el) => ({
   height: el.getBoundingClientRect().height,
   scrolls: el.scrollHeight > el.clientHeight,
@@ -222,7 +223,7 @@ const capped = await box.evaluate((el) => ({
 if (capped.height > capped.viewport * 0.41) fail(`composer passed its cap: ${capped.height}px of ${capped.viewport}px`);
 if (!capped.scrolls) fail("a capped composer does not scroll");
 await page.screenshot({ path: `${shots}/llm-agent-8b-composer-capped.png` });
-await box.fill("");
+await fill("");
 if ((await box.boundingBox()).height > oneLine + 1) fail("composer did not shrink back when emptied");
 
 // 10c. a text file goes with the message as a chip and reaches the model as text
@@ -232,7 +233,7 @@ await panel.getByLabel("Attach photos or files").setInputFiles({
   buffer: Buffer.from("light:\n  - platform: template\n"),
 });
 await panel.locator(".file", { hasText: "e2e_config.yaml" }).first().waitFor({ timeout: 10000 });
-await box.fill("what is in this file");
+await fill("what is in this file");
 await box.press("Enter");
 await page.getByText("I read the attached file.").waitFor({ timeout: 15000 });
 if (!(await panel.locator(".msg.user .file", { hasText: "e2e_config.yaml" }).count())) fail("sent file chip not shown");
@@ -242,7 +243,7 @@ await page.screenshot({ path: `${shots}/llm-agent-8c-file.png` });
 await panel.getByRole("button", { name: "New chat" }).first().click();
 await panel.getByLabel("Attach photos or files").setInputFiles(`${configDir}/camera.png`);
 await panel.locator(".attached img").waitFor({ timeout: 10000 });
-await box.fill("what is in this photo");
+await fill("what is in this photo");
 await box.press("Enter");
 await page.getByText("I can see 1 photo.").waitFor({ timeout: 15000 });
 if (!(await panel.locator(".msg.user .photos img").count())) fail("sent photo not shown");
@@ -270,7 +271,7 @@ for (let i = 0; (await panel.locator(".attached img").count()) < 3; i++) {
   if (i > 60) fail("noisy photos were not attached");
   await page.waitForTimeout(500);
 }
-await box.fill("three noisy photos");
+await fill("three noisy photos");
 await box.press("Enter");
 await page.getByText("I can see 3 photo.").waitFor({ timeout: 30000 });
 
@@ -278,7 +279,7 @@ await page.getByText("I can see 3 photo.").waitFor({ timeout: 30000 });
 await panel.getByRole("button", { name: "New chat" }).first().click();
 const outside = [];
 page.on("request", (r) => r.url().includes(".invalid") && outside.push(r.url()));
-await box.fill("make a new dashboard");
+await fill("make a new dashboard");
 await box.press("Enter");
 await panel.getByRole("button", { name: "Preview the dashboard" }).click({ timeout: 30000 });
 await panel.locator("llm-dashboard-preview").getByText("E2E preview").waitFor({ timeout: 15000 });
@@ -363,7 +364,7 @@ await page.screenshot({ path: `${shots}/llm-agent-8-scheduled.png` });
 
 // 17. a suggested note gets its own card, and its Save button waits a moment
 await panel.getByRole("button", { name: "New chat" }).first().click();
-await box.fill("remember the freezer plug");
+await fill("remember the freezer plug");
 await box.press("Enter");
 const card = panel.locator(".note-suggestion");
 await card.waitFor({ timeout: 15000 });
@@ -387,14 +388,14 @@ const send = panel.locator("button.send");
 const userTexts = () => panel.locator(".msg.user").allInnerTexts();
 const replyDone = () => panel.locator("button.send:not(.stop)").waitFor({ timeout: 15000 });
 // the panel sits inside Home Assistant's own shadow roots, so ask the element itself
-const focused = () => panel.evaluate((el) => el.shadowRoot.activeElement?.tagName);
+const focused = () => panel.evaluate((el) => el.shadowRoot.activeElement?.className);
 if (!(await send.isDisabled())) fail("Send is clickable with an empty composer");
-await box.fill("first question");
+await fill("first question");
 if (await send.isDisabled()) fail("Send stays disabled with text in the box");
 await box.press("Shift+Enter");
-if ((await box.inputValue()) !== "first question\n") fail("Shift+Enter did not add a new line");
+if ((await value()) !== "first question\n") fail("Shift+Enter did not add a new line");
 // Enter while an input method is still composing (Japanese, Chinese) picks a word, never sends
-await box.fill("first question");
+await fill("first question");
 await box.evaluate((el) =>
   el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing: true, bubbles: true, composed: true })),
 );
@@ -404,40 +405,40 @@ await box.press("Enter");
 await panel.locator(".msg.assistant", { hasText: "Hello from the stub model." }).waitFor({ timeout: 15000 });
 await replyDone();
 // sent with the button this time: focus still ends up back in the composer
-await box.fill("second question");
+await fill("second question");
 await send.click();
 await panel.locator(".msg.assistant").nth(1).waitFor({ timeout: 15000 });
 await replyDone();
-if ((await focused()) !== "TEXTAREA") fail(`focus did not come back to the composer: ${await focused()}`);
+if (!(await focused())?.split(" ").includes("box")) fail(`focus did not come back to the composer: ${await focused()}`);
 // Up arrow in an empty box takes the last message back for editing; Cancel puts it away
 await box.press("ArrowUp");
-if ((await box.inputValue()) !== "second question") fail("Up arrow did not load the last message");
+if ((await value()) !== "second question") fail("Up arrow did not load the last message");
 await panel.locator(".editing", { hasText: "Editing your last message" }).waitFor();
 await panel.locator(".editing button", { hasText: "Cancel" }).click();
-if ((await box.inputValue()) !== "") fail("Cancel left the edited text in the box");
+if ((await value()) !== "") fail("Cancel left the edited text in the box");
 // a draft stays with its chat, across switching chats and a reload
-await box.fill("half-typed draft");
+await fill("half-typed draft");
 await panel.locator(".conv", { hasText: "tell me a long story" }).click();
 await panel.locator(".msg.user", { hasText: "tell me a long story" }).waitFor({ timeout: 15000 });
-if ((await box.inputValue()) === "half-typed draft") fail("the draft followed into another chat");
+if ((await value()) === "half-typed draft") fail("the draft followed into another chat");
 await panel.locator(".conv", { hasText: "first question" }).click();
 await panel.locator(".msg.user", { hasText: "second question" }).waitFor({ timeout: 15000 });
-if ((await box.inputValue()) !== "half-typed draft") fail("the draft was lost switching chats");
+if ((await value()) !== "half-typed draft") fail("the draft was lost switching chats");
 await page.reload();
 await panel.locator(".msg.user", { hasText: "second question" }).waitFor({ timeout: 30000 });
-if ((await box.inputValue()) !== "half-typed draft") fail("the draft was lost on reload");
+if ((await value()) !== "half-typed draft") fail("the draft was lost on reload");
 // editing an earlier message replaces it and everything after it, on the server too
 await panel.locator(".row.user").first().getByRole("button", { name: "Edit" }).click();
-if ((await box.inputValue()) !== "first question") fail("Edit did not load the message");
+if ((await value()) !== "first question") fail("Edit did not load the message");
 await panel.locator(".editing", { hasText: "not undone" }).waitFor();
 await page.screenshot({ path: `${shots}/llm-agent-10-editor.png` });
-await box.fill("edited question");
+await fill("edited question");
 await box.press("Enter");
 await panel.locator(".msg.user", { hasText: "edited question" }).waitFor({ timeout: 15000 });
 await replyDone();
 if (JSON.stringify(await userTexts()) !== JSON.stringify(["edited question"]))
   fail(`edit did not replace the later turns: ${await userTexts()}`);
-if ((await box.inputValue()) !== "half-typed draft") fail("the draft did not come back after the edit");
+if ((await value()) !== "half-typed draft") fail("the draft did not come back after the edit");
 await page.reload();
 await panel.locator(".msg.user", { hasText: "edited question" }).waitFor({ timeout: 30000 });
 if (JSON.stringify(await userTexts()) !== JSON.stringify(["edited question"]))
@@ -454,7 +455,7 @@ await panel.locator(".msg-actions.acts button").last().click();
 const copied = await page.evaluate(() => window.copied);
 if (copied[0] !== "Hello from the stub model.") fail(`reply copy gave ${JSON.stringify(copied)}`);
 // Stop sits where Send was while a reply runs, and Esc stops it
-await box.fill("write file please");
+await fill("write file please");
 await box.press("Enter");
 await panel.getByRole("button", { name: "Approve" }).waitFor({ timeout: 30000 });
 await panel.locator("button.send.stop").waitFor();
@@ -476,10 +477,10 @@ await page.setViewportSize({ width: 1280, height: 800 });
 // 19. a sent message renders its Markdown (a code block stays a code block) and shows a
 // picked entity as a chip with its name, while the model still gets the exact id
 await panel.getByRole("button", { name: "New chat" }).first().click();
-await box.fill("```\nyaml: 1\n```\nturn on @e2e_sw");
+await fill("```\nyaml: 1\n```\nturn on @e2e_sw");
 await panel.locator("ul.mentions li", { hasText: "input_boolean.e2e_switch" }).click();
-if (!(await box.inputValue()).endsWith("turn on @E2E switch "))
-  fail(`picked name not shown: ${JSON.stringify(await box.inputValue())}`);
+if (!(await value()).endsWith("turn on @E2E switch "))
+  fail(`picked name not shown: ${JSON.stringify(await value())}`);
 await send.click();
 const sent = panel.locator(".msg.user").last();
 await sent.locator("pre code").waitFor({ timeout: 15000 });
@@ -492,11 +493,14 @@ if ((await chip.getAttribute("title")) !== "input_boolean.e2e_switch")
 await replyDone();
 await page.screenshot({ path: `${shots}/llm-agent-11-markdown-chips.png` });
 // editing it puts the name back in the box, and sending sends the id again
-await box.fill("");
+await fill("");
 await box.press("ArrowUp");
-if (!(await box.inputValue()).endsWith("turn on @E2E switch"))
-  fail(`editing did not show the name: ${JSON.stringify(await box.inputValue())}`);
+if (!(await value()).endsWith("turn on @E2E switch"))
+  fail(`editing did not show the name: ${JSON.stringify(await value())}`);
 await panel.locator(".editing button", { hasText: "Cancel" }).click();
+
+// 20. the chat box formats Markdown while it is typed, before sending
+await formattingSteps({ page, panel, shots, tag: "chromium", fail });
 
 // The panel follows the user's Home Assistant language.
 const de = JSON.parse(
@@ -509,9 +513,9 @@ await german.addInitScript((t) => {
   localStorage.setItem("selectedLanguage", JSON.stringify("de"));
 }, tokens);
 await german.goto(`${ha}/llm-agent`);
-const germanBox = german.locator("llm-agent-panel textarea");
+const germanBox = german.locator("llm-agent-panel .composer .box");
 await germanBox.waitFor({ timeout: 60000 });
-const placeholder = () => germanBox.getAttribute("placeholder");
+const placeholder = () => germanBox.getAttribute("data-placeholder");
 // the placeholder adds the send keys on a wide screen
 const inGerman = async () => (await placeholder())?.startsWith(de.composer_placeholder);
 for (let i = 0; i < 50 && !(await inGerman()); i++) await german.waitForTimeout(200);
