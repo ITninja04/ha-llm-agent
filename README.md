@@ -616,6 +616,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   copy on replies, up arrow to recall your last message, and Esc stops a reply from anywhere.
 - **0.9.3 (released):** home notes are separate notes you can edit, switch off or delete, and a
   knowledge base the agent reads only when a question needs it.
+- **0.9.4 (released):** your messages render Markdown (code blocks stay code blocks), and picked
+  devices, areas and entities show as names instead of ids.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
