@@ -196,6 +196,10 @@ Features:
 - model picker per conversation (suggestions plus free text)
 - token and $ footer
 - a settings link
+- the integration's own settings (its options flow over HA's flow API, admins only),
+  drawn in the panel, with a link to the integration's page in Home Assistant for
+  any step the panel cannot draw. A save reloads the entry with the panel kept
+  registered, so the admin stays in the panel.
 
 Image attachments are deferred to 0.2.
 

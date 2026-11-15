@@ -63,7 +63,6 @@
   "use_current_model": "Använd aktuell modell",
   "clear": "Rensa",
   "prefs_hint": "De här inställningarna sparas i den här webbläsaren.",
-  "prefs_hint_admin": "Agentens inställningar finns under Inställningar → Enheter och tjänster → LLM Agent → Konfigurera.",
   "greeting_morning": "God morgon",
   "greeting_afternoon": "God eftermiddag",
   "greeting_evening": "God kväll",
@@ -249,5 +248,19 @@
   "balance_none": "{name} har inget saldo som en API-nyckel kan läsa.",
   "balance_local": "{name} körs lokalt och har inget saldo.",
   "balance_error": "{name}: saldot kunde inte läsas ({error}).",
-  "billing_page": "Faktureringssida"
+  "billing_page": "Faktureringssida",
+  "integration_settings": "Integrationsinställningar",
+  "open_in_ha": "Öppna i Home Assistant",
+  "close": "Stäng",
+  "settings_loading": "Läser in integrationens inställningar.",
+  "settings_unsupported": "Det här steget kan inte visas här. Öppna det i Home Assistant för att fortsätta.",
+  "settings_error": "Det gick inte att öppna integrationens inställningar: {error}",
+  "settings_menu": "Tillbaka till menyn",
+  "settings_submit": "Skicka",
+  "settings_reloading": "Sparat. LLM Agent läses in igen med de nya inställningarna.",
+  "settings_reloaded": "Sparat. LLM Agent lästes in igen med de nya inställningarna.",
+  "settings_saved": "Sparat.",
+  "settings_reload_failed": "Sparat, men LLM Agent startade inte igen. Öppna den i Home Assistant för att se varför.",
+  "settings_back": "Tillbaka till chatten",
+  "settings_bad_json": "Det här är inte giltig JSON."
 }

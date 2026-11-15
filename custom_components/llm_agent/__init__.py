@@ -8,7 +8,7 @@ from pathlib import Path
 
 from homeassistant.components import frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
@@ -34,6 +34,8 @@ from .services import async_setup_services
 
 PLATFORMS = [Platform.AI_TASK, Platform.CONVERSATION]
 _REGISTERED = f"{DOMAIN}_registered"
+# Set while a settings save reloads the entry, so the unload keeps the panel.
+_KEEP_PANEL = f"{DOMAIN}_keep_panel"
 
 type LLMAgentConfigEntry = ConfigEntry[Agent]
 
@@ -66,19 +68,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> 
         websocket.async_register(hass)
         hass.data[_REGISTERED] = True
 
-    await panel_custom.async_register_panel(
-        hass,
-        frontend_url_path=PANEL_URL,
-        webcomponent_name=PANEL_ELEMENT,
-        sidebar_title=NAME,
-        sidebar_icon="mdi:robot-outline",
-        # the version query busts the browser cache after an update
-        module_url=f"{STATIC_URL}/{PANEL_ELEMENT}.js?v={version}",
-        embed_iframe=False,
-        # With household chat on, every user sees the panel; the WebSocket commands
-        # decide what each one may do.
-        require_admin=not setting(options, CONF_HOUSEHOLD),
-    )
+    # the version query busts the browser cache after an update
+    module_url = f"{STATIC_URL}/{PANEL_ELEMENT}.js?v={version}"
+    # With household chat on, every user sees the panel; the WebSocket commands
+    # decide what each one may do.
+    require_admin = not setting(options, CONF_HOUSEHOLD)
+    kept = hass.data.get(frontend.DATA_PANELS, {}).get(PANEL_URL)
+    if kept is not None and kept.config:
+        # Kept across a settings save (see _async_update_listener): update it in place,
+        # which sends the browser one change and, when nothing changed, none it acts on.
+        # panel_custom has no update option, so its config is reused with the new URL.
+        custom = {**kept.config["_panel_custom"], "module_url": module_url}
+        frontend.async_register_built_in_panel(
+            hass,
+            component_name="custom",
+            sidebar_title=NAME,
+            sidebar_icon="mdi:robot-outline",
+            frontend_url_path=PANEL_URL,
+            config={**kept.config, "_panel_custom": custom},
+            require_admin=require_admin,
+            update=True,
+        )
+    else:
+        await panel_custom.async_register_panel(
+            hass,
+            frontend_url_path=PANEL_URL,
+            webcomponent_name=PANEL_ELEMENT,
+            sidebar_title=NAME,
+            sidebar_icon="mdi:robot-outline",
+            module_url=module_url,
+            embed_iframe=False,
+            require_admin=require_admin,
+        )
 
     async def _auto_delete(_now: object = None) -> None:
         days = setting(options, CONF_AUTO_DELETE_DAYS)
@@ -94,7 +115,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> 
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)
+    """A settings save reloads the entry with the panel kept registered. Removing it,
+    even for the moment the reload takes, makes the frontend drop the open panel and
+    go to the default dashboard, so saving from inside the panel would throw the admin
+    out of it. Other unloads (disable, remove, a reload from the integrations page)
+    still remove the panel, so it never outlives an entry that is not coming back."""
+    hass.data[_KEEP_PANEL] = True
+    try:
+        await hass.config_entries.async_reload(entry.entry_id)
+    finally:
+        hass.data.pop(_KEEP_PANEL, None)
+        if entry.state is not ConfigEntryState.LOADED:  # the setup after it failed
+            frontend.async_remove_panel(hass, PANEL_URL, warn_if_unknown=False)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> bool:
@@ -110,7 +142,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) ->
         # let stopped turns save their last state before the new stores load
         await asyncio.wait(tasks, timeout=10)
     await agent.store.flush()
-    frontend.async_remove_panel(hass, PANEL_URL, warn_if_unknown=False)
+    if not hass.data.get(_KEEP_PANEL):
+        frontend.async_remove_panel(hass, PANEL_URL, warn_if_unknown=False)
     hass.data.pop(DOMAIN, None)
     return True
 

@@ -63,7 +63,6 @@
   "use_current_model": "使用目前模型",
   "clear": "清除",
   "prefs_hint": "這些設定儲存在此瀏覽器中。",
-  "prefs_hint_admin": "代理程式設定位於 設定 → 裝置與服務 → LLM Agent → 設定。",
   "greeting_morning": "早安",
   "greeting_afternoon": "午安",
   "greeting_evening": "晚安",
@@ -249,5 +248,19 @@
   "balance_none": "{name} 沒有 API 金鑰可以讀取的餘額。",
   "balance_local": "{name} 在本機執行，沒有餘額。",
   "balance_error": "{name}：無法讀取餘額（{error}）。",
-  "billing_page": "帳單頁面"
+  "billing_page": "帳單頁面",
+  "integration_settings": "整合設定",
+  "open_in_ha": "在 Home Assistant 中開啟",
+  "close": "關閉",
+  "settings_loading": "正在載入整合設定。",
+  "settings_unsupported": "此步驟無法在這裡顯示。請在 Home Assistant 中開啟以繼續。",
+  "settings_error": "無法開啟整合設定：{error}",
+  "settings_menu": "返回選單",
+  "settings_submit": "提交",
+  "settings_reloading": "已儲存。LLM Agent 正在使用新設定重新載入。",
+  "settings_reloaded": "已儲存。LLM Agent 已使用新設定重新載入。",
+  "settings_saved": "已儲存。",
+  "settings_reload_failed": "已儲存，但 LLM Agent 未能重新啟動。請在 Home Assistant 中開啟查看原因。",
+  "settings_back": "返回聊天",
+  "settings_bad_json": "這不是有效的 JSON。"
 }

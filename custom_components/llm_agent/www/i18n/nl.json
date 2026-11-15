@@ -63,7 +63,6 @@
   "use_current_model": "Huidig model gebruiken",
   "clear": "Wissen",
   "prefs_hint": "Deze instellingen worden in deze browser bewaard.",
-  "prefs_hint_admin": "Agentinstellingen vind je via Instellingen → Apparaten & diensten → LLM Agent → Configureren.",
   "greeting_morning": "Goedemorgen",
   "greeting_afternoon": "Goedemiddag",
   "greeting_evening": "Goedenavond",
@@ -249,5 +248,19 @@
   "balance_none": "{name} heeft geen saldo dat een API-sleutel kan lezen.",
   "balance_local": "{name} draait lokaal en heeft geen saldo.",
   "balance_error": "{name}: het saldo kon niet worden gelezen ({error}).",
-  "billing_page": "Factuurpagina"
+  "billing_page": "Factuurpagina",
+  "integration_settings": "Integratie-instellingen",
+  "open_in_ha": "Openen in Home Assistant",
+  "close": "Sluiten",
+  "settings_loading": "De instellingen van de integratie worden geladen.",
+  "settings_unsupported": "Deze stap kan hier niet worden getoond. Open hem in Home Assistant om verder te gaan.",
+  "settings_error": "Kan de instellingen van de integratie niet openen: {error}",
+  "settings_menu": "Terug naar het menu",
+  "settings_submit": "Verzenden",
+  "settings_reloading": "Opgeslagen. LLM Agent wordt opnieuw geladen met de nieuwe instellingen.",
+  "settings_reloaded": "Opgeslagen. LLM Agent is opnieuw geladen met de nieuwe instellingen.",
+  "settings_saved": "Opgeslagen.",
+  "settings_reload_failed": "Opgeslagen, maar LLM Agent is niet opnieuw gestart. Open hem in Home Assistant om te zien waarom.",
+  "settings_back": "Terug naar de chat",
+  "settings_bad_json": "Dit is geen geldige JSON."
 }

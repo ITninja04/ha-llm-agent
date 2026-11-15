@@ -63,7 +63,6 @@
   "use_current_model": "Use the current model",
   "clear": "Clear",
   "prefs_hint": "These settings are kept in this browser.",
-  "prefs_hint_admin": "Agent settings are under Settings → Devices & services → LLM Agent → Configure.",
   "greeting_morning": "Good morning",
   "greeting_afternoon": "Good afternoon",
   "greeting_evening": "Good evening",
@@ -249,5 +248,19 @@
   "balance_none": "{name} has no balance an API key can read.",
   "balance_local": "{name} runs locally and has no balance.",
   "balance_error": "{name}: the balance could not be read ({error}).",
-  "billing_page": "Billing page"
+  "billing_page": "Billing page",
+  "integration_settings": "Integration settings",
+  "open_in_ha": "Open in Home Assistant",
+  "close": "Close",
+  "settings_loading": "Loading the integration's settings.",
+  "settings_unsupported": "This step can't be shown here. Open it in Home Assistant to continue.",
+  "settings_error": "Could not open the integration's settings: {error}",
+  "settings_menu": "Back to the menu",
+  "settings_submit": "Submit",
+  "settings_reloading": "Saved. LLM Agent is reloading with the new settings.",
+  "settings_reloaded": "Saved. LLM Agent reloaded with the new settings.",
+  "settings_saved": "Saved.",
+  "settings_reload_failed": "Saved, but LLM Agent did not start again. Open it in Home Assistant to see why.",
+  "settings_back": "Back to chat",
+  "settings_bad_json": "This isn't valid JSON."
 }

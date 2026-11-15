@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { deflateSync, crc32 } from "node:zlib";
 import { chromium } from "playwright";
 import { composer, formattingSteps } from "./composer.mjs";
+import { settingsSteps } from "./settings.mjs";
 
 const [ha, tokenFile, configDir, shots = "/tmp"] = process.argv.slice(2);
 const tokens = JSON.parse(readFileSync(tokenFile, "utf8"));
@@ -568,6 +569,9 @@ await page.setViewportSize({ width: 1280, height: 800 });
 await setTheme("light");
 await panel.getByRole("button", { name: "Usage", exact: true }).click();
 if (await usageView.count()) fail("the Usage button did not close the view");
+
+// 22. the integration's settings inside the panel, and the jump to its page in HA
+await settingsSteps({ page, panel, browser, ha, tokens, shots, fail, fill, box });
 
 // The panel follows the user's Home Assistant language.
 const de = JSON.parse(

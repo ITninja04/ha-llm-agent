@@ -16,6 +16,7 @@ import "./preview";
 import "./changes";
 import "./notes";
 import "./usage";
+import { openInHa } from "./settings";
 import { styles } from "./styles";
 import type {
   ChatEvent,
@@ -90,6 +91,8 @@ class LlmAgentPanel extends LitElement {
   private picked = new Mentions();
   @state() private prefs: Prefs = loadPrefs();
   @state() private showPrefs = false;
+  /** The integration's own settings (its options flow), drawn over the panel. */
+  @state() private showSettings = false;
   /** A view in the chat's place: Changes, Notes or Usage, named by `view`. One flag for
    * all, so everything that hides the composer for Changes covers the others too. */
   @state() private showChanges = false;
@@ -318,6 +321,25 @@ class LlmAgentPanel extends LitElement {
   private get member(): boolean {
     return this.info?.is_admin === false;
   }
+
+  /** May change the integration's settings: HA's flow API refuses everyone else, the
+   * check here only keeps members from seeing entries that would fail for them. */
+  private get admin(): boolean {
+    return !this.member && !!this.hass?.user?.is_admin;
+  }
+
+  /** A settings save reloaded the integration: providers, models and limits may have
+   * changed, and a reply that was running was stopped by the reload. */
+  private readonly reloaded = async (): Promise<void> => {
+    try {
+      this.info = await this.ws.sendMessagePromise<Info>({ type: "llm_agent/info" });
+    } catch {
+      return;
+    }
+    if (!this.provider) this.startModel();
+    await this.refreshList();
+    if (this.convId) await this.open(this.convId).catch(() => undefined);
+  };
 
   private get provider(): ProviderInfo | undefined {
     return this.info?.providers.find((p) => p.id === this.providerId);
@@ -1180,6 +1202,15 @@ class LlmAgentPanel extends LitElement {
           </div>
           ${this.renderComposer()}
         </main>
+        ${
+          this.showSettings
+            ? html`<llm-agent-settings
+                .hass=${this.hass}
+                @close=${() => (this.showSettings = false)}
+                @reloaded=${this.reloaded}
+              ></llm-agent-settings>`
+            : nothing
+        }
       </div>
     `;
   }
@@ -1372,9 +1403,23 @@ class LlmAgentPanel extends LitElement {
         }
       </div>`
       }
-      <div class="hint">
-        ${t("prefs_hint")}${this.member ? "" : ` ${t("prefs_hint_admin")}`}
-      </div>
+      ${
+        this.admin
+          ? html`<div class="mine">
+              <button
+                class="small"
+                @click=${() => {
+                  this.showPrefs = false;
+                  this.showSettings = true;
+                }}
+              >
+                ${t("integration_settings")}
+              </button>
+              <button class="small ghost" @click=${openInHa}>${t("open_in_ha")}</button>
+            </div>`
+          : nothing
+      }
+      <div class="hint">${t("prefs_hint")}</div>
     </div>`;
   }
 

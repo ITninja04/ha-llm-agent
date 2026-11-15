@@ -63,7 +63,6 @@
   "use_current_model": "Usar el modelo actual",
   "clear": "Borrar",
   "prefs_hint": "Estos ajustes se guardan en este navegador.",
-  "prefs_hint_admin": "Los ajustes del agente están en Ajustes → Dispositivos y servicios → LLM Agent → Configurar.",
   "greeting_morning": "Buenos días",
   "greeting_afternoon": "Buenas tardes",
   "greeting_evening": "Buenas noches",
@@ -249,5 +248,19 @@
   "balance_none": "{name} no tiene un saldo que una clave de API pueda leer.",
   "balance_local": "{name} se ejecuta localmente y no tiene saldo.",
   "balance_error": "{name}: no se pudo leer el saldo ({error}).",
-  "billing_page": "Página de facturación"
+  "billing_page": "Página de facturación",
+  "integration_settings": "Ajustes de la integración",
+  "open_in_ha": "Abrir en Home Assistant",
+  "close": "Cerrar",
+  "settings_loading": "Cargando los ajustes de la integración.",
+  "settings_unsupported": "Este paso no se puede mostrar aquí. Ábrelo en Home Assistant para continuar.",
+  "settings_error": "No se pudieron abrir los ajustes de la integración: {error}",
+  "settings_menu": "Volver al menú",
+  "settings_submit": "Enviar",
+  "settings_reloading": "Guardado. LLM Agent se está recargando con los nuevos ajustes.",
+  "settings_reloaded": "Guardado. LLM Agent se recargó con los nuevos ajustes.",
+  "settings_saved": "Guardado.",
+  "settings_reload_failed": "Guardado, pero LLM Agent no volvió a iniciarse. Ábrelo en Home Assistant para ver por qué.",
+  "settings_back": "Volver al chat",
+  "settings_bad_json": "Esto no es JSON válido."
 }
