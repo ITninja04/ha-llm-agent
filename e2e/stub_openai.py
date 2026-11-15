@@ -4,7 +4,8 @@ Standard library only. Replies depend on the last user message:
   "switch on"  -> call_service input_boolean.turn_on, then a confirmation
   "write file" -> write_file (risky, needs approval), then a confirmation
   "long story" -> a reply cut off at the length limit
-  "remember"   -> update_home_notes (a note suggestion card), then a confirmation
+  "remember"   -> change_home_note adding one note (a note suggestion card), then a
+                  confirmation
   "new dashboard" -> save_dashboard for the main dashboard, which is refused until the
                      dashboards reference is read; then read_reference, then the same
                      save_dashboard again (risky, shows a preview)
@@ -117,8 +118,7 @@ def reply(messages: list[dict]) -> list[dict]:
         )
     if "remember" in user:
         return tool_call(
-            "update_home_notes",
-            {"notes": "The office is upstairs.\nNever switch off the freezer plug."},
+            "change_home_note", {"action": "add", "text": "Never switch off the freezer plug."}
         )
     if "new dashboard" in user:
         return save_dashboard()

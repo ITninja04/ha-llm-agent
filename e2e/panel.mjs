@@ -290,17 +290,63 @@ await page.screenshot({ path: `${shots}/llm-agent-6-dashboard-preview.png` });
 await panel.getByRole("button", { name: "Deny" }).click();
 await page.getByText("OK, I did not do that.").waitFor({ timeout: 15000 });
 
-// 15. home notes are edited in the panel and kept
+// 15. home notes are separate notes and the knowledge base separate entries, edited in
+// the Notes view and kept
 await panel.getByRole("button", { name: "Home notes" }).click();
-await panel.locator(".prefs.notes textarea").fill("The office is upstairs.");
-await panel.locator(".prefs.notes").getByRole("button", { name: "Save" }).click();
-await panel.getByText("Saved.").waitFor({ timeout: 10000 });
+const notesView = panel.locator("llm-agent-notes");
+const noteRow = (text) => notesView.locator(".row", { hasText: text });
+await notesView.getByRole("button", { name: "Add" }).click();
+await notesView.locator(".ed textarea").fill("The office is upstairs.");
+await notesView.getByRole("button", { name: "Save" }).click();
+await noteRow("The office is upstairs.").waitFor({ timeout: 10000 });
+await notesView.getByRole("button", { name: "Add" }).click();
+await notesView.locator(".ed textarea").fill("The old router is in the loft.");
+await notesView.getByRole("button", { name: "Save" }).click();
+await noteRow("The old router").getByRole("checkbox", { name: "Enabled" }).uncheck();
+await notesView.locator(".row.off", { hasText: "The old router" }).waitFor({ timeout: 10000 });
+// edit in place
+await noteRow("The office").getByRole("button", { name: "Edit" }).click();
+await notesView.locator(".ed textarea").fill("The office is upstairs, second door.");
+await notesView.getByRole("button", { name: "Save" }).click();
+await noteRow("second door").waitFor({ timeout: 10000 });
+if (!(await notesView.getByText(/characters left/).count())) fail("room left for notes not shown");
 await page.screenshot({ path: `${shots}/llm-agent-7-home-notes.png` });
+// delete asks inline, not with a browser dialog
+const dialogs = [];
+const onDialog = (d) => dialogs.push(d.message());
+page.on("dialog", onDialog);
+await noteRow("The old router").getByRole("button", { name: "Delete" }).click();
+await noteRow("The old router").getByText("Delete this?").waitFor({ timeout: 5000 });
+await noteRow("The old router").getByRole("button", { name: "Delete" }).click();
+for (let i = 0; i < 20 && (await noteRow("The old router").count()); i++) await page.waitForTimeout(250);
+if (await noteRow("The old router").count()) fail("deleted note still listed");
+page.off("dialog", onDialog);
+if (dialogs.length) fail(`delete opened a browser dialog: ${dialogs.join("; ")}`);
+// the knowledge base: a larger editor for the body
+await notesView.getByRole("tab", { name: "Knowledge" }).click();
+await notesView.getByRole("button", { name: "Add" }).click();
+await notesView.getByRole("textbox", { name: "Title" }).fill("Heating");
+await notesView.getByRole("textbox", { name: "One-line summary" }).fill("Two zones, boiler in the garage");
+await notesView.getByRole("textbox", { name: "Text (Markdown)" }).fill("## Zones\n- Zone 1: downstairs\n- Zone 2: upstairs\n");
+await notesView.getByRole("button", { name: "Save" }).click();
+await noteRow("Heating").waitFor({ timeout: 10000 });
+await page.screenshot({ path: `${shots}/llm-agent-7b-knowledge.png` });
+// on a phone the rows wrap inside the screen
+await page.setViewportSize({ width: 390, height: 844 });
+await page.waitForTimeout(200);
+const wide = await notesView.locator(".row, .bar").evaluateAll((els) =>
+  els.map((el) => el.getBoundingClientRect().right).filter((r) => r > 391),
+);
+if (wide.length) fail(`Notes rows wider than the phone: ${wide}`);
+await page.screenshot({ path: `${shots}/llm-agent-7c-knowledge-phone.png` });
+await page.setViewportSize({ width: 1280, height: 800 });
 await page.reload();
 await panel.getByRole("button", { name: "Home notes" }).click({ timeout: 30000 });
-const kept = await panel.locator(".prefs.notes textarea").inputValue();
-if (kept !== "The office is upstairs.") fail(`home notes not kept: ${kept}`);
-await page.keyboard.press("Escape");
+await noteRow("second door").waitFor({ timeout: 10000 });
+await notesView.getByRole("tab", { name: "Knowledge" }).click();
+await noteRow("Heating").waitFor({ timeout: 10000 });
+await panel.getByRole("button", { name: "Home notes" }).click();
+if (await notesView.count()) fail("the Home notes button did not close the Notes view");
 
 // 16. a scheduled prompt (llm_agent.ask from an automation) shows up named and marked
 await page.evaluate(() =>
@@ -330,13 +376,10 @@ await page.screenshot({ path: `${shots}/llm-agent-9-note-suggestion.png` });
 await save.click({ timeout: 5000 });
 await panel.getByText("I'll remember that.").waitFor({ timeout: 15000 });
 await panel.getByRole("button", { name: "Home notes" }).click();
-let notesNow = "";
-for (let i = 0; i < 20 && !notesNow.includes("freezer plug"); i++) {
-  await page.waitForTimeout(250); // the popover refreshes the notes from the server
-  notesNow = await panel.locator(".prefs.notes textarea").inputValue();
-}
-if (!notesNow.includes("freezer plug")) fail(`suggested note not saved: ${notesNow}`);
-await page.keyboard.press("Escape");
+const fromAi = noteRow("freezer plug");
+await fromAi.waitFor({ timeout: 10000 });
+if (!(await fromAi.getByText("from the AI").count())) fail("a note the AI suggested is not marked");
+await panel.getByRole("button", { name: "Home notes" }).click();
 
 // 18. the editor: keys, Stop, per-chat drafts, editing an earlier message, copy
 await panel.getByRole("button", { name: "New chat" }).first().click();
