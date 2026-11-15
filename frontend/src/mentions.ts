@@ -43,6 +43,11 @@ export class Mentions {
     return name;
   }
 
+  /** Every label picked so far, for the composer to draw as a pill. */
+  labels(): string[] {
+    return [...this.byLabel.keys()];
+  }
+
   /** Stored text to what the composer shows. */
   show(text: string, hass: Hass | undefined): string {
     return text.replace(TOKEN, (token, device, area, entity) => {

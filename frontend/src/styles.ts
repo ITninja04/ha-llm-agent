@@ -1102,6 +1102,128 @@ export const styles = css`
     max-height: 40dvh;
     overflow-y: auto;
   }
+  /* The Markdown editor that takes the textarea's place (composer.ts). It keeps the
+     textarea's type, padding and cap so swapping one for the other moves nothing. Its
+     classes are TinyMDE's; none of TinyMDE's own stylesheet is loaded, because its fixed
+     colours (black on white, red list markers) ignore the panel's themes. */
+  .composer .box {
+    font-size: 15px;
+    line-height: 1.5;
+    padding: 6px 2px 4px;
+    outline: none;
+    box-sizing: border-box;
+    min-height: calc(1.5em + 10px);
+    max-height: 40vh;
+    max-height: 40dvh;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    cursor: text;
+  }
+  .box.TinyMDE_empty {
+    position: relative;
+  }
+  .box.TinyMDE_empty::before {
+    content: attr(data-placeholder);
+    position: absolute;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .box .TMMark,
+  .box .TMInfoString {
+    color: var(--muted);
+  }
+  .box .TMH1,
+  .box .TMSetextH1 {
+    font-size: 1.35em;
+    font-weight: 650;
+    line-height: 1.35;
+  }
+  .box .TMH2,
+  .box .TMSetextH2 {
+    font-size: 1.2em;
+    font-weight: 650;
+    line-height: 1.35;
+  }
+  .box .TMH3,
+  .box .TMH4,
+  .box .TMH5,
+  .box .TMH6 {
+    font-size: 1.05em;
+    font-weight: 600;
+  }
+  /* A list item hangs its wrapped lines under its text, past the marker, as a rendered
+     list does; the marker itself is accented so the line reads as a bullet. */
+  .box .TMUL,
+  .box .TMOL {
+    padding-left: 1.1em;
+    text-indent: -1.1em;
+  }
+  .box .TMMark_TMUL,
+  .box .TMMark_TMOL {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .box .TMStrong {
+    font-weight: 650;
+  }
+  .box .TMEm {
+    font-style: italic;
+  }
+  .box .TMStrikethrough {
+    text-decoration: line-through;
+  }
+  .box .TMMark_TMCode,
+  .box .TMCode {
+    font-family: var(--mono);
+    font-size: 0.88em;
+  }
+  .box .TMCode {
+    background: var(--soft);
+    border-radius: 5px;
+    padding: 0.1em 0.2em;
+  }
+  /* A fenced block: every line of it, fences included, shares one shaded panel. */
+  .box .TMCodeFenceBacktickOpen,
+  .box .TMCodeFenceTildeOpen,
+  .box .TMFencedCodeBacktick,
+  .box .TMFencedCodeTilde,
+  .box .TMCodeFenceBacktickClose,
+  .box .TMCodeFenceTildeClose,
+  .box .TMIndentedCode {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--soft);
+    padding: 0 10px;
+  }
+  .box .TMCodeFenceBacktickOpen,
+  .box .TMCodeFenceTildeOpen {
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    padding-top: 4px;
+  }
+  .box .TMCodeFenceBacktickClose,
+  .box .TMCodeFenceTildeClose {
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    padding-bottom: 4px;
+  }
+  .box .TMBlockquote {
+    border-left: 3px solid var(--line);
+    padding-left: 10px;
+    color: var(--muted);
+  }
+  .box .TMLink,
+  .box .TMAutolink {
+    color: var(--accent);
+  }
+  /* A picked device, area or entity, drawn like the name chip in a sent message. Inline
+     with padding rather than inline-block, so the caret still moves through it letter by
+     letter and a long name wraps. */
+  .box .TMMention {
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 0.05em 0.45em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
   .composer.dragging {
     border-color: var(--accent);
     box-shadow:

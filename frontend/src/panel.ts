@@ -10,6 +10,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { repeat } from "lit/directives/repeat.js";
 import { has, type Key, loadLanguage, t } from "./i18n";
 import { renderMarkdown } from "./markdown";
+import { type ComposerBox, makeBox } from "./composer";
 import { Mentions, withChips } from "./mentions";
 import "./preview";
 import "./changes";
@@ -95,7 +96,9 @@ class LlmAgentPanel extends LitElement {
   @state() private mentionIndex = 0;
   private mentionStart = -1;
 
-  @query(".composer textarea") private input?: HTMLTextAreaElement;
+  @query(".composer textarea") private source?: HTMLTextAreaElement;
+  /** The chat box: the Markdown editor, or the textarea when the editor cannot start. */
+  private input?: ComposerBox;
   @query(".messages") private scroller?: HTMLElement;
 
   private gen = 0;
@@ -162,10 +165,33 @@ class LlmAgentPanel extends LitElement {
           if (c) this.requestUpdate();
         });
     }
+    this.attachBox();
     if (this.stickToBottom && this.scroller) {
       this.scroller.scrollTop = this.scroller.scrollHeight;
     }
     this.addCopyButtons();
+  }
+
+  /** The composer's textarea is rendered by the template; the box that formats it is
+   * made here, once per textarea, and kept in step with its placeholder. */
+  private attachBox(): void {
+    const ta = this.source;
+    if (!ta) return;
+    if (this.input?.source !== ta) {
+      this.input?.destroy();
+      this.input = makeBox(ta, {
+        onKey: (ev) => this.onKey(ev),
+        onChange: () => this.onInput(),
+        onPaste: (ev) => void this.onPaste(ev),
+        onBlur: () =>
+          // close the list unless focus came back (a pick by mouse refocuses the box)
+          setTimeout(() => {
+            if ((this.renderRoot as ShadowRoot).activeElement !== this.input?.el)
+              this.mentions = [];
+          }, 150),
+      });
+    }
+    this.input.setPlaceholder(ta.placeholder);
   }
 
   /** Copy buttons on code blocks in finished replies (the model's YAML is often pasted). */
@@ -260,7 +286,9 @@ class LlmAgentPanel extends LitElement {
   private setText(text: string): void {
     const ta = this.input;
     if (!ta) return;
-    ta.value = this.picked.show(text, this.hass);
+    const shown = this.picked.show(text, this.hass);
+    ta.setMentions(this.picked.labels());
+    ta.value = shown;
     this.stored(text);
   }
 
@@ -271,7 +299,7 @@ class LlmAgentPanel extends LitElement {
 
   private stored(text: string): void {
     this.hasText = !!text.trim();
-    this.autosize();
+    this.input?.fit();
     if (this.editAt < 0) saveDraft(this.draftKey, this.convId, text);
   }
 
@@ -281,7 +309,7 @@ class LlmAgentPanel extends LitElement {
   private focusComposer(): void {
     const active = (this.renderRoot as ShadowRoot).activeElement;
     if (matchMedia("(pointer: coarse)").matches) return;
-    if (active && active !== this.input && active.tagName !== "BUTTON") return;
+    if (active && active !== this.input?.el && active.tagName !== "BUTTON") return;
     this.input?.focus();
   }
 
@@ -963,21 +991,13 @@ class LlmAgentPanel extends LitElement {
     const end = ta.selectionStart ?? ta.value.length;
     const value = ta.value;
     const label = `@${this.picked.add(item.label, item.insert)} `;
+    ta.setMentions(this.picked.labels());
     ta.value = value.slice(0, this.mentionStart) + label + value.slice(end);
     this.stored(this.composed);
     const pos = this.mentionStart + label.length;
     ta.setSelectionRange(pos, pos);
     this.mentions = [];
     ta.focus();
-  }
-
-  /** Fit the box to its text. The cap lives in CSS (a share of the visible viewport,
-   * which shrinks when a phone keyboard opens); past it the box scrolls inside. */
-  private autosize(): void {
-    const ta = this.input;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${ta.scrollHeight}px`;
   }
 
   private onScroll(): void {
@@ -1704,15 +1724,6 @@ class LlmAgentPanel extends LitElement {
               ? t("composer_placeholder")
               : `${t("composer_placeholder")} (${t(this.prefs.send === "ctrl" ? "keys_ctrl" : "keys_enter")})`
           }
-          @keydown=${this.onKey}
-          @input=${this.onInput}
-          @paste=${this.onPaste}
-          @blur=${() =>
-            // close the list unless focus came back (a pick by mouse refocuses the box)
-            setTimeout(() => {
-              if ((this.renderRoot as ShadowRoot).activeElement !== this.input)
-                this.mentions = [];
-            }, 150)}
         ></textarea>
         ${
           this.mentions.length
