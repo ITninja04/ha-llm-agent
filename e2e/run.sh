@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end test: real Home Assistant container + stub model + headless Chromium.
+# End-to-end test: real Home Assistant container + stub model + headless Chromium and WebKit.
 # Usage: e2e/run.sh [ha-image]   (needs docker, python3, node)
 # LIVE_MODEL=<model> runs e2e/live_check.py against a real model in the running Ollama
 # container named by OLLAMA_CONTAINER (default hla-ollama) instead of the browser test.
@@ -69,6 +69,9 @@ python3 "$ROOT/e2e/setup_ha.py" "http://127.0.0.1:$HA_PORT" "http://stub:$STUB_P
 cd "$ROOT/e2e"
 [[ -d node_modules ]] || npm install --no-audit --no-fund >/dev/null
 node panel.mjs "http://127.0.0.1:$HA_PORT" "$WORK/tokens.json" "$WORK/config" "${SHOTS:-$WORK}" \
+  || { docker logs "$NAME" 2>&1 | grep -i "llm_agent\|error" | tail -40; exit 1; }
+# The chat box again in WebKit (Safari, the iPhone app): its caret code differs per engine.
+node webkit.mjs "http://127.0.0.1:$HA_PORT" "$WORK/tokens.json" "${SHOTS:-$WORK}" \
   || { docker logs "$NAME" 2>&1 | grep -i "llm_agent\|error" | tail -40; exit 1; }
 if docker logs "$NAME" 2>&1 | grep -q "Error.*llm_agent\|Traceback.*llm_agent"; then
   docker logs "$NAME" 2>&1 | grep -B2 -A20 "llm_agent" | tail -60

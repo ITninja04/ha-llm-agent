@@ -14,7 +14,7 @@ async function open(viewport) {
   const page = await browser.newPage({ viewport, deviceScaleFactor: 2 });
   await page.addInitScript((t) => localStorage.setItem("hassTokens", JSON.stringify(t)), tokens);
   await page.goto(`${ha}/llm-agent`);
-  await page.locator("llm-agent-panel textarea").waitFor({ timeout: 60000 });
+  await page.locator("llm-agent-panel .composer .box").waitFor({ timeout: 60000 });
   return page;
 }
 
