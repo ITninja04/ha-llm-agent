@@ -1,4 +1,5 @@
-"""Conversation storage: a small index plus one HA Store file per conversation.
+"""Conversation storage: a small index plus one HA Store file per conversation, and the
+home notes and knowledge base in a Store file of their own.
 
 Writes are debounced, so a streaming turn costs one disk write, not hundreds.
 """
@@ -15,7 +16,18 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN, MAX_CONVERSATIONS, NOTES_MAX
+from .const import (
+    DOMAIN,
+    KNOWLEDGE_BODY_MAX,
+    KNOWLEDGE_COUNT_MAX,
+    KNOWLEDGE_INDEX_MAX,
+    KNOWLEDGE_SUMMARY_MAX,
+    KNOWLEDGE_TITLE_MAX,
+    MAX_CONVERSATIONS,
+    NOTE_MAX,
+    NOTES_COUNT_MAX,
+    NOTES_MAX,
+)
 
 VERSION = 1
 SAVE_DELAY = 2
@@ -58,8 +70,8 @@ class ConversationStore:
         self._user_spend: dict[str, dict[str, float]] = {}
         # user id -> {"provider_id", "model"}: each admin's default for new chats
         self._prefs: dict[str, dict[str, str]] = {}
-        # Home notes: facts and rules the household wants every chat to know
-        self._notes = ""
+        # Home notes and knowledge base: facts about this home the household keeps
+        self.home = HomeNotes(hass, self._delay_save)
         self.cache_size = CACHE_SIZE
         self.max_chats = MAX_CONVERSATIONS
 
@@ -69,8 +81,10 @@ class ConversationStore:
         self._spend = data.get("spend", {})
         self._user_spend = data.get("user_spend", {})
         self._prefs = data.get("prefs", {})
-        notes = data.get("notes", "")
-        self._notes = notes if isinstance(notes, str) else ""
+        # Before 0.10 the notes were one text in this file. They move to their own file
+        # once; saving the index again drops the old key.
+        if await self.home.async_load(data.get("notes")):
+            self._save_index()
 
     def user_default(self, user_id: str) -> dict[str, str] | None:
         return self._prefs.get(user_id)
@@ -80,14 +94,6 @@ class ConversationStore:
             self._prefs[user_id] = {"provider_id": provider_id, "model": model}
         else:
             self._prefs.pop(user_id, None)
-        self._save_index()
-
-    @property
-    def notes(self) -> str:
-        return self._notes
-
-    def set_notes(self, text: str) -> None:
-        self._notes = text.strip()[:NOTES_MAX]
         self._save_index()
 
     def add_spend(self, day: str, cost: float, user_id: str | None = None) -> None:
@@ -146,7 +152,6 @@ class ConversationStore:
                 "spend": self._spend,
                 "user_spend": self._user_spend,
                 "prefs": self._prefs,
-                "notes": self._notes,
             },
         )
 
@@ -310,6 +315,301 @@ class ConversationStore:
             return total
 
         return {"chats": len(self._index), "bytes": await self.hass.async_add_executor_job(_size)}
+
+
+class Refused(ValueError):
+    """A note or knowledge change that breaks a limit. The message is shown to a person or
+    the model as it is, so it says what to do instead."""
+
+
+def _one_line(text: Any) -> str:
+    # A note is one line of the prompt, so line breaks typed into it become spaces.
+    return " ".join(str(text or "").split())
+
+
+class HomeNotes:
+    """Home notes (short facts and rules, all enabled ones in every admin chat) and the
+    knowledge base (longer entries; only their titles and summaries go into a chat, and
+    the model reads a body when it needs it).
+
+    The limits are checked here and nowhere else, so the panel, the AI's approved
+    suggestions and undo all refuse the same things with the same words. Both lists
+    live in one Store file rather than the chat index, because the index is rewritten
+    on every chat save and knowledge bodies can be long.
+    """
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        delay_save: Callable[[str, Store[dict[str, Any]], Callable[[], Any]], None],
+    ) -> None:
+        self._store: Store[dict[str, Any]] = Store(hass, VERSION, f"{DOMAIN}.home_notes")
+        self._delay_save = delay_save
+        self.notes: list[dict[str, Any]] = []
+        self.knowledge: list[dict[str, Any]] = []
+
+    async def async_load(self, legacy: Any = None) -> bool:
+        """Load, or turn the pre-0.10 notes text `legacy` into one note per non-empty
+        line. True when that migration ran. A line longer than a note may be now is kept
+        whole: nothing the household wrote is cut, and the old 2000 character cap on the
+        whole text means the enabled total still fits."""
+        data = await self._store.async_load()
+        if data is not None:
+            self.notes = [n for n in data.get("notes", []) if isinstance(n, dict) and n.get("id")]
+            self.knowledge = [
+                k for k in data.get("knowledge", []) if isinstance(k, dict) and k.get("id")
+            ]
+            return False
+        if not isinstance(legacy, str) or not legacy.strip():
+            return False
+        self.notes = _lines_to_notes(legacy)
+        # Written now, not delayed: the index drops the old text on its next save, and
+        # that must not happen before the notes are safely in their new file.
+        await self._store.async_save(self._data())
+        return True
+
+    def _data(self) -> dict[str, Any]:
+        return {"notes": self.notes, "knowledge": self.knowledge}
+
+    def _changed(self) -> None:
+        self._delay_save("home_notes", self._store, self._data)
+
+    # Notes
+
+    def note(self, note_id: str) -> dict[str, Any] | None:
+        return next((n for n in self.notes if n["id"] == note_id), None)
+
+    def room(self, exclude: str | None = None) -> int:
+        """Characters left for enabled notes, not counting note `exclude`."""
+        used = sum(len(n["text"]) for n in self.notes if n.get("enabled") and n["id"] != exclude)
+        return NOTES_MAX - used
+
+    def notes_prompt(self) -> str:
+        """The enabled notes, one line each with the id the AI's tool needs."""
+        return "\n".join(f"- [{n['id']}] {n['text']}" for n in self.notes if n.get("enabled"))
+
+    def save_note(
+        self,
+        note_id: str | None,
+        text: str | None = None,
+        enabled: bool | None = None,
+        by: str = "person",
+        user_id: str | None = None,
+        new_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Add a note (no id) or change one. Raises Refused. `new_id` names a new note,
+        so an undo snapshot can be written before the note exists."""
+        old = self._find(self.notes, note_id, "note")
+        if old is None and len(self.notes) >= NOTES_COUNT_MAX:
+            raise Refused(
+                f"There are already {NOTES_COUNT_MAX} notes. Remove one you no longer need."
+            )
+        new_text = old["text"] if old and text is None else _one_line(text)
+        if text is not None or old is None:
+            if not new_text:
+                raise Refused("A note needs some text.")
+            if len(new_text) > NOTE_MAX:
+                raise Refused(
+                    f"A note can be at most {NOTE_MAX} characters; this one has "
+                    f"{len(new_text)}. Shorten it, or put longer text in the knowledge base."
+                )
+        on = (old.get("enabled", True) if old else True) if enabled is None else enabled
+        if on and len(new_text) > (left := self.room(exclude=note_id)):
+            raise Refused(
+                f"Enabled notes can use {NOTES_MAX} characters in all and {max(left, 0)} "
+                f"are left; this note has {len(new_text)}. Shorten it, or disable or "
+                "remove another note."
+            )
+        note = self._put(
+            self.notes, old, {"text": new_text, "enabled": on}, by, user_id, new_id or new_note_id()
+        )
+        self._changed()
+        return note
+
+    def remove_note(self, note_id: str) -> None:
+        self._remove(self.notes, note_id, "note")
+
+    def restore_note(self, note_id: str, note: dict[str, Any] | None) -> None:
+        """Put a note back as it was (None: it did not exist), for undo. The room is
+        checked again, since other notes may have been enabled since."""
+        if note and note.get("enabled") and len(note["text"]) > self.room(exclude=note_id):
+            raise Refused(
+                "Putting this note back would go over the space for enabled notes. "
+                "Disable or remove another note first."
+            )
+        self._restore(self.notes, note_id, note)
+
+    def replace_notes_text(self, text: str) -> None:
+        """Undo a change made before 0.10, when the notes were one text."""
+        self.notes = _lines_to_notes(text)
+        self._changed()
+
+    # Knowledge base
+
+    def entry(self, entry_id: str) -> dict[str, Any] | None:
+        return next((k for k in self.knowledge if k["id"] == entry_id), None)
+
+    @staticmethod
+    def index_line(entry: dict[str, Any]) -> str:
+        return f"- {entry['id']}: {entry['title']}: {entry['summary']}"
+
+    def index_room(self, exclude: str | None = None) -> int:
+        used = sum(
+            len(self.index_line(k)) + 1
+            for k in self.knowledge
+            if k.get("enabled") and k["id"] != exclude
+        )
+        return KNOWLEDGE_INDEX_MAX - used
+
+    def knowledge_index(self) -> str:
+        return "\n".join(self.index_line(k) for k in self.knowledge if k.get("enabled"))
+
+    def save_entry(
+        self,
+        entry_id: str | None,
+        title: str | None = None,
+        summary: str | None = None,
+        body: str | None = None,
+        enabled: bool | None = None,
+        by: str = "person",
+        user_id: str | None = None,
+        new_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Add an entry (no id) or change one. Raises Refused."""
+        old = self._find(self.knowledge, entry_id, "knowledge entry")
+        if old is None and len(self.knowledge) >= KNOWLEDGE_COUNT_MAX:
+            raise Refused(
+                f"There are already {KNOWLEDGE_COUNT_MAX} knowledge entries. Remove one "
+                "you no longer need."
+            )
+        fields = {
+            "title": _one_line(title) if title is not None else (old or {}).get("title", ""),
+            "summary": _one_line(summary)
+            if summary is not None
+            else (old or {}).get("summary", ""),
+            "body": str(body).strip() if body is not None else (old or {}).get("body", ""),
+        }
+        for key, limit in (
+            ("title", KNOWLEDGE_TITLE_MAX),
+            ("summary", KNOWLEDGE_SUMMARY_MAX),
+            ("body", KNOWLEDGE_BODY_MAX),
+        ):
+            if not fields[key]:
+                raise Refused(f"A knowledge entry needs a {key}.")
+            if len(fields[key]) > limit:
+                raise Refused(
+                    f"A knowledge entry's {key} can be at most {limit} characters; this "
+                    f"one has {len(fields[key])}."
+                )
+        fields["enabled"] = (
+            (old.get("enabled", True) if old else True) if enabled is None else enabled
+        )
+        new_id = new_id or new_entry_id()
+        probe = {"id": entry_id or new_id, **fields}
+        if fields["enabled"] and len(self.index_line(probe)) + 1 > (
+            left := self.index_room(exclude=entry_id)
+        ):
+            raise Refused(
+                f"The titles and summaries of enabled entries can use {KNOWLEDGE_INDEX_MAX} "
+                f"characters in all, and {max(left, 0)} are left. Shorten this title or "
+                "summary, or disable or remove another entry."
+            )
+        entry = self._put(self.knowledge, old, fields, by, user_id, new_id)
+        self._changed()
+        return entry
+
+    def remove_entry(self, entry_id: str) -> None:
+        self._remove(self.knowledge, entry_id, "knowledge entry")
+
+    def restore_entry(self, entry_id: str, entry: dict[str, Any] | None) -> None:
+        if (
+            entry
+            and entry.get("enabled")
+            and len(self.index_line(entry)) + 1 > self.index_room(exclude=entry_id)
+        ):
+            raise Refused(
+                "Putting this entry back would go over the space for the knowledge index. "
+                "Disable or remove another entry first."
+            )
+        self._restore(self.knowledge, entry_id, entry)
+
+    # Shared
+
+    @staticmethod
+    def _find(items: list[dict[str, Any]], item_id: str | None, name: str) -> Any:
+        if not item_id:
+            return None
+        found = next((i for i in items if i["id"] == item_id), None)
+        if found is None:
+            raise Refused(f"There is no {name} {item_id}; it may have been removed.")
+        return found
+
+    @staticmethod
+    def _put(
+        items: list[dict[str, Any]],
+        old: dict[str, Any] | None,
+        fields: dict[str, Any],
+        by: str,
+        user_id: str | None,
+        new_id: str,
+    ) -> dict[str, Any]:
+        now = time.time()
+        if old is not None:
+            # A new dict, not an edit in place: a waiting approval keeps the copy it
+            # showed and compares it with this one.
+            new = {**old, **fields, "updated": now}
+            items[items.index(old)] = new
+            return new
+        new = {
+            "id": new_id,
+            **fields,
+            "created": now,
+            "updated": now,
+            "added_by": by,
+            **({"user_id": user_id} if user_id else {}),
+        }
+        items.append(new)
+        return new
+
+    def _remove(self, items: list[dict[str, Any]], item_id: str, name: str) -> None:
+        items.remove(self._find(items, item_id, name))
+        self._changed()
+
+    def _restore(
+        self, items: list[dict[str, Any]], item_id: str, item: dict[str, Any] | None
+    ) -> None:
+        at = next((i for i, x in enumerate(items) if x["id"] == item_id), None)
+        if item is None:
+            if at is not None:
+                items.pop(at)
+        elif at is None:
+            items.append(item)
+        else:
+            items[at] = item
+        self._changed()
+
+
+def new_note_id() -> str:
+    return "n" + secrets.token_hex(4)
+
+
+def new_entry_id() -> str:
+    return "k" + secrets.token_hex(4)
+
+
+def _lines_to_notes(text: str) -> list[dict[str, Any]]:
+    now = time.time()
+    return [
+        {
+            "id": new_note_id(),
+            "text": _one_line(line),
+            "enabled": True,
+            "created": now,
+            "updated": now,
+        }
+        for line in text.splitlines()
+        if line.strip()
+    ]
 
 
 def _snippet(text: str, needle: str, width: int = 60) -> str:

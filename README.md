@@ -89,8 +89,8 @@ the integration, and that deletes its settings. Export them first:
    **Restore settings from an export**. Setup skips the provider step and comes back with
    every provider, key, rule and setting.
 
-Chats and home notes are not in the export and don't need to be: deleting the integration
-leaves them in place, and the new install picks them up. A ChatGPT sign-in is deleted with
+Chats, home notes and the knowledge base are not in the export and don't need to be:
+deleting the integration leaves them in place, and the new install picks them up. A ChatGPT sign-in is deleted with
 the integration, so a ChatGPT provider signs in again.
 
 ## What it can do
@@ -289,10 +289,28 @@ every chat counts as having read outside content, like a web page, and every cha
 you first, in every approval mode. The approval card shows exactly what is sent.
 Automations (`llm_agent.ask`) don't get MCP tools, because nobody is there to approve.
 
-**Home notes.** The notebook button in the panel's header holds short facts and rules
-that every chat sees ("the office is upstairs", "never turn off the freezer plug"). You
-can edit them there, and the AI can propose changes. Those always ask you, in every
-approval mode (the reviewer can't approve them), and can be undone.
+**Home notes and knowledge.** The notebook button in the panel's header opens two lists
+about your home, for admins only:
+- **Notes** are short lasting facts and household rules ("the office is upstairs", "never
+  turn off the freezer plug"). Each note is one line of at most 300 characters, and each
+  can be switched off without deleting it. Every enabled note goes into every admin chat,
+  so together they are capped at 2,000 characters. A note that would go over is refused,
+  with the room left. Switched-off notes don't count.
+- **Knowledge** holds longer reference: a title, a one-line summary and a Markdown text of
+  up to 20,000 characters ("how the heating is zoned", "what each breaker feeds"). Only
+  the titles and summaries of enabled entries go into a chat, capped at 3,000 characters
+  in all. The AI reads an entry's text when a question needs it. It does not see
+  switched-off entries at all.
+
+You can add, edit, switch off and delete both in the panel. The AI can propose one change
+at a time (add, edit, switch off or remove one note or entry). Those always ask you, in
+every approval mode (the reviewer can't approve them), show that one item before and
+after, are refused if the item changed while the card waited, and can be undone. At most
+100 notes and 100 entries.
+
+Neither is the place to change how the AI behaves. Ask it to "always answer in French"
+and it tells you to use **Extra instructions for the AI** in the settings instead. It
+won't save that as a note. Household members' chats get neither notes nor knowledge.
 
 **Web content.** Pages and search results can contain text written to steer an AI. Once a
 chat has read anything from the web, every change in that chat asks you first, whatever
@@ -307,7 +325,7 @@ locks), `deny cover.garage_door` (never do it). Patterns match a `domain.service
 entity id or a tool name, and `*` matches anything. Deny wins over ask, and ask over
 allow. An allow only counts when it covers everything the call touches, so `allow
 light.*` never lets through a call that also reaches a lock. Rules never switch off the
-asking that web content, MCP tools or home notes turn on, and never let a member's risky
+asking that web content, MCP tools or note and knowledge changes turn on, and never let a member's risky
 action skip the admin. An `ask` rule also asks before reads (`ask home_history`). If
 what a call reaches changes while it waits for approval (a device joins the targeted
 area), it isn't run. Start a line with `members` to apply it only to household members'
@@ -322,7 +340,7 @@ phone**) and users who aren't admins get the AI panel too:
   assistants → Expose), by entity id, the same set a voice assistant gets, and only with
   everyday controls (on and off, brightness, temperature, media, covers, locks, alarms,
   scenes and scripts by name);
-- no settings, files, automations, dashboards, notes, undo or model choice;
+- no settings, files, automations, dashboards, notes, knowledge, undo or model choice;
 - Autopilot and Reviewer don't apply to them: everyday changes ask them as in the default
   mode, and risky ones (locks, alarms, garage doors, scripts) need an admin's approval on the
   phone. Without a phone set up, those are refused;
@@ -437,7 +455,7 @@ as a conversation log.
   not checked this way, and models on the smaller tool set skip the check because they
   can't read the pages.
 - **One approval phone.** Approvals by phone go to one notify action, not to each admin.
-- **Undo covers files and dashboards only.** Device actions (on/off) and registry changes
+- **Undo covers files, dashboards, and the AI's changes to notes and knowledge.** Device actions (on/off) and registry changes
   (renames, areas) can't be undone, so ask it to change them back. Integration removal and
   HACS installs are covered by the automatic backup instead.
 - **Pictures need a vision model.** Camera snapshots and photos only work with models
@@ -468,6 +486,7 @@ telemetry.
 | Data | Where | Limit |
 | --- | --- | --- |
 | Conversations | `/config/.storage/llm_agent.*` | Loaded on demand; 5 kept in memory, 200 saved per person (both adjustable) |
+| Home notes and knowledge | `/config/.storage/llm_agent.home_notes` | 100 notes of 300 characters, 100 entries of 20,000 characters |
 | Undo snapshots | `/config/.llm_agent/snapshots/` | 50 MB and 50 snapshots, oldest removed first (adjustable) |
 | Audit log | `/config/.llm_agent/audit.jsonl` | Rotated at 2 MB (adjustable) |
 
