@@ -7277,7 +7277,7 @@ summary{cursor:pointer;padding:12px 0;font-weight:600;font-size:14px}
 			"menu",
 			"abort",
 			"create_entry"
-		].includes(e.type) || !fa(t);
+		].includes(e.type) || e.type === "form" && !fa(t);
 		e.type === "form" && (this.v = pa(t), this.raw = {}), this.s = {
 			step: e,
 			stuck: n

@@ -188,7 +188,10 @@ summary{cursor:pointer;padding:12px 0;font-weight:600;font-size:14px}
 
   private show(step: Step): void {
     const fs = step.data_schema ?? [];
-    const stuck = !["form", "menu", "abort", "create_entry"].includes(step.type) || !drawable(fs);
+    // a menu's schema is HA's own next_step_id list, drawn as buttons, never as fields
+    const stuck =
+      !["form", "menu", "abort", "create_entry"].includes(step.type) ||
+      (step.type === "form" && !drawable(fs));
     if (step.type === "form") {
       this.v = initial(fs);
       this.raw = {};
