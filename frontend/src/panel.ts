@@ -15,6 +15,7 @@ import { Mentions, withChips } from "./mentions";
 import "./preview";
 import "./changes";
 import "./notes";
+import "./usage";
 import { styles } from "./styles";
 import type {
   ChatEvent,
@@ -89,10 +90,10 @@ class LlmAgentPanel extends LitElement {
   private picked = new Mentions();
   @state() private prefs: Prefs = loadPrefs();
   @state() private showPrefs = false;
-  /** A view in the chat's place: Changes, or Notes when notesView is set. One flag for
-   * both, so everything that hides the composer for Changes covers Notes too. */
+  /** A view in the chat's place: Changes, Notes or Usage, named by `view`. One flag for
+   * all, so everything that hides the composer for Changes covers the others too. */
   @state() private showChanges = false;
-  @state() private notesView = false;
+  @state() private view: "changes" | "notes" | "usage" = "changes";
   @state() private mentionIndex = 0;
   private mentionStart = -1;
 
@@ -1063,7 +1064,7 @@ class LlmAgentPanel extends LitElement {
                 icon=${this.narrow ? "mdi:forum-outline" : "mdi:dock-left"}
               ></ha-icon>
             </button>
-            <div class="title">${this.showChanges ? t(this.notesView ? "home_notes" : "changes") : chatName(this.chatTitle)}</div>
+            <div class="title">${this.showChanges ? t(this.view === "notes" ? "home_notes" : this.view) : chatName(this.chatTitle)}</div>
             ${
               this.items.length
                 ? html`<button
@@ -1095,10 +1096,10 @@ class LlmAgentPanel extends LitElement {
                     class="icon"
                     title=${t("home_notes")}
                     aria-label=${t("home_notes")}
-                    aria-pressed=${this.showChanges && this.notesView}
+                    aria-pressed=${this.showChanges && this.view === "notes"}
                     @click=${() => {
-                      this.showChanges = !(this.showChanges && this.notesView);
-                      this.notesView = true;
+                      this.showChanges = !(this.showChanges && this.view === "notes");
+                      this.view = "notes";
                     }}
                   >
                     <ha-icon icon="mdi:notebook-outline"></ha-icon>
@@ -1111,13 +1112,29 @@ class LlmAgentPanel extends LitElement {
                     class="icon"
                     title=${t("changes_title")}
                     aria-label=${t("changes")}
-                    aria-pressed=${this.showChanges && !this.notesView}
+                    aria-pressed=${this.showChanges && this.view === "changes"}
                     @click=${() => {
-                      this.showChanges = !this.showChanges || this.notesView;
-                      this.notesView = false;
+                      this.showChanges = !(this.showChanges && this.view === "changes");
+                      this.view = "changes";
                     }}
                   >
                     <ha-icon icon="mdi:history"></ha-icon>
+                  </button>`
+            }
+            ${
+              this.member
+                ? nothing
+                : html`<button
+                    class="icon"
+                    title=${t("usage_view_title")}
+                    aria-label=${t("usage")}
+                    aria-pressed=${this.showChanges && this.view === "usage"}
+                    @click=${() => {
+                      this.showChanges = !(this.showChanges && this.view === "usage");
+                      this.view = "usage";
+                    }}
+                  >
+                    <ha-icon icon="mdi:chart-bar"></ha-icon>
                   </button>`
             }
             <button
@@ -1132,8 +1149,10 @@ class LlmAgentPanel extends LitElement {
             ${this.showPrefs ? this.renderPrefs() : nothing}
           </header>
           ${
-            this.showChanges && this.notesView
+            this.showChanges && this.view === "notes"
               ? html`<llm-agent-notes .hass=${this.hass}></llm-agent-notes>`
+              : this.showChanges && this.view === "usage"
+              ? html`<llm-agent-usage .hass=${this.hass}></llm-agent-usage>`
               : this.showChanges
               ? html`<llm-agent-changes
                   .hass=${this.hass}

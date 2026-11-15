@@ -502,6 +502,69 @@ await panel.locator(".editing button", { hasText: "Cancel" }).click();
 // 20. the chat box formats Markdown while it is typed, before sending
 await formattingSteps({ page, panel, shots, tag: "chromium", fail });
 
+// 21. the Usage view: spend per day as bars, totals, the breakdown with an AI Task row of
+// its own, and the provider balance line, in both themes and at phone width.
+// One AI Task call first, the way an automation would make it, so its row is there.
+const api = (path, body) =>
+  fetch(`${ha}/api/${path}`, {
+    method: body ? "POST" : "GET",
+    headers: { authorization: `Bearer ${tokens.access_token}`, "content-type": "application/json" },
+    body: body && JSON.stringify(body),
+  });
+const taskEntity = (await (await api("states")).json()).find((s) => s.entity_id.startsWith("ai_task."));
+if (!taskEntity) fail("no AI Task entity");
+const task = await api("services/ai_task/generate_data?return_response", {
+  task_name: "e2e",
+  entity_id: taskEntity.entity_id,
+  instructions: "Say hello",
+});
+if (!task.ok) fail(`AI Task call failed: HTTP ${task.status} ${await task.text()}`);
+await panel.getByRole("button", { name: "Usage", exact: true }).click();
+const usageView = panel.locator("llm-agent-usage");
+await usageView.locator(".tot").waitFor({ timeout: 10000 });
+const totals = await usageView.locator(".tot").innerText();
+if (!/Today\s*\$0\.\d*[1-9]/.test(totals)) fail(`no spend today in the Usage totals: ${totals}`);
+const bars = usageView.locator("svg rect.b");
+if ((await bars.count()) !== 30) fail(`expected 30 day bars, got ${await bars.count()}`);
+const todayBar = usageView.locator("svg g").last();
+if (!(Number(await todayBar.locator("rect.b").getAttribute("height")) > 0)) fail("today's bar is empty");
+if (!/: \$\d+\.\d+$/.test(await todayBar.locator("title").textContent())) fail("bar title lacks date and amount");
+const stubRows = usageView.locator("tr", { hasText: "stub-model" });
+if ((await stubRows.count()) < 2) fail("breakdown lacks the chat and the AI Task rows");
+if (!(await usageView.locator("tr.task", { hasText: "AI Task" }).count())) fail("AI Task not in its own row");
+await usageView.getByText("has no balance an API key can read").waitFor();
+await usageView.getByRole("link", { name: "Billing page" }).waitFor();
+await usageView.getByRole("tab", { name: "7 days" }).click();
+for (let i = 0; i < 50 && (await bars.count()) !== 7; i++) await page.waitForTimeout(100);
+if ((await bars.count()) !== 7) fail(`7 day range shows ${await bars.count()} bars`);
+await usageView.getByRole("tab", { name: "30 days" }).click();
+for (let i = 0; i < 50 && (await bars.count()) !== 30; i++) await page.waitForTimeout(100);
+const setTheme = async (theme) => {
+  if (!(await panel.locator(".prefs").count()))
+    await panel.getByRole("button", { name: "Panel settings" }).click();
+  await panel.getByLabel("Theme").selectOption(theme);
+  await panel.getByRole("button", { name: "Panel settings" }).click();
+  if (await panel.locator(".prefs").count()) fail("panel settings stayed open");
+};
+for (const theme of ["light", "dark"]) {
+  await setTheme(theme);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${shots}/llm-agent-10-usage-${theme}.png` });
+}
+await page.setViewportSize({ width: 390, height: 844 });
+await page.waitForTimeout(400);
+const usageWidth = await usageView.evaluate((el) => ({
+  right: el.getBoundingClientRect().right,
+  overflow: el.scrollWidth - el.clientWidth,
+}));
+if (usageWidth.right > 391 || usageWidth.overflow > 0)
+  fail(`Usage view wider than the phone: ${JSON.stringify(usageWidth)}`);
+await page.screenshot({ path: `${shots}/llm-agent-10-usage-phone.png` });
+await page.setViewportSize({ width: 1280, height: 800 });
+await setTheme("light");
+await panel.getByRole("button", { name: "Usage", exact: true }).click();
+if (await usageView.count()) fail("the Usage button did not close the view");
+
 // The panel follows the user's Home Assistant language.
 const de = JSON.parse(
   readFileSync(new URL("../custom_components/llm_agent/www/i18n/de.json", import.meta.url), "utf8"),
