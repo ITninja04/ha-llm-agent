@@ -251,6 +251,39 @@ def test_rewind_drops_last_turn_and_reports_actions() -> None:
     assert conv["messages"] == []
 
 
+def test_rewind_to_cuts_at_an_earlier_user_message() -> None:
+    """Editing an earlier message must drop that message and every later turn, and still
+    tell the model what those turns already did (a dropped lamp change stays on)."""
+    from custom_components.llm_agent.agent import rewind_to
+
+    def conv() -> dict:
+        return {
+            "compacted_upto": 6,
+            "messages": [
+                {"role": "user", "content": "first"},
+                {"role": "assistant", "content": "ok"},
+                {"role": "user", "content": "turn on the lamp"},
+                {"role": "assistant", "content": "", "tool_calls": [{"id": "c1"}]},
+                {"role": "tool", "name": "call_service", "summary": "Called light.turn_on"},
+                {"role": "assistant", "content": "Done"},
+                {"role": "user", "content": "thanks"},
+                {"role": "assistant", "content": "welcome"},
+            ],
+        }
+
+    c = conv()
+    note = rewind_to(c, 1)
+    assert [m["content"] for m in c["messages"]] == ["first", "ok"]
+    assert "Called light.turn_on" in note
+    # compaction must not claim to cover messages that are gone
+    assert c["compacted_upto"] == 2
+    c = conv()
+    assert "Called light.turn_on" in rewind_to(c, 0)
+    assert c["messages"] == []
+    c = conv()
+    assert rewind_to(c, 3) == "" and len(c["messages"]) == 8  # out of range: untouched
+
+
 def test_compaction_is_rare_batched_and_keeps_recent_turns(monkeypatch) -> None:
     from custom_components.llm_agent import agent as agent_mod
 

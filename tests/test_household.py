@@ -399,6 +399,11 @@ async def test_household_members_get_their_own_limited_chat(
             {"type": "llm_agent/chat", "conversation_id": conv_id, "text": "hi"}
         )
         assert (await member.receive_json())["error"]["code"] == "not_found"
+        # nor cut someone else's chat short
+        await member.send_json_auto_id(
+            {"type": "llm_agent/conversations/truncate", "conversation_id": conv_id, "index": 0}
+        )
+        assert (await member.receive_json())["error"]["code"] == "not_found"
 
     provider = ScriptedProvider([reply_text("Hello")])
     with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
