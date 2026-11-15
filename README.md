@@ -590,6 +590,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   Frigate, cameras, Matter, Thread, ESPHome, ZHA, Zigbee2MQTT and Z-Wave JS.
 - **0.9.1 (released):** a rewritten system prompt, and the agent must read the built-in
   reference page before acting on an integration it covers or saving config.
+- **0.9.2 (released):** edit any message you sent and rerun from there, drafts kept per chat,
+  copy on replies, up arrow to recall your last message, and Esc stops a reply from anywhere.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
