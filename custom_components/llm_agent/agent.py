@@ -28,6 +28,7 @@ from .approval import (
     parse_rules,
     summarize_args,
 )
+from .attachments import Prepared
 from .chatgpt_auth import get_auth
 from .const import (
     APPROVAL_TIMEOUT,
@@ -346,6 +347,7 @@ class ChatRun:
         note: str = "",
         over_cap: bool = False,
         images: list[dict[str, str]] | None = None,
+        attached: Prepared | None = None,
         language: str | None = None,
     ) -> None:
         conv = self.conv
@@ -399,6 +401,18 @@ class ChatRun:
         user: dict[str, Any] = {"role": "user", "content": f"[{now}] {note}{text}", "display": text}
         if images:
             user["photos"] = len(images)  # the count stays for the history
+        if attached:
+            user["files"] = attached.files  # names and sizes stay for the history
+            if attached.text:
+                user["attachments"] = attached.text
+                if not attached.keep_text:
+                    # too large to keep: sent with this turn only, like photos
+                    user["attachments_once"] = True
+            # A file can carry instructions as easily as a web page can (a log line, a
+            # comment in a YAML file someone shared), so the chat now counts as having
+            # read outside content: every change asks first, except in YOLO mode.
+            conv["untrusted"] = True
+            conv["untrusted_files"] = True
         conv["messages"].append(user)
         conv.pop("stopped", None)
         if conv["title"] == "New chat":
@@ -420,8 +434,10 @@ class ChatRun:
         usage, text_parts, calls = Usage(), [], []
         try:
             if images:
-                # Sent with this turn only: the finally block drops them (_drop_images).
+                # Sent with this turn only: the finally block drops them (_drop_turn_only).
                 user["images"] = images
+            if attached and attached.documents:
+                user["documents"] = attached.documents
             while True:
                 if (
                     self.member
@@ -553,10 +569,14 @@ class ChatRun:
             )
         finally:
             _close_open_calls(conv["messages"])
-            if not sent and user.pop("images", None):
+            if not sent:
                 # stopped before the model saw them (the spend cap): say so, don't pretend
-                user["content"] += " (photos were attached but not sent; attach them again)"
-            _drop_images(conv["messages"])
+                if user.pop("images", None):
+                    user["content"] += " (photos were attached but not sent; attach them again)"
+                once = user.pop("attachments_once", False) and user.pop("attachments", None)
+                if user.pop("documents", None) or once:
+                    user["content"] += " (files were attached but not sent; attach them again)"
+            _drop_turn_only(conv["messages"])
             agent.store.save(conv)
             self.emit({"type": "done", "usage": conv["usage"]})
 
@@ -746,12 +766,16 @@ class ChatRun:
             and changes
             and not (self.member and risk.level is Level.RISKY)
         )
-        # Once the chat has read web content, that content may be steering the model,
-        # so every change asks first, whatever the approval mode or rules. YOLO is the
+        # Once the chat has read web content or attached files, that content may be
+        # steering the model, so every change asks first, whatever the approval mode or rules. YOLO is the
         # admin's explicit opt-out; a member's chat never gets here as YOLO (see above).
         tainted = bool(self.conv.get("untrusted")) and changes and mode != MODE_YOLO
         if tainted:
-            note = "this chat has read web content"
+            note = (
+                "this chat has read attached files"
+                if self.conv.get("untrusted_files")
+                else "this chat has read web content"
+            )
             risk = replace(risk, reason=f"{risk.reason}; {note}" if risk.reason else note)
         verdict: Review | None = None
         forced: str | None = None
@@ -1067,13 +1091,22 @@ class ChatRun:
         )
 
 
-def _drop_images(messages: list[dict[str, Any]]) -> None:
-    """Pictures are sent for the turn that took them only: they are large, and resending
-    them on every later request would cost tokens each time."""
+def _drop_turn_only(messages: list[dict[str, Any]]) -> None:
+    """Pictures, PDFs and large file text are sent for the turn that took them only: they
+    are large, and resending them on every later request would cost tokens each time."""
     for m in messages:
         if m.get("images"):
             del m["images"]
             m["content"] += " (the picture was shown earlier and is no longer attached)"
+        if m.get("documents"):
+            del m["documents"]
+            m["content"] += " (the attached PDF was shown earlier and is no longer attached)"
+        if m.pop("attachments_once", False):
+            m.pop("attachments", None)
+            m["content"] += (
+                " (the attached files were shown earlier and are no longer attached; ask "
+                "for them again if you need them)"
+            )
 
 
 def _estimate_usage(
@@ -1143,6 +1176,8 @@ def _loggable(msg: dict[str, Any]) -> dict[str, Any]:
     view = _provider_view(msg)
     if view.get("images"):
         view = {**view, "images": f"({len(view['images'])} picture(s) not logged)"}
+    if view.get("documents"):
+        view = {**view, "documents": f"({len(view['documents'])} PDF(s) not logged)"}
     return view
 
 
@@ -1158,9 +1193,16 @@ def _provider_view(msg: dict[str, Any]) -> dict[str, Any]:
             **({"images": msg["images"]} if msg.get("images") else {}),
         }
     if msg["role"] == "user":
-        out = {"role": "user", "content": msg["content"]}
+        content = msg["content"]
+        if msg.get("attachments"):
+            # File text joins the message as text: every adapter takes that, and the
+            # block opens with its own untrusted-content note.
+            content = f"{content}\n\n{msg['attachments']}"
+        out = {"role": "user", "content": content}
         if msg.get("images"):
             out["images"] = msg["images"]
+        if msg.get("documents"):
+            out["documents"] = msg["documents"]
         return out
     return msg
 
@@ -1169,7 +1211,8 @@ def _provider_view(msg: dict[str, Any]) -> dict[str, Any]:
 # costs about a tenth of fresh input), while any change to an earlier message forces the
 # rest of the prompt to be cached again. So compaction is rare and done in batches:
 # - only once the history passes COMPACT_AT_TOKENS (estimated at CHARS_PER_TOKEN);
-# - it shortens old tool results and tool arguments only; user and assistant text stay;
+# - it shortens old tool results, tool arguments and attached file text only; what the
+#   user and the assistant wrote stays;
 # - the last KEEP_TURNS turns are never touched;
 # - after a batch, the next one waits until KEEP_TURNS more turns have passed, so the
 #   cache is rebuilt at most once every KEEP_TURNS turns, not on every turn.
@@ -1180,12 +1223,13 @@ SHORT_RESULT = 400
 SHORT_ARG = 300
 _ARG_MARK = " …(shortened)"
 _RESULT_MARK = " …(older result shortened)"
+_FILES_MARK = " (older file contents left out, ask for the files again if needed)"
 
 
 def _history_chars(messages: list[dict[str, Any]]) -> int:
     total = 0
     for m in messages:
-        total += len(m.get("content") or "")
+        total += len(m.get("content") or "") + len(m.get("attachments") or "")
         for c in m.get("tool_calls") or []:
             total += len(json.dumps(c.get("args", {}), default=str))
     return total
@@ -1204,7 +1248,8 @@ def _shorten_args(value: Any) -> Any:
 def compact_history(
     conv: dict[str, Any], at_tokens: int | None = None, keep_turns: int | None = None
 ) -> bool:
-    """Shorten old tool results and arguments in place. Returns True if anything changed."""
+    """Shorten old tool results, arguments and file text in place. Returns True if
+    anything changed."""
     at_tokens = COMPACT_AT_TOKENS if at_tokens is None else at_tokens
     keep_turns = KEEP_TURNS if keep_turns is None else keep_turns
     messages = conv["messages"]
@@ -1221,6 +1266,11 @@ def compact_history(
     for m in messages[:boundary]:
         if m["role"] == "tool" and len(m.get("content") or "") > SHORT_RESULT + len(_RESULT_MARK):
             m["content"] = m["content"][:SHORT_RESULT] + _RESULT_MARK
+            changed = True
+        elif m["role"] == "user" and len(m.get("attachments") or "") > SHORT_RESULT + len(
+            _FILES_MARK
+        ):
+            m["attachments"] = m["attachments"][:SHORT_RESULT] + _FILES_MARK
             changed = True
         elif m["role"] == "assistant":
             # Provider-native blocks (e.g. thinking) are dropped for old turns; the neutral

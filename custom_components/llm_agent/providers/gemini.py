@@ -55,7 +55,9 @@ def to_gemini_contents(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for msg in messages:
         role = msg["role"]
         if role == "user":
+            # inlineData takes PDFs the same way as pictures
             parts = [_inline(img) for img in msg.get("images") or []]
+            parts += [_inline(doc) for doc in msg.get("documents") or []]
             parts.append({"text": msg["content"] or " "})
             _add(out, "user", parts)
         elif role == "assistant":

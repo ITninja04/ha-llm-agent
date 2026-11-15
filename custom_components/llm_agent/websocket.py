@@ -11,7 +11,7 @@ from __future__ import annotations
 import base64
 import binascii
 from collections.abc import Callable
-from functools import wraps
+from functools import partial, wraps
 from typing import Any
 
 from homeassistant.components import websocket_api
@@ -20,10 +20,12 @@ from homeassistant.exceptions import Unauthorized
 import probatio as vol
 
 from .agent import STOP_TEXT, Agent, ChatRun, Emit, home_context, rewind_last_turn
+from .attachments import MAX_FILE_BYTES, MAX_FILES, MAX_TEXT_CHARS, AttachmentError, prepare
 from .const import (
     CONF_APPROVAL_MODE,
     CONF_HOME_SUMMARY,
     CONF_HOUSEHOLD,
+    CONF_PROTECT_SENSITIVE,
     DOMAIN,
     NOTES_MAX,
     setting,
@@ -273,6 +275,8 @@ def _public(conv: dict[str, Any]) -> dict[str, Any]:
             item = {"role": "user", "content": m.get("display", m["content"])}
             if m.get("photos"):
                 item["photos"] = m["photos"]
+            if m.get("files"):
+                item["files"] = m["files"]
             messages.append(item)
         elif m["role"] == "assistant":
             messages.append(
@@ -386,6 +390,24 @@ def _photo(value: Any) -> dict[str, str]:
     return {"media_type": value["media_type"], "data": data}
 
 
+def _file(value: Any) -> dict[str, str]:
+    """A file from the panel. Only the shape and size are checked here; what the bytes
+    are is decided from the bytes themselves in attachments.prepare, never from the
+    browser's guess at a media type."""
+    if not isinstance(value, dict) or not {"name", "data"} <= set(value) <= {
+        "name",
+        "data",
+        "media_type",
+    }:
+        raise vol.Invalid("a file needs name and data")
+    name, data = value["name"], value["data"]
+    if not isinstance(name, str) or not 0 < len(name) <= 255:
+        raise vol.Invalid("a file needs a name")
+    if not isinstance(data, str) or len(data) > MAX_FILE_BYTES * 4 // 3 + 4:
+        raise vol.Invalid(f"{name} is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
+    return {"name": name, "data": data}
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "llm_agent/chat",
@@ -399,6 +421,8 @@ def _photo(value: Any) -> dict[str, str]:
         vol.Optional("over_cap", default=False): bool,
         # Photos for this message, for models that can see images.
         vol.Optional("images", default=list): vol.All([_photo], vol.Length(max=MAX_PHOTOS)),
+        # Other files (text, logs, configs, PDFs, zip and gzip archives); see attachments.py.
+        vol.Optional("files", default=list): vol.All([_file], vol.Length(max=MAX_FILES)),
         # The panel's language (the user's profile setting), for replies
         vol.Optional("language"): vol.All(
             str, vol.Match(r"^[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})*$")
@@ -437,6 +461,26 @@ async def ws_chat(
     except ToolError as err:
         connection.send_error(msg["id"], "no_provider", str(err))
         return
+    attached = None
+    if msg["files"]:
+        # A small configured context window gets at most a third of it as file text.
+        window = pconf.context_window
+        max_chars = min(MAX_TEXT_CHARS, window * 4 // 3) if window else MAX_TEXT_CHARS
+        try:
+            # Decompressing and scanning archives is CPU work: off the event loop.
+            attached = await hass.async_add_executor_job(
+                partial(
+                    prepare,
+                    msg["files"],
+                    pconf.type,
+                    max_chars=max_chars,
+                    # a member never lifts the protection an admin may have turned off
+                    protect=member or bool(setting(agent.options, CONF_PROTECT_SENSITIVE)),
+                )
+            )
+        except AttachmentError as err:
+            connection.send_error(msg["id"], "bad_file", str(err))
+            return
     if conv is None:
         summary = setting(agent.options, CONF_HOME_SUMMARY) and not member
         context = home_context(hass) if summary else ""
@@ -469,6 +513,7 @@ async def ws_chat(
                 note,
                 over_cap=msg["over_cap"],
                 images=msg["images"],
+                attached=attached,
                 language=msg.get("language"),
             )
         finally:

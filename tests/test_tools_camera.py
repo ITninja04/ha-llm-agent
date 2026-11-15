@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 import pytest
 
-from custom_components.llm_agent.agent import _drop_images, _provider_view
+from custom_components.llm_agent.agent import _drop_turn_only, _provider_view
 from custom_components.llm_agent.providers.anthropic import to_anthropic_messages
 from custom_components.llm_agent.providers.openai_compat import to_openai_messages
 from custom_components.llm_agent.tools import ToolError, build_tools
@@ -99,7 +99,7 @@ def test_openai_sends_the_picture_after_the_tool_results() -> None:
 
 def test_pictures_are_dropped_after_the_turn() -> None:
     history = [dict(m) for m in HISTORY]
-    _drop_images(history)
+    _drop_turn_only(history)
     assert "images" not in history[-1] and "no longer attached" in history[-1]["content"]
 
 

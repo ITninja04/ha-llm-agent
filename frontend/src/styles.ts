@@ -1076,6 +1076,26 @@ export const styles = css`
     max-height: 240px;
     padding: 6px 2px 4px;
   }
+  /* The composer is a column flexbox with no set height. flex: 1 on the box gives it
+     a flex-basis of 0 there, which lets the engine size it from its one-row minimum
+     instead of the height autosize() sets. Reported as "effectively one line"; the
+     cause is from reading this CSS, not reproduced in a browser. flex: none makes the
+     inline height the size. The cap is a share of the visible viewport: dvh shrinks
+     when a phone keyboard opens, so the box never pushes the chat off screen. */
+  .composer textarea {
+    flex: none;
+    box-sizing: border-box;
+    min-height: calc(1.5em + 10px);
+    max-height: 40vh;
+    max-height: 40dvh;
+    overflow-y: auto;
+  }
+  .composer.dragging {
+    border-color: var(--accent);
+    box-shadow:
+      var(--shadow),
+      0 0 0 3px var(--ring);
+  }
   .toolbar {
     display: flex;
     align-items: center;
@@ -1141,6 +1161,51 @@ export const styles = css`
   .photos img {
     width: 120px;
     height: 120px;
+  }
+  .files {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .attached.files {
+    margin-bottom: 0;
+  }
+  .file {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    min-width: 0;
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    white-space: nowrap;
+    --mdc-icon-size: 18px;
+  }
+  .file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+    min-width: 0;
+  }
+  .file-meta {
+    color: var(--muted);
+    font-size: 12px;
+    flex: none;
+  }
+  .file button.icon {
+    padding: 2px;
+    margin-right: -4px;
+    --mdc-icon-size: 14px;
+  }
+  @media (max-width: 600px) {
+    .file-name {
+      max-width: 40vw;
+    }
   }
   .photo-note {
     display: flex;

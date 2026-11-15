@@ -110,6 +110,9 @@ export type Item =
       images?: Photo[];
       /** Photos sent earlier; the pictures themselves are not kept. */
       photos?: number;
+      /** Files sent with this message. `data` is there only in the session that sent
+       * them, so a retry can send them again; a reloaded chat has names and sizes. */
+      files?: AttachedFile[];
     }
   | { kind: "assistant"; text: string }
   | {
@@ -152,7 +155,7 @@ export interface Conversation {
 }
 
 export type StoredMessage =
-  | { role: "user"; content: string; photos?: number }
+  | { role: "user"; content: string; photos?: number; files?: FileInfo[] }
   | { role: "assistant"; content: string; tool_calls: ToolCallInfo[] }
   | {
       role: "tool";
@@ -203,6 +206,18 @@ export type ChatEvent =
   | { type: "notice"; text: string; stop?: string }
   | { type: "error"; message: string }
   | { type: "done"; usage: Usage };
+
+/** What the server keeps about a sent file. `kind` is decided from the bytes. */
+export interface FileInfo {
+  name: string;
+  size: number;
+  kind: "text" | "pdf" | "zip" | "gzip";
+}
+
+/** A file waiting to be sent (or just sent), with its contents as base64. */
+export interface AttachedFile extends FileInfo {
+  data?: string;
+}
 
 /** A photo attached to a message. `url` is a data URL for showing it. */
 export interface Photo {

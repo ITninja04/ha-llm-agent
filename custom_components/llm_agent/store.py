@@ -326,11 +326,19 @@ def _snippet(text: str, needle: str, width: int = 60) -> str:
 
 
 def _without_images(conv: dict[str, Any]) -> dict[str, Any]:
-    """The conversation as stored: photos and snapshots are sent for one turn only."""
-    if not any("images" in m for m in conv["messages"]):
+    """The conversation as stored: photos, snapshots, PDFs and file text too large to keep
+    are sent for one turn only, so a save that lands mid-turn must not write them."""
+    if not any(_TURN_ONLY & m.keys() for m in conv["messages"]):
         return conv
-    messages = [
-        {k: v for k, v in m.items() if k != "images"} if "images" in m else m
-        for m in conv["messages"]
-    ]
+    messages = [_stored(m) if _TURN_ONLY & m.keys() else m for m in conv["messages"]]
     return {**conv, "messages": messages}
+
+
+_TURN_ONLY = {"images", "documents", "attachments_once"}
+
+
+def _stored(m: dict[str, Any]) -> dict[str, Any]:
+    drop = {"images", "documents"}
+    if m.get("attachments_once"):
+        drop |= {"attachments", "attachments_once"}
+    return {k: v for k, v in m.items() if k not in drop}

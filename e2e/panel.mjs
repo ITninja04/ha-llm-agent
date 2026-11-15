@@ -156,9 +156,41 @@ await panel.getByRole("button", { name: "Panel settings" }).click();
 await panel.getByLabel("Theme").selectOption("auto");
 await box.press("Escape");
 
+// 10b. the composer grows with its text, stops at its cap and scrolls, then shrinks back
+await panel.getByRole("button", { name: "New chat" }).first().click();
+await box.fill("");
+const oneLine = (await box.boundingBox()).height;
+await box.fill("one\ntwo\nthree\nfour");
+const fourLines = (await box.boundingBox()).height;
+if (fourLines < oneLine * 2) fail(`composer did not grow: ${oneLine}px for one line, ${fourLines}px for four`);
+await box.fill(Array.from({ length: 200 }, (_, i) => `line ${i}`).join("\n"));
+const capped = await box.evaluate((el) => ({
+  height: el.getBoundingClientRect().height,
+  scrolls: el.scrollHeight > el.clientHeight,
+  viewport: window.innerHeight,
+}));
+if (capped.height > capped.viewport * 0.41) fail(`composer passed its cap: ${capped.height}px of ${capped.viewport}px`);
+if (!capped.scrolls) fail("a capped composer does not scroll");
+await page.screenshot({ path: `${shots}/llm-agent-8b-composer-capped.png` });
+await box.fill("");
+if ((await box.boundingBox()).height > oneLine + 1) fail("composer did not shrink back when emptied");
+
+// 10c. a text file goes with the message as a chip and reaches the model as text
+await panel.getByLabel("Attach photos or files").setInputFiles({
+  name: "e2e_config.yaml",
+  mimeType: "text/yaml",
+  buffer: Buffer.from("light:\n  - platform: template\n"),
+});
+await panel.locator(".file", { hasText: "e2e_config.yaml" }).first().waitFor({ timeout: 10000 });
+await box.fill("what is in this file");
+await box.press("Enter");
+await page.getByText("I read the attached file.").waitFor({ timeout: 15000 });
+if (!(await panel.locator(".msg.user .file", { hasText: "e2e_config.yaml" }).count())) fail("sent file chip not shown");
+await page.screenshot({ path: `${shots}/llm-agent-8c-file.png` });
+
 // 11. a photo goes with the message, shows in the chat, and is noted (not kept) after reopening
 await panel.getByRole("button", { name: "New chat" }).first().click();
-await panel.getByLabel("Add a photo").setInputFiles(`${configDir}/camera.png`);
+await panel.getByLabel("Attach photos or files").setInputFiles(`${configDir}/camera.png`);
 await panel.locator(".attached img").waitFor({ timeout: 10000 });
 await box.fill("what is in this photo");
 await box.press("Enter");
@@ -175,7 +207,7 @@ if (!(await panel.getByText("I can see 1 photo.").count())) fail("retry without 
 await panel.locator(".editing button", { hasText: "Cancel" }).click();
 
 // 12. draft photos don't follow you into another chat
-await panel.getByLabel("Add a photo").setInputFiles(`${configDir}/camera.png`);
+await panel.getByLabel("Attach photos or files").setInputFiles(`${configDir}/camera.png`);
 await panel.locator(".attached img").waitFor({ timeout: 10000 });
 await panel.getByRole("button", { name: "New chat" }).first().click();
 if (await panel.locator(".attached img").count()) fail("draft photo followed into a new chat");
@@ -183,7 +215,7 @@ if (await panel.locator(".attached img").count()) fail("draft photo followed int
 // 13. three large, noisy photos still fit in one message (HA closes the socket over 4 MiB)
 const noisy = noisyPng(2000, 1500);
 const files = [1, 2, 3].map((i) => ({ name: `noise${i}.png`, mimeType: "image/png", buffer: noisy }));
-await panel.getByLabel("Add a photo").setInputFiles(files);
+await panel.getByLabel("Attach photos or files").setInputFiles(files);
 for (let i = 0; (await panel.locator(".attached img").count()) < 3; i++) {
   if (i > 60) fail("noisy photos were not attached");
   await page.waitForTimeout(500);
