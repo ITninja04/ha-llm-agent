@@ -11,6 +11,7 @@ import { repeat } from "lit/directives/repeat.js";
 import { has, type Key, loadLanguage, t } from "./i18n";
 import { renderMarkdown } from "./markdown";
 import "./preview";
+import "./changes";
 import { styles } from "./styles";
 import type {
   ChatEvent,
@@ -81,6 +82,7 @@ class LlmAgentPanel extends LitElement {
   @state() private prefs: Prefs = loadPrefs();
   @state() private showPrefs = false;
   @state() private showNotes = false;
+  @state() private showChanges = false;
   @state() private notesDraft = "";
   private notesBase = "";
   @state() private notesStatus = "";
@@ -266,6 +268,7 @@ class LlmAgentPanel extends LitElement {
   }
 
   private newChat(): void {
+    this.showChanges = false;
     this.editing = false;
     this.clearAttachments();
     void this.detach();
@@ -281,6 +284,7 @@ class LlmAgentPanel extends LitElement {
   }
 
   private async open(id: string, retried = false): Promise<void> {
+    this.showChanges = false;
     const gen = await this.detach();
     if (gen !== this.gen) return; // a newer open started while the old one ended
     this.showList = false;
@@ -732,8 +736,10 @@ class LlmAgentPanel extends LitElement {
   private onDragOver(ev: DragEvent): void {
     if (!ev.dataTransfer?.types.includes("Files")) return;
     ev.preventDefault();
-    ev.dataTransfer.dropEffect = this.running ? "none" : "copy";
-    this.dragging = !this.running;
+    // the composer is hidden while Changes shows, so nothing may land in it unseen
+    const closed = this.running || this.showChanges;
+    ev.dataTransfer.dropEffect = closed ? "none" : "copy";
+    this.dragging = !closed;
   }
 
   private onDragLeave(ev: DragEvent): void {
@@ -747,7 +753,7 @@ class LlmAgentPanel extends LitElement {
     if (!ev.dataTransfer?.types.includes("Files")) return;
     ev.preventDefault();
     this.dragging = false;
-    if (!this.running) await this.addFiles([...ev.dataTransfer.files]);
+    if (!this.running && !this.showChanges) await this.addFiles([...ev.dataTransfer.files]);
   }
 
   /** Pictures go the photo way (re-encoded, metadata dropped); everything else is
@@ -934,6 +940,7 @@ class LlmAgentPanel extends LitElement {
       >
         ${listOpen ? this.renderList() : nothing}
         <main
+          class=${this.showChanges ? "changes" : ""}
           @dragover=${this.onDragOver}
           @dragleave=${this.onDragLeave}
           @drop=${this.onDrop}
@@ -957,7 +964,7 @@ class LlmAgentPanel extends LitElement {
                 icon=${this.narrow ? "mdi:forum-outline" : "mdi:dock-left"}
               ></ha-icon>
             </button>
-            <div class="title">${chatName(this.chatTitle)}</div>
+            <div class="title">${this.showChanges ? t("changes") : chatName(this.chatTitle)}</div>
             ${
               this.items.length
                 ? html`<button
@@ -996,6 +1003,19 @@ class LlmAgentPanel extends LitElement {
                   </button>`
             }
             ${this.showNotes && !this.member ? this.renderNotes() : nothing}
+            ${
+              this.member
+                ? nothing
+                : html`<button
+                    class="icon"
+                    title=${t("changes_title")}
+                    aria-label=${t("changes")}
+                    aria-pressed=${this.showChanges}
+                    @click=${() => (this.showChanges = !this.showChanges)}
+                  >
+                    <ha-icon icon="mdi:history"></ha-icon>
+                  </button>`
+            }
             <button
               class="icon gear"
               title=${t("panel_settings")}
@@ -1010,6 +1030,14 @@ class LlmAgentPanel extends LitElement {
             </button>
             ${this.showPrefs ? this.renderPrefs() : nothing}
           </header>
+          ${
+            this.showChanges
+              ? html`<llm-agent-changes
+                  .hass=${this.hass}
+                  @open-chat=${(e: CustomEvent<string>) => void this.open(e.detail)}
+                ></llm-agent-changes>`
+              : nothing
+          }
           <div class="sr-only" role="status" aria-live="polite">${this.announce}</div>
           <div class="messages" role="log" aria-label=${t("conversation")} @scroll=${this.onScroll}>
             ${this.items.length ? nothing : this.renderWelcome()}

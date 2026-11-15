@@ -73,6 +73,23 @@ await page.getByText("Done, the test switch is on.").waitFor({ timeout: 15000 })
 if (!(await panel.locator(".tag", { hasText: "undone" }).count())) fail("undone state lost on reload");
 if (await panel.getByRole("button", { name: "Undo" }).count()) fail("Undo offered again after reload");
 
+// 4b. the Changes view lists what was changed, how it was allowed, and the undo
+await panel.getByRole("button", { name: "Changes" }).click();
+const changes = panel.locator("llm-agent-changes");
+const changeRow = (tool) => changes.locator(".row").filter({ has: page.locator(".what", { hasText: new RegExp(`^${tool}$`) }) });
+await changeRow("write file").first().waitFor({ timeout: 15000 });
+const writeText = await changeRow("write file").first().innerText();
+if (!writeText.includes("e2e_note.txt")) fail(`write row has no target: ${writeText}`);
+if (!writeText.includes("Approved by a person")) fail(`write row has no approval: ${writeText}`);
+if (!writeText.includes("undone")) fail(`write row does not show it was undone: ${writeText}`);
+if (await changeRow("write file").getByRole("button", { name: "Undo" }).count()) fail("Undo offered for an undone change");
+if (!(await changeRow("call service").first().innerText()).includes("Automatic")) fail("switch change not shown as automatic");
+if (!(await changeRow("undo").count())) fail("the undo itself is not listed");
+await page.screenshot({ path: `${shots}/llm-agent-3b-changes.png` });
+await changeRow("write file").first().locator(".link").click();
+await page.getByText("I wrote").waitFor({ timeout: 15000 });
+if (await changes.count()) fail("opening a chat from Changes left the Changes view open");
+
 // 5. phone layout: the chat fills the screen and the conversation list opens on demand
 await page.setViewportSize({ width: 390, height: 844 });
 await page.reload();

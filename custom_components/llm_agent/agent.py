@@ -942,7 +942,18 @@ class ChatRun:
                 review=_review_meta(verdict),
             )
         if risk.level is not Level.READ:
-            await self._audit(call, risk, decision, True, out.summary, verdict)
+            # the Changes view offers Undo from snapshot_id, and tells a rule's allow
+            # apart from an approval mode's auto by the rule
+            await self._audit(
+                call,
+                risk,
+                decision,
+                True,
+                out.summary,
+                verdict,
+                snapshot_id=out.snapshot_id,
+                rule=rule.pattern if rule_allow and decision == "auto" and rule else None,
+            )
         return result(
             out.data,
             summary=out.summary,
@@ -1070,12 +1081,19 @@ class ChatRun:
         ok: bool,
         detail: str = "",
         verdict: Review | None = None,
+        snapshot_id: str | None = None,
+        rule: str | None = None,
     ) -> None:
-        extra = (
+        extra: dict[str, Any] = (
             {"reviewer": f"{verdict.model}: {verdict.decision}, {verdict.reason}"[:300]}
             if verdict
             else {}
         )
+        # Only added when set, so records without them look exactly as they always did.
+        if snapshot_id:
+            extra["snapshot_id"] = snapshot_id
+        if rule:
+            extra["rule"] = rule[:200]
         await self.agent.snapshots.audit(
             {
                 **extra,
