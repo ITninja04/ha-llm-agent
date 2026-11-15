@@ -147,9 +147,12 @@ In the panel:
 - Replies stream as they are written. Each tool call shows as a card you can expand.
 - File edits and deletions show a diff and wait for approval. Changes to files,
   automations and dashboards get an **Undo** button.
-- Type `@` to pick an entity, area or device; the exact id goes into your message, so the
-  AI doesn't have to search for it.
-- You can **Edit** or **Retry** your last message, and **Copy** any code block.
+- Type `@` to pick an entity, area or device. The box and your sent message show its name
+  (as a chip once sent, with the id on hover), and the exact id goes to the AI, so it
+  doesn't have to search for it.
+- Your messages render Markdown like replies do: a code block stays a code block.
+- You can **Edit** any message you sent or **Retry** the last one, and **Copy** a reply or
+  any code block.
 - Conversations are saved and searchable, and you can **Export** one as Markdown.
 - If a reply stops early (cut off, tool limit, you pressed Stop), it says why and offers
   **Continue**.

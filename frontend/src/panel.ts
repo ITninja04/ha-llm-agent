@@ -10,6 +10,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { repeat } from "lit/directives/repeat.js";
 import { has, type Key, loadLanguage, t } from "./i18n";
 import { renderMarkdown } from "./markdown";
+import { Mentions, withChips } from "./mentions";
 import "./preview";
 import "./changes";
 import "./notes";
@@ -83,6 +84,8 @@ class LlmAgentPanel extends LitElement {
   @state() private showList = false;
   @state() private loadError = "";
   @state() private mentions: Mention[] = [];
+  // @Name labels in the composer and the exact ids they stand for (see mentions.ts)
+  private picked = new Mentions();
   @state() private prefs: Prefs = loadPrefs();
   @state() private showPrefs = false;
   /** A view in the chat's place: Changes, or Notes when notesView is set. One flag for
@@ -257,7 +260,16 @@ class LlmAgentPanel extends LitElement {
   private setText(text: string): void {
     const ta = this.input;
     if (!ta) return;
-    ta.value = text;
+    ta.value = this.picked.show(text, this.hass);
+    this.stored(text);
+  }
+
+  /** The composer's text with each @Name back to its id, as it is sent and stored. */
+  private get composed(): string {
+    return this.picked.expand(this.input?.value ?? "");
+  }
+
+  private stored(text: string): void {
     this.hasText = !!text.trim();
     this.autosize();
     if (this.editAt < 0) saveDraft(this.draftKey, this.convId, text);
@@ -425,7 +437,7 @@ class LlmAgentPanel extends LitElement {
         : this.photos;
     const files =
       retry !== undefined ? (prev?.kind === "user" && prev.files) || [] : this.files;
-    let text = retry ?? this.input?.value.trim();
+    let text = retry ?? this.composed.trim();
     // the server needs some text; file names make a better chat title than a placeholder
     if (!text && files.length) text = `(${files.map((f) => f.name).join(", ")})`;
     if (!text && photos.length) text = "(photo)";
@@ -458,7 +470,7 @@ class LlmAgentPanel extends LitElement {
     // to put back if the server refuses the message; a cut chat stays cut
     const before = {
       items: at >= 0 && !rewind ? kept : this.items,
-      draft: this.input?.value ?? "",
+      draft: this.composed,
       photos: this.photos,
       files: this.files,
       editAt: rewind ? this.editAt : -1,
@@ -925,7 +937,8 @@ class LlmAgentPanel extends LitElement {
   }
 
   private onInput(): void {
-    this.setText(this.input!.value);
+    // Not setText: rewriting the box while someone types would move their cursor.
+    this.stored(this.composed);
     this.updateMentions();
   }
 
@@ -949,10 +962,10 @@ class LlmAgentPanel extends LitElement {
     const ta = this.input!;
     const end = ta.selectionStart ?? ta.value.length;
     const value = ta.value;
-    this.setText(
-      value.slice(0, this.mentionStart) + item.insert + " " + value.slice(end),
-    );
-    const pos = this.mentionStart + item.insert.length + 1;
+    const label = `@${this.picked.add(item.label, item.insert)} `;
+    ta.value = value.slice(0, this.mentionStart) + label + value.slice(end);
+    this.stored(this.composed);
+    const pos = this.mentionStart + label.length;
     ta.setSelectionRange(pos, pos);
     this.mentions = [];
     ta.focus();
@@ -1400,7 +1413,9 @@ class LlmAgentPanel extends LitElement {
                 </div>`
               : nothing
           }
-          <div class="msg user">${this.renderPhotos(item)}${item.text}</div>
+          <div class="msg user md">
+            ${this.renderPhotos(item)}${unsafeHTML(withChips(renderMarkdown(item.text), this.hass))}
+          </div>
         </div>`;
       case "assistant":
         if (!item.text) {
