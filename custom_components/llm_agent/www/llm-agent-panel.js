@@ -5524,9 +5524,9 @@ var Xi = s`
     flex-direction: column;
     min-width: 0;
   }
-  /* the Changes and Notes views take the place of the chat; the chat keeps its state
+  /* the Changes, Notes and Usage views take the place of the chat; the chat keeps its state
      underneath */
-  main.changes > :not(header):not(llm-agent-changes):not(llm-agent-notes) {
+  main.changes > :not(header):not(llm-agent-changes):not(llm-agent-notes):not(llm-agent-usage) {
     display: none;
   }
   header {
