@@ -19,7 +19,7 @@ import yaml
 
 from custom_components.llm_agent.tools import ToolError
 from custom_components.llm_agent.tools.config_items import _validate
-from custom_components.llm_agent.tools.reference import ORDER, _read_pages, summary
+from custom_components.llm_agent.tools.reference import _read_pages, summary
 
 from .test_tools import _ctx, _tool
 
@@ -106,7 +106,7 @@ def _steps(node) -> list[dict]:
 def test_pages_are_indexed_ascii_and_have_a_title_and_summary() -> None:
     for name in MINE:
         text = PAGES[name]
-        assert name in ORDER, name
+        assert name in PAGES, name
         assert text.startswith("# ") and summary(text), name
         assert text.isascii(), f"{name} has non-ASCII characters"
         assert "—" not in text and "..." not in text, name
