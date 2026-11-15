@@ -280,8 +280,9 @@ export const styles = css`
     flex-direction: column;
     min-width: 0;
   }
-  /* the Changes view takes the place of the chat; the chat keeps its state underneath */
-  main.changes > :not(header):not(llm-agent-changes) {
+  /* the Changes and Notes views take the place of the chat; the chat keeps its state
+     underneath */
+  main.changes > :not(header):not(llm-agent-changes):not(llm-agent-notes) {
     display: none;
   }
   header {
@@ -351,24 +352,6 @@ export const styles = css`
   }
   .prefs .mine div {
     width: 100%;
-  }
-  .prefs.notes {
-    width: min(420px, calc(100vw - 24px));
-  }
-  .prefs.notes textarea {
-    flex: none;
-    width: 100%;
-    box-sizing: border-box;
-    resize: vertical;
-    font: inherit;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 8px 10px;
-    background: var(--bg);
-  }
-  .prefs .over {
-    color: var(--error-color, #db4437);
-    font-size: 12px;
   }
   .prefs .hint {
     color: var(--muted);

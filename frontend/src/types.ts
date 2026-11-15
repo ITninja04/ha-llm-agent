@@ -50,8 +50,6 @@ export interface Info {
   providers: ProviderInfo[];
   running: string[];
   my_default?: { provider_id: string; model: string } | null;
-  notes?: string;
-  notes_max?: number;
   /** false for household members: no notes, model choice or undo */
   is_admin?: boolean;
   household?: boolean;

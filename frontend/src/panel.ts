@@ -12,6 +12,7 @@ import { has, type Key, loadLanguage, t } from "./i18n";
 import { renderMarkdown } from "./markdown";
 import "./preview";
 import "./changes";
+import "./notes";
 import { styles } from "./styles";
 import type {
   ChatEvent,
@@ -33,7 +34,7 @@ import type {
 } from "./types";
 
 // Arguments a preview diff shows in full (same list as the server's phone text).
-const DIFF_ARGS = new Set(["config", "content", "old", "new", "notes"]);
+const DIFF_ARGS = new Set(["config", "content", "old", "new", "text", "body"]);
 
 const EMPTY_USAGE: Usage = {
   input: 0,
@@ -84,11 +85,10 @@ class LlmAgentPanel extends LitElement {
   @state() private mentions: Mention[] = [];
   @state() private prefs: Prefs = loadPrefs();
   @state() private showPrefs = false;
-  @state() private showNotes = false;
+  /** A view in the chat's place: Changes, or Notes when notesView is set. One flag for
+   * both, so everything that hides the composer for Changes covers Notes too. */
   @state() private showChanges = false;
-  @state() private notesDraft = "";
-  private notesBase = "";
-  @state() private notesStatus = "";
+  @state() private notesView = false;
   @state() private mentionIndex = 0;
   private mentionStart = -1;
 
@@ -998,10 +998,9 @@ class LlmAgentPanel extends LitElement {
           if (e.key === "Escape") {
             // Esc stops a reply from anywhere in the panel, unless it closed a popover
             // or the @ list (those prevent the default) first
-            if (this.running && !e.defaultPrevented && !e.isComposing && !this.showPrefs && !this.showNotes)
+            if (this.running && !e.defaultPrevented && !e.isComposing && !this.showPrefs)
               void this.stop();
             this.showPrefs = false;
-            this.showNotes = false;
           }
         }}
       >
@@ -1031,7 +1030,7 @@ class LlmAgentPanel extends LitElement {
                 icon=${this.narrow ? "mdi:forum-outline" : "mdi:dock-left"}
               ></ha-icon>
             </button>
-            <div class="title">${this.showChanges ? t("changes") : chatName(this.chatTitle)}</div>
+            <div class="title">${this.showChanges ? t(this.notesView ? "home_notes" : "changes") : chatName(this.chatTitle)}</div>
             ${
               this.items.length
                 ? html`<button
@@ -1060,16 +1059,18 @@ class LlmAgentPanel extends LitElement {
               this.member
                 ? nothing
                 : html`<button
-                    class="icon gear"
+                    class="icon"
                     title=${t("home_notes")}
                     aria-label=${t("home_notes")}
-                    aria-expanded=${this.showNotes}
-                    @click=${this.toggleNotes}
+                    aria-pressed=${this.showChanges && this.notesView}
+                    @click=${() => {
+                      this.showChanges = !(this.showChanges && this.notesView);
+                      this.notesView = true;
+                    }}
                   >
                     <ha-icon icon="mdi:notebook-outline"></ha-icon>
                   </button>`
             }
-            ${this.showNotes && !this.member ? this.renderNotes() : nothing}
             ${
               this.member
                 ? nothing
@@ -1077,8 +1078,11 @@ class LlmAgentPanel extends LitElement {
                     class="icon"
                     title=${t("changes_title")}
                     aria-label=${t("changes")}
-                    aria-pressed=${this.showChanges}
-                    @click=${() => (this.showChanges = !this.showChanges)}
+                    aria-pressed=${this.showChanges && !this.notesView}
+                    @click=${() => {
+                      this.showChanges = !this.showChanges || this.notesView;
+                      this.notesView = false;
+                    }}
                   >
                     <ha-icon icon="mdi:history"></ha-icon>
                   </button>`
@@ -1088,17 +1092,16 @@ class LlmAgentPanel extends LitElement {
               title=${t("panel_settings")}
               aria-label=${t("panel_settings")}
               aria-expanded=${this.showPrefs}
-              @click=${() => {
-                this.showPrefs = !this.showPrefs;
-                this.showNotes = false;
-              }}
+              @click=${() => (this.showPrefs = !this.showPrefs)}
             >
               <ha-icon icon="mdi:cog-outline"></ha-icon>
             </button>
             ${this.showPrefs ? this.renderPrefs() : nothing}
           </header>
           ${
-            this.showChanges
+            this.showChanges && this.notesView
+              ? html`<llm-agent-notes .hass=${this.hass}></llm-agent-notes>`
+              : this.showChanges
               ? html`<llm-agent-changes
                   .hass=${this.hass}
                   @open-chat=${(e: CustomEvent<string>) => void this.open(e.detail)}
@@ -1230,9 +1233,9 @@ class LlmAgentPanel extends LitElement {
     </nav>`;
   }
 
-  /** Close the panel settings and home notes popovers on a click anywhere outside them. */
+  /** Close the panel settings popover on a click anywhere outside it. */
   private closePrefsOutside(ev: Event): void {
-    if (!this.showPrefs && !this.showNotes) return;
+    if (!this.showPrefs) return;
     const inside = ev
       .composedPath()
       .some(
@@ -1240,71 +1243,7 @@ class LlmAgentPanel extends LitElement {
           el instanceof HTMLElement &&
           (el.classList.contains("prefs") || el.classList.contains("gear")),
       );
-    if (!inside) {
-      this.showPrefs = false;
-      this.showNotes = false;
-    }
-  }
-
-  private async toggleNotes(): Promise<void> {
-    this.showNotes = !this.showNotes;
-    this.showPrefs = false;
-    if (!this.showNotes) return;
-    this.notesDraft = this.info?.notes ?? "";
-    this.notesBase = this.notesDraft;
-    this.notesStatus = "";
-    try {
-      // The AI or another window may have changed them since the panel loaded.
-      const info = await this.ws.sendMessagePromise<Info>({ type: "llm_agent/info" });
-      this.info = info;
-      if (this.showNotes && this.notesDraft === this.notesBase) {
-        this.notesDraft = info.notes ?? "";
-        this.notesBase = this.notesDraft;
-      }
-    } catch {
-      /* keep what was loaded */
-    }
-  }
-
-  private async saveNotes(): Promise<void> {
-    const sent = this.notesDraft;
-    try {
-      const res = await this.ws.sendMessagePromise<{ notes: string }>({
-        type: "llm_agent/notes",
-        notes: sent,
-        base: this.notesBase,
-      });
-      if (this.info) this.info = { ...this.info, notes: res.notes };
-      if (this.notesDraft === sent) this.notesDraft = res.notes; // keep newer typing
-      this.notesBase = res.notes;
-      this.notesStatus = t("saved");
-    } catch (err) {
-      this.notesStatus = (err as { message?: string }).message || t("could_not_save");
-    }
-  }
-
-  private renderNotes(): TemplateResult {
-    const max = this.info?.notes_max ?? 2000;
-    const left = max - this.notesDraft.trim().length;
-    return html`<div class="prefs notes" role="dialog" aria-label=${t("home_notes")}>
-      <strong>${t("home_notes")}</strong>
-      <textarea
-        rows="8"
-        maxlength=${max + 200}
-        placeholder=${t("notes_placeholder")}
-        .value=${this.notesDraft}
-        @input=${(e: Event) => {
-          this.notesDraft = (e.target as HTMLTextAreaElement).value;
-          this.notesStatus = "";
-        }}
-      ></textarea>
-      <div class="mine">
-        <button class="small" ?disabled=${left < 0} @click=${this.saveNotes}>${t("save")}</button>
-        <span class=${left < 0 ? "over" : "hint"}>${t("characters_left", { count: left })}</span>
-        ${this.notesStatus ? html`<span class="hint">${this.notesStatus}</span>` : nothing}
-      </div>
-      <div class="hint">${t("notes_hint")}</div>
-    </div>`;
+    if (!inside) this.showPrefs = false;
   }
 
   private renderPrefs(): TemplateResult {
@@ -1593,7 +1532,7 @@ class LlmAgentPanel extends LitElement {
 
   private renderTool(item: Extract<Item, { kind: "tool" }>): TemplateResult {
     const approval = item.approval;
-    if (approval && !approval.phoneOnly && item.name === "update_home_notes") return this.renderNoteSuggestion(item);
+    if (approval && !approval.phoneOnly && item.name === "change_home_note") return this.renderNoteSuggestion(item);
     const status = {
       running: html`<span class="spinner" aria-label=${t("running")}></span>`,
       ok: html`<ha-icon
