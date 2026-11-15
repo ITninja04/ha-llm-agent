@@ -736,8 +736,10 @@ class LlmAgentPanel extends LitElement {
   private onDragOver(ev: DragEvent): void {
     if (!ev.dataTransfer?.types.includes("Files")) return;
     ev.preventDefault();
-    ev.dataTransfer.dropEffect = this.running ? "none" : "copy";
-    this.dragging = !this.running;
+    // the composer is hidden while Changes shows, so nothing may land in it unseen
+    const closed = this.running || this.showChanges;
+    ev.dataTransfer.dropEffect = closed ? "none" : "copy";
+    this.dragging = !closed;
   }
 
   private onDragLeave(ev: DragEvent): void {
@@ -751,7 +753,7 @@ class LlmAgentPanel extends LitElement {
     if (!ev.dataTransfer?.types.includes("Files")) return;
     ev.preventDefault();
     this.dragging = false;
-    if (!this.running) await this.addFiles([...ev.dataTransfer.files]);
+    if (!this.running && !this.showChanges) await this.addFiles([...ev.dataTransfer.files]);
   }
 
   /** Pictures go the photo way (re-encoded, metadata dropped); everything else is

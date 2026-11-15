@@ -5536,14 +5536,17 @@ var Ri = /* @__PURE__ */ new Set([
 		t.length && (e.preventDefault(), await this.addFiles(t));
 	}
 	onDragOver(e) {
-		e.dataTransfer?.types.includes("Files") && (e.preventDefault(), e.dataTransfer.dropEffect = this.running ? "none" : "copy", this.dragging = !this.running);
+		if (!e.dataTransfer?.types.includes("Files")) return;
+		e.preventDefault();
+		let t = this.running || this.showChanges;
+		e.dataTransfer.dropEffect = t ? "none" : "copy", this.dragging = !t;
 	}
 	onDragLeave(e) {
 		let t = e.relatedTarget;
 		t && e.currentTarget.contains(t) || (this.dragging = !1);
 	}
 	async onDrop(e) {
-		e.dataTransfer?.types.includes("Files") && (e.preventDefault(), this.dragging = !1, this.running || await this.addFiles([...e.dataTransfer.files]));
+		e.dataTransfer?.types.includes("Files") && (e.preventDefault(), this.dragging = !1, !this.running && !this.showChanges && await this.addFiles([...e.dataTransfer.files]));
 	}
 	async addFiles(e) {
 		let t = e.filter(ya);
