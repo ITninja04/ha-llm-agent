@@ -343,8 +343,8 @@ await panel.getByRole("button", { name: "New chat" }).first().click();
 const send = panel.locator("button.send");
 const userTexts = () => panel.locator(".msg.user").allInnerTexts();
 const replyDone = () => panel.locator("button.send:not(.stop)").waitFor({ timeout: 15000 });
-const focused = () =>
-  page.evaluate(() => document.querySelector("llm-agent-panel").shadowRoot.activeElement?.tagName);
+// the panel sits inside Home Assistant's own shadow roots, so ask the element itself
+const focused = () => panel.evaluate((el) => el.shadowRoot.activeElement?.tagName);
 if (!(await send.isDisabled())) fail("Send is clickable with an empty composer");
 await box.fill("first question");
 if (await send.isDisabled()) fail("Send stays disabled with text in the box");
