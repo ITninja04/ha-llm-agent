@@ -59,7 +59,17 @@ Prices can be overridden in options.
    compact home summary (areas, domains, counts; full entity detail only through
    tools), the history and the tool schemas.
 2. Provider deltas stream to the browser over a WS subscription.
-3. For each tool call, the risk classifier returns `safe` or `risky`. The
+3. For each tool call, the loop first checks the reference pages the call needs
+   (`Tool.reference_pages`): an action on an integration with a page (WLED, Music
+   Assistant and the others in `INTEGRATION_PAGES`, matched by the action's domain
+   and by each target entity's registry platform), or a saved automation, script,
+   scene, dashboard or helper. A page not read with `read_reference` in this chat
+   refuses the call with the page name, before any approval. The prompt asked for
+   this already, and models skipped it, so the check is in code. Compaction clears
+   the record of read pages, since the pages left the history. Where `read_reference`
+   is not offered (the lean tool set), there is no check.
+
+   Then the risk classifier returns `safe` or `risky`. The
    approval mode decides whether to run it or pause:
    - **ask_all**: pause on every write.
    - **ask_risky** (default): pause on risky calls.
