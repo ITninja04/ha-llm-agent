@@ -842,6 +842,9 @@ var Ge = He(We), { I: Ke } = Me, qe = (e) => e, Je = () => document.createCommen
 	stop: "Stop",
 	send: "Send",
 	editing_last: "Editing your last message",
+	editing_earlier: "Editing an earlier message. Sending replaces it and everything after it. Device changes already made are not undone.",
+	keys_enter: "Enter to send, Shift+Enter for a new line",
+	keys_ctrl: "Ctrl+Enter to send",
 	cancel: "Cancel",
 	usage_title: "Tokens in / out (cached). Cost is an estimate.",
 	usage_line: "{input} in · {output} out",
@@ -4066,14 +4069,29 @@ var Mi = o`
     transition: opacity 0.12s;
     --mdc-icon-size: 17px;
   }
-  .row.user:hover .msg-actions,
+  .row:hover .msg-actions,
   .msg-actions:focus-within {
     opacity: 1;
+  }
+  .row.reply {
+    flex-wrap: wrap;
+  }
+  .msg-actions.acts {
+    flex-basis: 100%;
+    margin: -10px 0 0 -5px;
+  }
+  .row.edited .msg.user {
+    outline: 2px solid var(--accent);
   }
   @media (hover: none) {
     .msg-actions {
       opacity: 1;
     }
+  }
+  /* a phone-width window may still report hover (a desktop browser, a tablet with a
+     mouse); on the narrow layout the buttons never wait for it */
+  .narrow .msg-actions {
+    opacity: 1;
   }
   .msg-actions button.icon {
     padding: 5px;
@@ -4839,6 +4857,11 @@ var Mi = o`
   button.send:hover {
     filter: brightness(1.1);
   }
+  button.send:disabled {
+    opacity: 0.4;
+    filter: none;
+    cursor: default;
+  }
   button.send.stop {
     background: var(--text);
     color: var(--bg);
@@ -5134,7 +5157,7 @@ var Ri = /* @__PURE__ */ new Set([
 	cost: 0
 }, $ = class extends A {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = zi, this.running = !1, this.announce = "", this.editing = !1, this.photos = [], this.files = [], this.dragging = !1, this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = Gi(), this.showPrefs = !1, this.showNotes = !1, this.showChanges = !1, this.notesDraft = "", this.notesBase = "", this.notesStatus = "", this.mentionIndex = 0, this.mentionStart = -1, this.gen = 0, this.started = !1, this.stickToBottom = !0, this.onReady = () => {
+		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = zi, this.running = !1, this.announce = "", this.editAt = -1, this.hasText = !1, this.photos = [], this.files = [], this.dragging = !1, this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.prefs = Zi(), this.showPrefs = !1, this.showNotes = !1, this.showChanges = !1, this.notesDraft = "", this.notesBase = "", this.notesStatus = "", this.mentionIndex = 0, this.mentionStart = -1, this.gen = 0, this.started = !1, this.stickToBottom = !0, this.onReady = () => {
 			this.running && this.convId && this.open(this.convId).catch(() => void 0);
 		}, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set(), this.noteCardSince = /* @__PURE__ */ new Map();
 	}
@@ -5152,7 +5175,7 @@ var Ri = /* @__PURE__ */ new Set([
 		this.prefs = {
 			...this.prefs,
 			[e]: t
-		}, Ki(this.prefs), this.applyPrefs();
+		}, Qi(this.prefs), this.applyPrefs();
 	}
 	async setMyDefault(e = !1) {
 		let t = await this.ws.sendMessagePromise({
@@ -5185,14 +5208,13 @@ var Ri = /* @__PURE__ */ new Set([
 			let t = document.createElement("button");
 			t.className = "copy small ghost", t.textContent = P("copy"), t.addEventListener("click", async () => {
 				let n = e.querySelector("code") ?? e;
-				try {
-					await navigator.clipboard.writeText(n.textContent ?? ""), t.textContent = P("copied");
-				} catch {
-					t.textContent = P("copy_failed");
-				}
-				setTimeout(() => t.textContent = P("copy"), 1500);
+				t.textContent = P(await Vi(n.textContent ?? "") ? "copied" : "copy_failed"), setTimeout(() => t.textContent = P("copy"), 1500);
 			}), e.prepend(t);
 		}
+	}
+	async copy(e, t) {
+		let n = await Vi(e), r = t.querySelector("ha-icon");
+		r?.setAttribute("icon", n ? "mdi:check" : "mdi:alert-circle-outline"), this.announce = P(n ? "copied" : "copy_failed"), setTimeout(() => r?.setAttribute("icon", "mdi:content-copy"), 1500);
 	}
 	disconnectedCallback() {
 		super.disconnectedCallback(), this.listening?.removeEventListener?.("ready", this.onReady), this.listening = void 0, this.detach(), this.started = !1;
@@ -5206,15 +5228,27 @@ var Ri = /* @__PURE__ */ new Set([
 			return;
 		}
 		this.applyPrefs(), this.providerId || this.startModel(), await this.refreshList();
-		let e = this.convId ?? Hi();
+		let e = this.convId ?? Ji();
 		if (e && this.convs.some((t) => t.id === e)) try {
 			await this.open(e);
 		} catch {
-			Ui(null);
+			Yi(null);
 		}
+		this.convId || (await this.updateComplete, this.setText(Wi(this.draftKey, null)));
 	}
 	async refreshList() {
-		this.convs = await this.ws.sendMessagePromise({ type: "llm_agent/conversations/list" });
+		this.convs = await this.ws.sendMessagePromise({ type: "llm_agent/conversations/list" }), Ki(this.draftKey, this.convs);
+	}
+	get draftKey() {
+		return `llm-agent-drafts-${this.hass?.user?.id ?? ""}`;
+	}
+	setText(e) {
+		let t = this.input;
+		t && (t.value = e, this.hasText = !!e.trim(), this.autosize(), this.editAt < 0 && Gi(this.draftKey, this.convId, e));
+	}
+	focusComposer() {
+		let e = this.renderRoot.activeElement;
+		matchMedia("(pointer: coarse)").matches || e && e !== this.input && e.tagName !== "BUTTON" || this.input?.focus();
 	}
 	get member() {
 		return this.info?.is_admin === !1;
@@ -5233,19 +5267,19 @@ var Ri = /* @__PURE__ */ new Set([
 		this.photos = [], this.files = [], this.photoGen++;
 	}
 	newChat() {
-		this.showChanges = !1, this.editing = !1, this.clearAttachments(), this.detach(), this.convId = null, Ui(null), this.chatTitle = "New chat", this.items = [], this.usage = zi, this.running = !1, this.showList = !1, this.startModel(), this.input?.focus();
+		this.showChanges = !1, this.editAt = -1, this.clearAttachments(), this.detach(), this.convId = null, Yi(null), this.chatTitle = "New chat", this.items = [], this.usage = zi, this.running = !1, this.showList = !1, this.startModel(), this.setText(Wi(this.draftKey, null)), this.input?.focus();
 	}
 	async open(e, t = !1) {
 		this.showChanges = !1;
 		let n = await this.detach();
 		if (n !== this.gen) return;
-		this.showList = !1, this.editing = !1, this.clearAttachments();
+		this.showList = !1, this.editAt = -1, this.clearAttachments();
 		let r = await this.ws.sendMessagePromise({
 			type: "llm_agent/conversations/get",
 			conversation_id: e
 		});
 		if (n !== this.gen) return;
-		this.convId = r.id, Ui(r.id), this.chatTitle = r.title, this.usage = r.usage, this.providerId = r.provider_id, this.model = r.model, this.items = ea(r.messages), r.stopped && r.stopped_text && this.items.push({
+		this.convId = r.id, Yi(r.id), this.setText(Wi(this.draftKey, r.id)), this.chatTitle = r.title, this.usage = r.usage, this.providerId = r.provider_id, this.model = r.model, this.items = oa(r.messages), r.stopped && r.stopped_text && this.items.push({
 			kind: "notice",
 			text: r.stopped_text,
 			stop: r.stopped
@@ -5288,62 +5322,77 @@ var Ri = /* @__PURE__ */ new Set([
 		return -1;
 	}
 	async send(e, t = !1) {
-		let n = e !== void 0 || this.editing, r = this.lastUserIndex(), i = this.items[r], a = e === void 0 ? this.photos : i?.kind === "user" && i.images || [], o = e === void 0 ? this.files : i?.kind === "user" && i.files || [], s = e ?? this.input?.value.trim();
-		if (!s && o.length && (s = `(${o.map((e) => e.name).join(", ")})`), !s && a.length && (s = "(photo)"), !s || this.running) return;
-		if (e !== void 0 && i?.kind === "user" && (i.photos && !i.images || i.files?.some((e) => !e.data))) {
-			this.editLast(i.text, void 0, i.photos, i.files);
+		let n = this.lastUserIndex(), r = e === void 0 ? this.editAt : n, i = r >= 0 && r === n, a = this.items[n], o = e === void 0 ? this.photos : a?.kind === "user" && a.images || [], s = e === void 0 ? this.files : a?.kind === "user" && a.files || [], c = e ?? this.input?.value.trim();
+		if (!c && s.length && (c = `(${s.map((e) => e.name).join(", ")})`), !c && o.length && (c = "(photo)"), !c || this.running) return;
+		if (e !== void 0 && a?.kind === "user" && (a.photos && !a.images || a.files?.some((e) => !e.data))) {
+			this.edit(n);
 			return;
 		}
-		let c = {
-			items: this.items,
+		let l = this.gen, u = r >= 0 ? this.items.slice(0, r) : this.items;
+		if (r >= 0 && !i) {
+			try {
+				await this.ws.sendMessagePromise({
+					type: "llm_agent/conversations/truncate",
+					conversation_id: this.convId,
+					index: u.filter((e) => e.kind === "user").length
+				});
+			} catch (e) {
+				this.push({
+					kind: "notice",
+					text: ya(e),
+					error: !0
+				});
+				return;
+			}
+			if (l !== this.gen) return;
+		}
+		let d = {
+			items: r >= 0 && !i ? u : this.items,
 			draft: this.input?.value ?? "",
 			photos: this.photos,
 			files: this.files,
-			editing: this.editing
-		};
-		e === void 0 && (this.input.value = "", this.clearAttachments(), this.autosize()), this.editing = !1;
-		let l = n && r >= 0 ? this.items.slice(0, r) : this.items;
-		this.items = [
-			...l,
+			editAt: i ? this.editAt : -1
+		}, f = this.editAt >= 0;
+		this.editAt = -1, e === void 0 && (this.clearAttachments(), this.setText(f ? Wi(this.draftKey, this.convId) : ""), this.focusComposer()), this.items = [
+			...u,
 			{
 				kind: "user",
-				text: s,
-				images: a.length ? a : void 0,
-				files: o.length ? o : void 0
+				text: c,
+				images: o.length ? o : void 0,
+				files: s.length ? s : void 0
 			},
 			{
 				kind: "assistant",
 				text: ""
 			}
 		], this.running = !0, this.announce = "", this.stickToBottom = !0;
-		let u = this.gen;
 		try {
 			let e = await this.ws.subscribeMessage((e) => {
-				u === this.gen && (e.type === "conversation" ? this.convId || (this.convId = e.conversation_id, this.chatTitle = e.title || s.slice(0, 60), Ui(this.convId)) : this.onEvent(e));
+				l === this.gen && (e.type === "conversation" ? this.convId || (this.convId = e.conversation_id, this.chatTitle = e.title || c.slice(0, 60), Yi(this.convId)) : this.onEvent(e));
 			}, {
 				type: "llm_agent/chat",
-				text: s,
+				text: c,
 				conversation_id: this.convId,
 				provider_id: this.providerId || void 0,
 				model: this.model || void 0,
-				rewind: n || void 0,
+				rewind: i || void 0,
 				over_cap: t || void 0,
 				language: this.hass?.locale?.language || void 0,
-				images: a.length ? a.map(({ media_type: e, data: t }) => ({
+				images: o.length ? o.map(({ media_type: e, data: t }) => ({
 					media_type: e,
 					data: t
 				})) : void 0,
-				files: o.length ? o.map(({ name: e, data: t }) => ({
+				files: s.length ? s.map(({ name: e, data: t }) => ({
 					name: e,
 					data: t
 				})) : void 0
 			}, { resubscribe: !1 });
-			this.keepOrDrop(u, e);
+			this.keepOrDrop(l, e);
 		} catch (t) {
-			if (u !== this.gen) return;
-			this.running = !1, this.items = c.items, this.editing = c.editing, e === void 0 && this.input && (this.input.value = c.draft, this.photos = c.photos, this.files = c.files, this.autosize()), this.push({
+			if (l !== this.gen) return;
+			this.running = !1, this.items = d.items, this.editAt = d.editAt, e === void 0 && (this.setText(d.draft), this.photos = d.photos, this.files = d.files), this.push({
 				kind: "notice",
-				text: pa(t),
+				text: ya(t),
 				error: !0
 			});
 			return;
@@ -5433,7 +5482,7 @@ var Ri = /* @__PURE__ */ new Set([
 				}), this.announce = P("announce_error");
 				return;
 			case "done":
-				this.usage = e.usage, this.running = !1, this.announce = P("announce_done"), this.items = this.items.filter((e) => !(e.kind === "assistant" && !e.text)), this.detach(), this.refreshList().then(() => {
+				this.usage = e.usage, this.running = !1, this.announce = P("announce_done"), this.items = this.items.filter((e) => !(e.kind === "assistant" && !e.text)), this.updateComplete.then(() => this.focusComposer()), this.detach(), this.refreshList().then(() => {
 					this.chatTitle = this.convs.find((e) => e.id === this.convId)?.title ?? this.chatTitle;
 				});
 				return;
@@ -5478,7 +5527,7 @@ var Ri = /* @__PURE__ */ new Set([
 		} catch (t) {
 			i && this.patchTool(e, i), this.push({
 				kind: "notice",
-				text: pa(t),
+				text: ya(t),
 				error: !0
 			});
 		}
@@ -5497,7 +5546,7 @@ var Ri = /* @__PURE__ */ new Set([
 		} catch (e) {
 			this.push({
 				kind: "notice",
-				text: pa(e),
+				text: ya(e),
 				error: !0
 			});
 		}
@@ -5527,16 +5576,17 @@ var Ri = /* @__PURE__ */ new Set([
 		}
 	}
 	continueTurn(e = !1) {
-		this.input.value = P("continue_message"), this.send(void 0, e);
+		this.setText(P("continue_message")), this.send(void 0, e);
 	}
-	editLast(e, t, n, r) {
-		this.editing = !0, this.clearAttachments(), this.photos = t ?? [], this.files = (r ?? []).filter((e) => e.data), n && !t && this.photosNotKept(), r?.some((e) => !e.data) && this.push({
+	edit(e) {
+		let t = this.items[e];
+		t?.kind === "user" && (this.editAt = e, this.clearAttachments(), this.photos = t.images ?? [], this.files = (t.files ?? []).filter((e) => e.data), t.photos && !t.images && this.photosNotKept(), t.files?.some((e) => !e.data) && this.push({
 			kind: "notice",
 			text: P("files_not_kept")
-		}), this.input.value = e, this.autosize(), this.input.focus();
+		}), this.setText(t.text), this.input.focus());
 	}
 	cancelEdit() {
-		this.editing = !1, this.clearAttachments(), this.input.value = "", this.autosize();
+		this.editAt = -1, this.clearAttachments(), this.setText(Wi(this.draftKey, this.convId));
 	}
 	async onPick(e) {
 		let t = e.target, n = [...t.files ?? []];
@@ -5560,10 +5610,10 @@ var Ri = /* @__PURE__ */ new Set([
 		e.dataTransfer?.types.includes("Files") && (e.preventDefault(), this.dragging = !1, !this.running && !this.showChanges && await this.addFiles([...e.dataTransfer.files]));
 	}
 	async addFiles(e) {
-		let t = e.filter(ya);
+		let t = e.filter(Ta);
 		t.length && await this.addPhotos(t);
 		let n = this.photoGen;
-		for (let t of e.filter((e) => !ya(e))) {
+		for (let t of e.filter((e) => !Ta(e))) {
 			let e = t.name || P("that_file"), r = (t, n = {}) => this.push({
 				kind: "notice",
 				text: P(t, {
@@ -5572,27 +5622,27 @@ var Ri = /* @__PURE__ */ new Set([
 				}),
 				error: !0
 			});
-			if (this.files.length >= ha) {
-				r("too_many_files", { count: ha });
+			if (this.files.length >= xa) {
+				r("too_many_files", { count: xa });
 				return;
 			}
-			if (t.size > ga) {
-				r("file_too_large", { limit: xa(ga) });
+			if (t.size > Sa) {
+				r("file_too_large", { limit: Da(Sa) });
 				continue;
 			}
-			if (this.payload() + ba(t.size) > _a) {
+			if (this.payload() + Ea(t.size) > Ca) {
 				r("files_over_total");
 				continue;
 			}
 			let i;
 			try {
-				i = await wa(t);
+				i = await Aa(t);
 			} catch {
 				r("file_unreadable");
 				continue;
 			}
 			if (n !== this.photoGen) return;
-			i ? this.payload() + (i.data?.length ?? 0) > _a ? r("files_over_total") : this.files = [...this.files, i] : r("file_unsupported");
+			i ? this.payload() + (i.data?.length ?? 0) > Ca ? r("files_over_total") : this.files = [...this.files, i] : r("file_unsupported");
 		}
 	}
 	payload() {
@@ -5607,10 +5657,10 @@ var Ri = /* @__PURE__ */ new Set([
 	async addPhotos(e) {
 		let t = this.photoGen;
 		for (let n of e) {
-			if (this.photos.length >= ma) break;
+			if (this.photos.length >= ba) break;
 			try {
-				let e = await Da(n);
-				if (t !== this.photoGen || this.photos.length >= ma) return;
+				let e = await Na(n);
+				if (t !== this.photoGen || this.photos.length >= ba) return;
 				this.photos = [...this.photos, e];
 			} catch {
 				this.push({
@@ -5637,27 +5687,29 @@ var Ri = /* @__PURE__ */ new Set([
 				return;
 			}
 		}
-		if (e.key === "Escape" && this.running && !e.isComposing) e.preventDefault(), this.stop();
-		else if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+		if (e.key === "ArrowUp" && !e.isComposing && !this.input?.value && !this.running && this.editAt < 0 && this.convId) {
+			let t = this.lastUserIndex();
+			t >= 0 && (e.preventDefault(), this.edit(t));
+		} else if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
 			let t = e.ctrlKey || e.metaKey;
 			if (this.prefs.send === "ctrl" && !t) return;
 			e.preventDefault(), this.send();
 		}
 	}
 	onInput() {
-		this.autosize(), this.updateMentions();
+		this.setText(this.input.value), this.updateMentions();
 	}
 	updateMentions() {
 		let e = this.input, t = this.hass;
 		if (!e || !t) return;
 		let n = e.value.slice(0, e.selectionStart ?? e.value.length), r = /(^|\s)@([^\s@]*)$/.exec(n);
-		r ? (this.mentionStart = n.length - r[2].length - 1, this.mentions = Xi(t, r[2]), this.mentionIndex = 0) : this.mentions = [];
+		r ? (this.mentionStart = n.length - r[2].length - 1, this.mentions = na(t, r[2]), this.mentionIndex = 0) : this.mentions = [];
 	}
 	pickMention(e) {
 		let t = this.input, n = t.selectionStart ?? t.value.length, r = t.value;
-		t.value = r.slice(0, this.mentionStart) + e.insert + " " + r.slice(n);
+		this.setText(r.slice(0, this.mentionStart) + e.insert + " " + r.slice(n));
 		let i = this.mentionStart + e.insert.length + 1;
-		t.setSelectionRange(i, i), this.mentions = [], t.focus(), this.autosize();
+		t.setSelectionRange(i, i), this.mentions = [], t.focus();
 	}
 	autosize() {
 		let e = this.input;
@@ -5679,7 +5731,7 @@ var Ri = /* @__PURE__ */ new Set([
         class="layout ${this.narrow ? "narrow" : ""}"
         @click=${this.closePrefsOutside}
         @keydown=${(e) => {
-			e.key === "Escape" && (this.showPrefs = !1, this.showNotes = !1);
+			e.key === "Escape" && (this.running && !e.defaultPrevented && !e.isComposing && !this.showPrefs && !this.showNotes && this.stop(), this.showPrefs = !1, this.showNotes = !1);
 		}}
       >
         ${e ? this.renderList() : w}
@@ -5705,7 +5757,7 @@ var Ri = /* @__PURE__ */ new Set([
                 icon=${this.narrow ? "mdi:forum-outline" : "mdi:dock-left"}
               ></ha-icon>
             </button>
-            <div class="title">${this.showChanges ? P("changes") : aa(this.chatTitle)}</div>
+            <div class="title">${this.showChanges ? P("changes") : da(this.chatTitle)}</div>
             ${this.items.length ? C`<button
                     class="icon"
                     title=${P("export_title")}
@@ -5761,7 +5813,7 @@ var Ri = /* @__PURE__ */ new Set([
           <div class="sr-only" role="status" aria-live="polite">${this.announce}</div>
           <div class="messages" role="log" aria-label=${P("conversation")} @scroll=${this.onScroll}>
             ${this.items.length ? w : this.renderWelcome()}
-            ${tt(this.items, (e, t) => t, (e, n) => this.renderItem(e, n === this.items.length - 1, n === t, e.kind !== "user" && e.kind !== "notice" && (n === 0 || this.items[n - 1].kind === "user")))}
+            ${tt(this.items, (e, t) => t, (e, n) => this.renderItem(e, n === this.items.length - 1, n === t, e.kind !== "user" && e.kind !== "notice" && (n === 0 || this.items[n - 1].kind === "user"), n))}
           </div>
           ${this.renderComposer()}
         </main>
@@ -5778,8 +5830,8 @@ var Ri = /* @__PURE__ */ new Set([
 		}, 300) : this.hits = null;
 	}
 	exportChat() {
-		let e = Zi(this.chatTitle, this.items), t = URL.createObjectURL(new Blob([e], { type: "text/markdown" })), n = document.createElement("a");
-		n.href = t, n.download = `${Qi(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
+		let e = ra(this.chatTitle, this.items), t = URL.createObjectURL(new Blob([e], { type: "text/markdown" })), n = document.createElement("a");
+		n.href = t, n.download = `${ia(this.chatTitle) || "chat"}.md`, n.click(), URL.revokeObjectURL(t);
 	}
 	renderList() {
 		let e = this.hits ?? this.convs;
@@ -5812,7 +5864,7 @@ var Ri = /* @__PURE__ */ new Set([
       <div class="convs">
         ${this.hits && !this.hits.length ? C`<div class="nav-empty">${P("no_matches")}</div>` : w}
         ${!this.hits && !this.convs.length ? C`<div class="nav-empty">${P("no_chats")}</div>` : w}
-        ${ca(e, !!this.hits).map(([e, t]) => C`
+        ${ma(e, !!this.hits).map(([e, t]) => C`
             ${e ? C`<div class="group">${P(e)}</div>` : w}
             ${t.map((e) => C`<div
                   class="conv ${e.id === this.convId ? "active" : ""}"
@@ -5823,7 +5875,7 @@ var Ri = /* @__PURE__ */ new Set([
                             class="auto"
                             icon="mdi:robot-outline"
                             title=${P("started_by_automation")}
-                          ></ha-icon>` : w}${aa(e.title)}${e.snippet && e.snippet !== e.title ? C`<small class="snippet">${e.snippet}</small>` : w}</span
+                          ></ha-icon>` : w}${da(e.title)}${e.snippet && e.snippet !== e.title ? C`<small class="snippet">${e.snippet}</small>` : w}</span
                   >
                   <button
                     class="icon del"
@@ -5937,23 +5989,23 @@ var Ri = /* @__PURE__ */ new Set([
     </div>`;
 	}
 	renderWelcome() {
-		let e = Yi(this.hass, this.member), t = this.hass?.user?.name?.split(" ")[0];
+		let e = ta(this.hass, this.member), t = this.hass?.user?.name?.split(" ")[0];
 		return C`<div class="welcome">
       <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
       <h2>${t ? P("greeting_name", {
-			greeting: sa(),
+			greeting: pa(),
 			name: t
-		}) : sa()}</h2>
+		}) : pa()}</h2>
       ${this.member ? C`<p>${P("welcome_member")}</p>` : C`<p>${P("welcome_admin")}</p>
               <span class="mode-chip"
                 ><ha-icon icon="mdi:shield-check-outline"></ha-icon
-                >${fa(this.info?.approval_mode)}</span
+                >${va(this.info?.approval_mode)}</span
               >`}
       <div class="tips">
         ${e.map((e) => C`<button
               class="tip"
               @click=${() => {
-			this.input.value = e.text, this.input.focus(), this.autosize();
+			this.setText(e.text), this.input.focus();
 		}}
             >
               <ha-icon icon=${e.icon}></ha-icon>
@@ -5962,46 +6014,56 @@ var Ri = /* @__PURE__ */ new Set([
       </div>
     </div>`;
 	}
-	renderItem(e, t, n = !1, r = !1) {
-		let i = r ? C`<div class="avatar" aria-hidden="true">
+	renderItem(e, t, n = !1, r = !1, i = -1) {
+		let a = r ? C`<div class="avatar" aria-hidden="true">
           <ha-icon icon="mdi:robot-happy-outline"></ha-icon>
         </div>` : w;
 		switch (e.kind) {
-			case "user": return C`<div class="row user">
-          ${n && !this.running ? C`<div class="msg-actions">
+			case "user": return C`<div class="row user ${i === this.editAt ? "edited" : ""}">
+          ${this.convId && !this.running ? C`<div class="msg-actions">
                   <button
                     class="icon"
                     title=${P("edit")}
                     aria-label=${P("edit")}
-                    @click=${() => this.editLast(e.text, e.images, e.photos, e.files)}
+                    @click=${() => this.edit(i)}
                   >
                     <ha-icon icon="mdi:pencil-outline"></ha-icon>
                   </button>
-                  <button
-                    class="icon"
-                    title=${P("retry")}
-                    aria-label=${P("retry")}
-                    @click=${() => this.send(e.text)}
-                  >
-                    <ha-icon icon="mdi:refresh"></ha-icon>
-                  </button>
+                  ${n ? C`<button
+                          class="icon"
+                          title=${P("retry")}
+                          aria-label=${P("retry")}
+                          @click=${() => this.send(e.text)}
+                        >
+                          <ha-icon icon="mdi:refresh"></ha-icon>
+                        </button>` : w}
                 </div>` : w}
           <div class="msg user">${this.renderPhotos(e)}${e.text}</div>
         </div>`;
 			case "assistant": return e.text ? C`<div class="row reply">
-          ${i}
+          ${a}
           <div class="msg assistant md">
             ${Ge(xi(e.text, !(t && this.running)))}
           </div>
+          ${t && this.running ? w : C`<div class="msg-actions acts">
+                  <button
+                    class="icon"
+                    title=${P("copy")}
+                    aria-label=${P("copy")}
+                    @click=${(t) => this.copy(e.text, t.currentTarget)}
+                  >
+                    <ha-icon icon="mdi:content-copy"></ha-icon>
+                  </button>
+                </div>`}
         </div>` : t && this.running ? C`<div class="row reply">
-                ${i}
+                ${a}
                 <div class="msg assistant typing">
                   <span></span><span></span><span></span>
                 </div>
               </div>` : w;
 			case "notice": return C`<div class="notice ${e.error ? "error" : ""}">
           ${e.text}
-          ${t && !this.running && e.stop && $i.has(e.stop) ? C`<button
+          ${t && !this.running && e.stop && aa.has(e.stop) ? C`<button
                   class="small"
                   @click=${() => this.continueTurn(e.stop === "spend_cap")}
                 >
@@ -6009,7 +6071,7 @@ var Ri = /* @__PURE__ */ new Set([
                 </button>` : w}
         </div>`;
 			case "tool": return C`<div class="row reply">
-          ${i}${this.renderTool(e)}
+          ${a}${this.renderTool(e)}
         </div>`;
 		}
 	}
@@ -6033,8 +6095,8 @@ var Ri = /* @__PURE__ */ new Set([
 	}
 	renderNoteSuggestion(e) {
 		let t = (e.approval?.diff ?? "").replace(/\n+$/, "").split("\n"), n = t.filter((e) => e.startsWith("+") && !e.startsWith("+++")).map((e) => e.slice(1)), r = t.filter((e) => e.startsWith("-") && !e.startsWith("---")).map((e) => e.slice(1)), i = this.noteCardSince.get(e.id);
-		i === void 0 && (i = Date.now(), this.noteCardSince.set(e.id, i), setTimeout(() => this.requestUpdate(), Ji + 50));
-		let a = Date.now() - i >= Ji;
+		i === void 0 && (i = Date.now(), this.noteCardSince.set(e.id, i), setTimeout(() => this.requestUpdate(), ea + 50));
+		let a = Date.now() - i >= ea;
 		return C`<div class="note-suggestion" role="group" aria-label=${P("suggested_note")}>
       <div class="note-head">
         <ha-icon icon="mdi:notebook-edit-outline"></ha-icon>
@@ -6096,14 +6158,14 @@ var Ri = /* @__PURE__ */ new Set([
       <details ?open=${!!t || this.prefs.toolsOpen}>
         <summary>
           <span class="tool-icon"
-            ><ha-icon icon=${ia(e.name)}></ha-icon
+            ><ha-icon icon=${ua(e.name)}></ha-icon
           ></span>
-          <span class="tool-name">${la(e.name)}</span>
+          <span class="tool-name">${ha(e.name)}</span>
           <span class="tool-summary"
-            >${t?.summary ?? e.summary ?? ua(e.args)}</span
+            >${t?.summary ?? e.summary ?? ga(e.args)}</span
           >
           ${e.undone ? C`<span class="tag">${P("undone")}</span>` : w}
-          ${na(e.review, e.reviewing)}
+          ${ca(e.review, e.reviewing)}
           ${n}
           ${e.snapshotId && !e.undone && e.status === "ok" && !this.member ? C`<button
                   class="ghost small undo"
@@ -6120,10 +6182,10 @@ var Ri = /* @__PURE__ */ new Set([
                 <ha-icon icon="mdi:shield-check-outline"></ha-icon>
                 <span
                   ><b>${e.review.model ? P("reviewer_model", { model: e.review.model }) : P("reviewer")}:</b>
-                  ${e.review.reason || P(ta[e.review.decision])}</span
+                  ${e.review.reason || P(sa[e.review.decision])}</span
                 >
               </div>` : w}
-        ${t?.diff ? C`<pre class="diff">${ra(t.diff)}</pre>` : w}
+        ${t?.diff ? C`<pre class="diff">${la(t.diff)}</pre>` : w}
         ${t && e.name === "save_dashboard" ? this.renderPreview(e) : w}
         ${this.renderArgs(e.args, !!t?.diff)}
         ${e.preview && !t ? C`<pre class="result">${e.preview}</pre>` : w}
@@ -6156,13 +6218,13 @@ var Ri = /* @__PURE__ */ new Set([
 	renderPhotos(e) {
 		if (e.kind !== "user") return w;
 		let t = e.files?.length ? C`<div class="files">${e.files.map((e) => this.renderFile(e))}</div>` : w;
-		return e.images?.length ? C`<div class="photos">${e.images.map((e) => C`<img src=${e.url} alt=${P("your_photo")} />`)}</div>${t}` : e.photos ? C`<div class="photo-note"><ha-icon icon="mdi:image-outline"></ha-icon>${oa(e.photos)} ${P("not_kept")}</div>${t}` : t;
+		return e.images?.length ? C`<div class="photos">${e.images.map((e) => C`<img src=${e.url} alt=${P("your_photo")} />`)}</div>${t}` : e.photos ? C`<div class="photo-note"><ha-icon icon="mdi:image-outline"></ha-icon>${fa(e.photos)} ${P("not_kept")}</div>${t}` : t;
 	}
 	renderFile(e, t) {
 		return C`<span class="file" title=${e.name}>
-      <ha-icon icon=${va[e.kind]}></ha-icon>
+      <ha-icon icon=${wa[e.kind]}></ha-icon>
       <span class="file-name">${e.name}</span>
-      <span class="file-meta">${Sa(e)}, ${xa(e.size)}</span>
+      <span class="file-meta">${Oa(e)}, ${Da(e.size)}</span>
       ${t ? C`<button
               class="icon"
               title=${P("remove_file")}
@@ -6179,7 +6241,7 @@ var Ri = /* @__PURE__ */ new Set([
       <div class="composer ${this.dragging ? "dragging" : ""}">
         <textarea
           rows="1"
-          placeholder=${P("composer_placeholder")}
+          placeholder=${this.narrow ? P("composer_placeholder") : `${P("composer_placeholder")} (${P(this.prefs.send === "ctrl" ? "keys_ctrl" : "keys_enter")})`}
           @keydown=${this.onKey}
           @input=${this.onInput}
           @paste=${this.onPaste}
@@ -6223,7 +6285,7 @@ var Ri = /* @__PURE__ */ new Set([
           <label
             class="attach icon"
             title=${P("attach_title")}
-            ?hidden=${this.photos.length >= ma && this.files.length >= ha}
+            ?hidden=${this.photos.length >= ba && this.files.length >= xa}
           >
             <ha-icon icon="mdi:paperclip"></ha-icon>
             <!-- No accept filter: HA files often have no extension (.storage/*,
@@ -6280,6 +6342,7 @@ var Ri = /* @__PURE__ */ new Set([
                   class="send"
                   title=${P("send")}
                   aria-label=${P("send")}
+                  ?disabled=${!this.hasText && !this.photos.length && !this.files.length}
                   @click=${() => this.send()}
                 >
                   <ha-icon icon="mdi:arrow-up"></ha-icon>
@@ -6287,8 +6350,8 @@ var Ri = /* @__PURE__ */ new Set([
         </div>
       </div>
       <div class="meta">
-        ${this.editing ? C`<span class="editing"
-                >${P("editing_last")}
+        ${this.editAt >= 0 ? C`<span class="editing"
+                >${P(this.editAt === this.lastUserIndex() ? "editing_last" : "editing_earlier")}
                 <button class="small ghost" @click=${this.cancelEdit}>
                   ${P("cancel")}
                 </button></span
@@ -6299,14 +6362,14 @@ var Ri = /* @__PURE__ */ new Set([
           title=${P("usage_title")}
         >
           ${P("usage_line", {
-			input: da(this.usage.input + this.usage.cache_read + this.usage.cache_write),
-			output: da(this.usage.output)
+			input: _a(this.usage.input + this.usage.cache_read + this.usage.cache_write),
+			output: _a(this.usage.output)
 		})}
-          ${this.usage.cache_read ? ` · ${P("usage_cached", { count: da(this.usage.cache_read) })}` : w}
+          ${this.usage.cache_read ? ` · ${P("usage_cached", { count: _a(this.usage.cache_read) })}` : w}
           ·
           ${this.usage.cost == null ? P("cost_na") : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
           ${this.usage.review ? ` · ${P("reviewer_usage", {
-			tokens: da(this.usage.review.input + this.usage.review.output),
+			tokens: _a(this.usage.review.input + this.usage.review.output),
 			cost: this.usage.review.cost == null ? P("cost_na") : `~$${this.usage.review.cost.toFixed(4)}`
 		})}` : w}
         </span>
@@ -6314,21 +6377,61 @@ var Ri = /* @__PURE__ */ new Set([
     </footer>`;
 	}
 };
-Q([Re({ attribute: !1 })], $.prototype, "hass", void 0), Q([Re({ type: Boolean })], $.prototype, "narrow", void 0), Q([j()], $.prototype, "info", void 0), Q([j()], $.prototype, "convs", void 0), Q([j()], $.prototype, "query", void 0), Q([j()], $.prototype, "previews", void 0), Q([j()], $.prototype, "hits", void 0), Q([j()], $.prototype, "convId", void 0), Q([j()], $.prototype, "chatTitle", void 0), Q([j()], $.prototype, "items", void 0), Q([j()], $.prototype, "usage", void 0), Q([j()], $.prototype, "running", void 0), Q([j()], $.prototype, "announce", void 0), Q([j()], $.prototype, "editing", void 0), Q([j()], $.prototype, "photos", void 0), Q([j()], $.prototype, "files", void 0), Q([j()], $.prototype, "dragging", void 0), Q([j()], $.prototype, "providerId", void 0), Q([j()], $.prototype, "model", void 0), Q([j()], $.prototype, "fetched", void 0), Q([j()], $.prototype, "showList", void 0), Q([j()], $.prototype, "loadError", void 0), Q([j()], $.prototype, "mentions", void 0), Q([j()], $.prototype, "prefs", void 0), Q([j()], $.prototype, "showPrefs", void 0), Q([j()], $.prototype, "showNotes", void 0), Q([j()], $.prototype, "showChanges", void 0), Q([j()], $.prototype, "notesDraft", void 0), Q([j()], $.prototype, "notesStatus", void 0), Q([j()], $.prototype, "mentionIndex", void 0), Q([Be(".composer textarea")], $.prototype, "input", void 0), Q([Be(".messages")], $.prototype, "scroller", void 0);
-var Bi = "llm-agent-prefs", Vi = "llm-agent-last-chat";
-function Hi() {
+Q([Re({ attribute: !1 })], $.prototype, "hass", void 0), Q([Re({ type: Boolean })], $.prototype, "narrow", void 0), Q([j()], $.prototype, "info", void 0), Q([j()], $.prototype, "convs", void 0), Q([j()], $.prototype, "query", void 0), Q([j()], $.prototype, "previews", void 0), Q([j()], $.prototype, "hits", void 0), Q([j()], $.prototype, "convId", void 0), Q([j()], $.prototype, "chatTitle", void 0), Q([j()], $.prototype, "items", void 0), Q([j()], $.prototype, "usage", void 0), Q([j()], $.prototype, "running", void 0), Q([j()], $.prototype, "announce", void 0), Q([j()], $.prototype, "editAt", void 0), Q([j()], $.prototype, "hasText", void 0), Q([j()], $.prototype, "photos", void 0), Q([j()], $.prototype, "files", void 0), Q([j()], $.prototype, "dragging", void 0), Q([j()], $.prototype, "providerId", void 0), Q([j()], $.prototype, "model", void 0), Q([j()], $.prototype, "fetched", void 0), Q([j()], $.prototype, "showList", void 0), Q([j()], $.prototype, "loadError", void 0), Q([j()], $.prototype, "mentions", void 0), Q([j()], $.prototype, "prefs", void 0), Q([j()], $.prototype, "showPrefs", void 0), Q([j()], $.prototype, "showNotes", void 0), Q([j()], $.prototype, "showChanges", void 0), Q([j()], $.prototype, "notesDraft", void 0), Q([j()], $.prototype, "notesStatus", void 0), Q([j()], $.prototype, "mentionIndex", void 0), Q([Be(".composer textarea")], $.prototype, "input", void 0), Q([Be(".messages")], $.prototype, "scroller", void 0);
+var Bi = "llm-agent-prefs";
+async function Vi(e) {
 	try {
-		return localStorage.getItem(Vi);
+		return await navigator.clipboard.writeText(e), !0;
+	} catch {
+		let t = document.createElement("textarea");
+		t.value = e, document.body.append(t), t.select();
+		let n = document.execCommand("copy");
+		return t.remove(), n;
+	}
+}
+function Hi(e) {
+	try {
+		let t = JSON.parse(localStorage.getItem(e) ?? "{}");
+		return t && typeof t == "object" ? t : {};
+	} catch {
+		return {};
+	}
+}
+function Ui(e, t) {
+	try {
+		Object.keys(t).length ? localStorage.setItem(e, JSON.stringify(t)) : localStorage.removeItem(e);
+	} catch {}
+}
+function Wi(e, t) {
+	let n = Hi(e)[t ?? ""];
+	return typeof n == "string" ? n : "";
+}
+function Gi(e, t, n) {
+	let r = Hi(e), i = t ?? "";
+	if (n.trim()) r[i] = n;
+	else if (i in r) delete r[i];
+	else return;
+	Ui(e, r);
+}
+function Ki(e, t) {
+	let n = Hi(e), r = new Set(t.map((e) => e.id)), i = Object.keys(n).filter((e) => e && !r.has(e));
+	for (let e of i) delete n[e];
+	i.length && Ui(e, n);
+}
+var qi = "llm-agent-last-chat";
+function Ji() {
+	try {
+		return localStorage.getItem(qi);
 	} catch {
 		return null;
 	}
 }
-function Ui(e) {
+function Yi(e) {
 	try {
-		e ? localStorage.setItem(Vi, e) : localStorage.removeItem(Vi);
+		e ? localStorage.setItem(qi, e) : localStorage.removeItem(qi);
 	} catch {}
 }
-var Wi = {
+var Xi = {
 	theme: "auto",
 	size: "normal",
 	compact: !1,
@@ -6337,24 +6440,24 @@ var Wi = {
 	send: "enter",
 	listOpen: !0
 };
-function Gi() {
+function Zi() {
 	try {
 		let e = JSON.parse(localStorage.getItem(Bi) ?? "{}");
 		return {
-			...Wi,
+			...Xi,
 			...typeof e == "object" && e ? e : {}
 		};
 	} catch {
-		return { ...Wi };
+		return { ...Xi };
 	}
 }
-function Ki(e) {
+function Qi(e) {
 	try {
 		localStorage.setItem(Bi, JSON.stringify(e));
 	} catch {}
 }
-var qi = 8, Ji = 1500;
-function Yi(e, t = !1) {
+var $i = 8, ea = 1500;
+function ta(e, t = !1) {
 	let n = Object.values(e?.areas ?? {}).map((e) => String(e.name ?? "")).filter(Boolean).sort((e, t) => e.localeCompare(t))[0] ?? P("living_room"), r = Object.values(e?.states ?? {}).some((e) => e.attributes?.device_class === "energy");
 	return t ? [
 		{
@@ -6399,7 +6502,7 @@ function Yi(e, t = !1) {
 		}
 	];
 }
-function Xi(e, t) {
+function na(e, t) {
 	let n = t.toLowerCase(), r = [], i = (e, t) => {
 		let i = e.label.toLowerCase(), a = t.toLowerCase(), o;
 		if (!n) o = 3;
@@ -6429,12 +6532,12 @@ function Xi(e, t) {
 		insert: t.entity_id,
 		detail: t.entity_id
 	}, t.entity_id);
-	return r.sort((e, t) => e[0] - t[0] || e[1].label.localeCompare(t[1].label)), r.slice(0, qi).map(([, e]) => e);
+	return r.sort((e, t) => e[0] - t[0] || e[1].label.localeCompare(t[1].label)), r.slice(0, $i).map(([, e]) => e);
 }
-function Zi(e, t) {
-	let n = [`# ${aa(e)}`, ""];
+function ra(e, t) {
+	let n = [`# ${da(e)}`, ""];
 	for (let e of t) if (e.kind === "user") {
-		let t = e.images?.length || e.photos || 0, r = [...t ? [oa(t)] : [], ...(e.files ?? []).map((e) => e.name)], i = r.length ? ` _(${r.join(", ")})_` : "";
+		let t = e.images?.length || e.photos || 0, r = [...t ? [fa(t)] : [], ...(e.files ?? []).map((e) => e.name)], i = r.length ? ` _(${r.join(", ")})_` : "";
 		n.push(`**${P("you")}:** ${e.text}${i}`, "");
 	} else if (e.kind === "assistant" && e.text) n.push(e.text, "");
 	else if (e.kind === "notice") n.push(`> ${e.text}`, "");
@@ -6444,16 +6547,16 @@ function Zi(e, t) {
 	}
 	return n.join("\n");
 }
-function Qi(e) {
+function ia(e) {
 	return e.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
 }
-var $i = /* @__PURE__ */ new Set([
+var aa = /* @__PURE__ */ new Set([
 	"length",
 	"tool_limit",
 	"cancelled",
 	"spend_cap"
 ]);
-function ea(e) {
+function oa(e) {
 	let t = [], n = /* @__PURE__ */ new Map();
 	for (let r of e) if (r.role === "user") t.push({
 		kind: "user",
@@ -6487,33 +6590,33 @@ function ea(e) {
 	}
 	return t;
 }
-var ta = {
+var sa = {
 	approve: "reviewer_approved",
 	deny: "reviewer_denied",
 	ask: "reviewer_unsure"
 };
-function na(e, t) {
+function ca(e, t) {
 	return t && !e ? C`<span class="tag wait">${P("reviewing")}</span>` : e ? C`<span class="tag review ${e.decision}" title=${e.reason}
-    >${P(ta[e.decision] ?? "reviewer")}</span
+    >${P(sa[e.decision] ?? "reviewer")}</span
   >` : w;
 }
-function ra(e) {
+function la(e) {
 	return e.replace(/\n+$/, "").split("\n").map((e) => C`<span class=${e.startsWith("+") && !e.startsWith("+++") ? "add" : e.startsWith("-") && !e.startsWith("---") ? "del" : e.startsWith("@@") ? "hunk" : ""}>${e || " "}</span>`);
 }
-function ia(e) {
+function ua(e) {
 	return e === "shell" ? "mdi:console" : e === "call_service" ? "mdi:play-circle-outline" : e === "undo" ? "mdi:undo" : e === "system" ? "mdi:cog-outline" : e === "ha_websocket" ? "mdi:api" : e === "integrations" ? "mdi:puzzle-outline" : e === "read_reference" ? "mdi:book-open-variant" : e === "render_template" ? "mdi:code-braces" : e === "get_history" ? "mdi:chart-timeline-variant" : e === "web_fetch" ? "mdi:web" : e === "web_search" ? "mdi:magnify" : e === "camera_snapshot" ? "mdi:cctv" : e === "get_traces" ? "mdi:transit-connection-variant" : e === "get_logbook" ? "mdi:history" : e === "read_log" ? "mdi:text-box-search-outline" : e.includes("dashboard") ? "mdi:view-dashboard-outline" : e.includes("config_item") ? "mdi:robot-outline" : e.includes("file") ? "mdi:file-document-outline" : e.includes("area") || e.includes("device") || e.includes("registry") ? "mdi:devices" : e.includes("entit") || e.includes("service") ? "mdi:format-list-bulleted" : "mdi:wrench-outline";
 }
-function aa(e) {
+function da(e) {
 	return e === "New chat" ? P("new_chat") : e;
 }
-function oa(e) {
+function fa(e) {
 	return e === 1 ? P("one_photo") : P("n_photos", { count: e });
 }
-function sa() {
+function pa() {
 	let e = (/* @__PURE__ */ new Date()).getHours();
 	return P(e < 5 ? "greeting_evening" : e < 12 ? "greeting_morning" : e < 18 ? "greeting_afternoon" : "greeting_evening");
 }
-function ca(e, t) {
+function ma(e, t) {
 	if (t) return [["", e]];
 	let n = /* @__PURE__ */ new Date();
 	n.setHours(0, 0, 0, 0);
@@ -6530,18 +6633,18 @@ function ca(e, t) {
 	}
 	return a;
 }
-function la(e) {
+function ha(e) {
 	let t = `tool_${e}`;
 	return at(t) ? P(t) : e.replace(/_/g, " ");
 }
-function ua(e) {
+function ga(e) {
 	let t = Object.entries(e).filter(([e]) => !e.startsWith("_")).map(([e, t]) => `${e}=${typeof t == "string" ? t : JSON.stringify(t)}`).join(" ");
 	return t.length > 120 ? `${t.slice(0, 117)}…` : t;
 }
-function da(e) {
+function _a(e) {
 	return e >= 1e6 ? `${(e / 1e6).toFixed(1)}M` : e >= 1e3 ? `${(e / 1e3).toFixed(1)}k` : String(e);
 }
-function fa(e) {
+function va(e) {
 	let t = {
 		ask_all: "mode_ask_all",
 		ask_risky: "mode_ask_risky",
@@ -6552,31 +6655,31 @@ function fa(e) {
 	}[e ?? ""];
 	return t ? P(t) : "";
 }
-function pa(e) {
+function ya(e) {
 	return e.message ?? String(e);
 }
 customElements.get("llm-agent-panel") || customElements.define("llm-agent-panel", $);
-var ma = 3, ha = 10, ga = 2097152, _a = 35e5, va = {
+var ba = 3, xa = 10, Sa = 2097152, Ca = 35e5, wa = {
 	text: "mdi:file-document-outline",
 	pdf: "mdi:file-pdf-box",
 	zip: "mdi:folder-zip-outline",
 	gzip: "mdi:folder-zip-outline"
 };
-function ya(e) {
+function Ta(e) {
 	return e.type.startsWith("image/") && e.type !== "image/svg+xml";
 }
-function ba(e) {
+function Ea(e) {
 	return Math.ceil(e / 3) * 4;
 }
-function xa(e) {
+function Da(e) {
 	return e >= 1048576 ? `${(e / 1048576).toFixed(1)} MB` : e >= 1024 ? `${Math.round(e / 1024)} KB` : `${e} B`;
 }
-function Sa(e) {
+function Oa(e) {
 	if (e.kind !== "text") return e.kind.toUpperCase();
 	let t = e.name.lastIndexOf("."), n = t > 0 ? e.name.slice(t + 1) : "";
 	return n && n.length <= 5 ? n.toUpperCase() : P("file_text");
 }
-function Ca(e) {
+function ka(e) {
 	let t = (...t) => t.every((t, n) => e[n] === t);
 	if (t(80, 75, 3, 4) || t(80, 75, 5, 6)) return "zip";
 	if (t(31, 139)) return "gzip";
@@ -6589,8 +6692,8 @@ function Ca(e) {
 	}
 	return e.length && n / e.length > .02 ? null : "text";
 }
-async function wa(e) {
-	let t = Ca(new Uint8Array(await e.slice(0, 8192).arrayBuffer()));
+async function Aa(e) {
+	let t = ka(new Uint8Array(await e.slice(0, 8192).arrayBuffer()));
 	if (!t) return null;
 	let n = await new Promise((t, n) => {
 		let r = new FileReader();
@@ -6603,19 +6706,19 @@ async function wa(e) {
 		data: n.slice(n.indexOf(",") + 1)
 	};
 }
-var Ta = 1568, Ea = 1e6;
-async function Da(e) {
+var ja = 1568, Ma = 1e6;
+async function Na(e) {
 	let t = await createImageBitmap(e);
 	try {
-		let e = Math.min(Ta, Math.max(t.width, t.height));
+		let e = Math.min(ja, Math.max(t.width, t.height));
 		for (;;) {
 			for (let n of [
 				.85,
 				.7,
 				.55
 			]) {
-				let r = Oa(t, e, n), i = r.slice(r.indexOf(",") + 1);
-				if (i.length <= Ea) return {
+				let r = Pa(t, e, n), i = r.slice(r.indexOf(",") + 1);
+				if (i.length <= Ma) return {
 					media_type: "image/jpeg",
 					data: i,
 					url: r
@@ -6628,11 +6731,11 @@ async function Da(e) {
 		t.close();
 	}
 }
-function Oa(e, t, n) {
+function Pa(e, t, n) {
 	let r = Math.min(1, t / Math.max(e.width, e.height)), i = document.createElement("canvas");
 	i.width = Math.max(1, Math.round(e.width * r)), i.height = Math.max(1, Math.round(e.height * r));
 	let a = i.getContext("2d");
 	return a.fillStyle = "#fff", a.fillRect(0, 0, i.width, i.height), a.drawImage(e, 0, 0, i.width, i.height), i.toDataURL("image/jpeg", n);
 }
 //#endregion
-export { Xi as findMentions, Zi as toMarkdown, Yi as welcomeTips };
+export { na as findMentions, ra as toMarkdown, ta as welcomeTips };
