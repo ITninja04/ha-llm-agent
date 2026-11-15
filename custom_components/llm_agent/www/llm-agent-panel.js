@@ -4980,15 +4980,26 @@ var Mi = o`
 		}, this.gen = 0;
 	}
 	static {
-		this.styles = [Mi, o`:host{flex:1;min-height:0;height:auto;overflow-y:auto;background:none}
+		this.styles = [Mi, o`:host{flex:1;min-height:0;height:auto;overflow-y:auto;background:none;container-type:inline-size}
 .bar{display:flex;flex-wrap:wrap;gap:8px;padding:12px 20px}
 .bar>*{font:inherit;font-size:13px;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
 .bar>[type=search]{flex:1;min-width:140px}
 .row,.bar,.more{border-bottom:1px solid var(--line)}
-.row{padding:10px 20px}
-.line{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:3px 0;font-size:13px;color:var(--muted)}
-b{color:var(--text);font-weight:500}
-code{font:12px var(--mono);overflow-wrap:anywhere}
+/* Every row uses the same column template, and the rows are the same width, so the
+   columns line up without the rows sharing a grid. Widths are shares (fr) over a
+   minimum, so the change column grows with the pane instead of getting only what fixed
+   columns leave. display and gap are set here because the panel's chat styles, which
+   this view shares, make .row a flex row. */
+.row{display:grid;grid-template-columns:11.5rem minmax(5rem,1fr) minmax(4rem,.6fr) minmax(8rem,2fr) minmax(9rem,1.4fr);grid-template-areas:"t c u w o";gap:4px 16px;align-items:start;padding:10px 20px;font-size:13px;color:var(--muted)}
+.row>*,.link{min-width:0;text-align:start;overflow-wrap:anywhere}
+.t{grid-area:t;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.c{grid-area:c}.u{grid-area:u;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w{grid-area:w;display:flex;gap:6px;align-items:baseline}
+.o{grid-area:o;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+/* the minimums above add up to about 720px with padding; narrower panes (phones) put
+   when, chat and person on one line and the change and outcome below */
+@container (max-width:720px){.row{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"t c u" "w w w" "o o o"}}
+b{color:var(--text);font-weight:500;flex:none}
+code{font:12px var(--mono);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .link{background:none;border:0;padding:0;font:inherit;color:var(--accent);cursor:pointer}
 .bad{color:var(--danger)}
 .more{padding:12px 20px}`];
@@ -5080,9 +5091,9 @@ code{font:12px var(--mono);overflow-wrap:anywhere}
 	}
 	row(e) {
 		let t = `tool_${e.tool}`, n = (e, t = !1, n = "") => C`<span class="tag ${t ? "bad" : ""}" title=${n}>${e}</span>`;
-		return C`<div class="row"><div class="line">${this.fmt(e.time)}${e.conversation_id ? C`<button class="link" @click=${() => this.dispatchEvent(new CustomEvent("open-chat", { detail: e.conversation_id }))}>${e.chat_title ?? P("changes_deleted_chat")}</button>` : w}<span>${e.user_name ?? (e.user_id ? e.user_id.slice(0, 8) : P("changes_no_user"))}</span></div>
-<div class="line"><b class="what">${at(t) ? P(t) : e.tool.replace(/_/g, " ")}</b><code>${e.args}</code></div>
-<div class="line">${e.approval ? n(P(Ni[e.approval]), e.approval === "denied") : w}${e.approval === "denied" ? w : n(e.ok ? P("done") : P("failed"), !e.ok)}<span>${e.detail}</span>${e.undo === "undone" ? n(P("undone")) : w}${e.undo === "gone" ? n(P("changes_undo_gone"), !1, P("changes_undo_gone_title")) : w}${e.undo === "available" ? C`<button class="ghost small" title=${P("undo_title")} @click=${() => this.undo(e)}>${P("undo")}</button>` : w}</div></div>`;
+		return C`<div class="row"><span class="t">${this.fmt(e.time)}</span><span class="c">${e.conversation_id ? C`<button class="link" @click=${() => this.dispatchEvent(new CustomEvent("open-chat", { detail: e.conversation_id }))}>${e.chat_title ?? P("changes_deleted_chat")}</button>` : w}</span><span class="u">${e.user_name ?? (e.user_id ? e.user_id.slice(0, 8) : P("changes_no_user"))}</span>
+<div class="w"><b class="what">${at(t) ? P(t) : e.tool.replace(/_/g, " ")}</b><code title=${e.args}>${e.args}</code></div>
+<div class="o">${e.approval ? n(P(Ni[e.approval]), e.approval === "denied") : w}${e.approval === "denied" ? w : n(e.ok ? P("done") : P("failed"), !e.ok)}<span>${e.detail}</span>${e.undo === "undone" ? n(P("undone")) : w}${e.undo === "gone" ? n(P("changes_undo_gone"), !1, P("changes_undo_gone_title")) : w}${e.undo === "available" ? C`<button class="ghost small" title=${P("undo_title")} @click=${() => this.undo(e)}>${P("undo")}</button>` : w}</div></div>`;
 	}
 };
 Q([Re({ attribute: !1 })], Fi.prototype, "hass", void 0), Q([j()], Fi.prototype, "s", void 0);

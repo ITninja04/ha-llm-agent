@@ -51,15 +51,26 @@ const ERR = (err: unknown) => (err as { message?: string }).message ?? String(er
 class LlmAgentChanges extends LitElement {
   static styles = [
     styles,
-    css`:host{flex:1;min-height:0;height:auto;overflow-y:auto;background:none}
+    css`:host{flex:1;min-height:0;height:auto;overflow-y:auto;background:none;container-type:inline-size}
 .bar{display:flex;flex-wrap:wrap;gap:8px;padding:12px 20px}
 .bar>*{font:inherit;font-size:13px;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
 .bar>[type=search]{flex:1;min-width:140px}
 .row,.bar,.more{border-bottom:1px solid var(--line)}
-.row{padding:10px 20px}
-.line{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:3px 0;font-size:13px;color:var(--muted)}
-b{color:var(--text);font-weight:500}
-code{font:12px var(--mono);overflow-wrap:anywhere}
+/* Every row uses the same column template, and the rows are the same width, so the
+   columns line up without the rows sharing a grid. Widths are shares (fr) over a
+   minimum, so the change column grows with the pane instead of getting only what fixed
+   columns leave. display and gap are set here because the panel's chat styles, which
+   this view shares, make .row a flex row. */
+.row{display:grid;grid-template-columns:11.5rem minmax(5rem,1fr) minmax(4rem,.6fr) minmax(8rem,2fr) minmax(9rem,1.4fr);grid-template-areas:"t c u w o";gap:4px 16px;align-items:start;padding:10px 20px;font-size:13px;color:var(--muted)}
+.row>*,.link{min-width:0;text-align:start;overflow-wrap:anywhere}
+.t{grid-area:t;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.c{grid-area:c}.u{grid-area:u;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w{grid-area:w;display:flex;gap:6px;align-items:baseline}
+.o{grid-area:o;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+/* the minimums above add up to about 720px with padding; narrower panes (phones) put
+   when, chat and person on one line and the change and outcome below */
+@container (max-width:720px){.row{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"t c u" "w w w" "o o o"}}
+b{color:var(--text);font-weight:500;flex:none}
+code{font:12px var(--mono);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .link{background:none;border:0;padding:0;font:inherit;color:var(--accent);cursor:pointer}
 .bad{color:var(--danger)}
 .more{padding:12px 20px}`,
@@ -169,11 +180,11 @@ code{font:12px var(--mono);overflow-wrap:anywhere}
     const key = `tool_${r.tool}`;
     const tag = (text: string, bad = false, title = "") =>
       html`<span class="tag ${bad ? "bad" : ""}" title=${title}>${text}</span>`;
-    return html`<div class="row"><div class="line">${this.fmt(r.time)}${r.conversation_id
+    return html`<div class="row"><span class="t">${this.fmt(r.time)}</span><span class="c">${r.conversation_id
       ? html`<button class="link" @click=${() => this.dispatchEvent(new CustomEvent("open-chat", { detail: r.conversation_id }))}>${r.chat_title ?? t("changes_deleted_chat")}</button>`
-      : nothing}<span>${r.user_name ?? (r.user_id ? r.user_id.slice(0, 8) : t("changes_no_user"))}</span></div>
-<div class="line"><b class="what">${has(key) ? t(key) : r.tool.replace(/_/g, " ")}</b><code>${r.args}</code></div>
-<div class="line">${r.approval ? tag(t(APPROVAL[r.approval]), r.approval === "denied") : nothing}${r.approval === "denied" ? nothing : tag(r.ok ? t("done") : t("failed"), !r.ok)}<span>${r.detail}</span>${r.undo === "undone" ? tag(t("undone")) : nothing}${r.undo === "gone" ? tag(t("changes_undo_gone"), false, t("changes_undo_gone_title")) : nothing}${r.undo === "available"
+      : nothing}</span><span class="u">${r.user_name ?? (r.user_id ? r.user_id.slice(0, 8) : t("changes_no_user"))}</span>
+<div class="w"><b class="what">${has(key) ? t(key) : r.tool.replace(/_/g, " ")}</b><code title=${r.args}>${r.args}</code></div>
+<div class="o">${r.approval ? tag(t(APPROVAL[r.approval]), r.approval === "denied") : nothing}${r.approval === "denied" ? nothing : tag(r.ok ? t("done") : t("failed"), !r.ok)}<span>${r.detail}</span>${r.undo === "undone" ? tag(t("undone")) : nothing}${r.undo === "gone" ? tag(t("changes_undo_gone"), false, t("changes_undo_gone_title")) : nothing}${r.undo === "available"
       ? html`<button class="ghost small" title=${t("undo_title")} @click=${() => this.undo(r)}>${t("undo")}</button>`
       : nothing}</div></div>`;
   }
