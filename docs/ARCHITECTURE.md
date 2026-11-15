@@ -87,6 +87,17 @@ entities, intents and scripts. Voice can therefore control devices and answer
 questions, but cannot edit config. This matches the owner's decision and needs
 no approval UI.
 
+## 4a. AI Task
+
+`ai_task.py` registers one AI Task entity per provider entry, for
+`ai_task.generate_data` and `ai_task.generate_image`. It is pure generation: no tools, no
+approvals. With a `structure`, the schema goes in the provider's native structured
+output field (`output_schema` on `Provider.stream`) and in the prompt; the reply is
+checked against the structure and sent back once for repair if it does not fit. Image
+generation exists for OpenAI (Images API), Gemini (generateContent with an image model)
+and OpenRouter (chat completions with the image modality); `image_model_for` in
+`providers/base.py` decides which entities advertise it.
+
 ## 5. Tools (panel only)
 
 | Group | Tools | Risky when |

@@ -167,6 +167,72 @@ In the panel:
 
 ![The panel in dark mode](docs/images/dark.png)
 
+### AI Tasks
+
+Each provider also shows up as an AI Task entity (named like its Assist agent, for
+example `ai_task.llm_agent_anthropic_claude_sonnet_5_5`), so automations can use Home
+Assistant's own `ai_task.generate_data` and `ai_task.generate_image` actions with it.
+
+AI Tasks are pure generation. The model gets no Home Assistant tools, so it can't read
+states or change anything, and nothing asks for approval. Give it what it needs in the
+instructions or as attachments. Use `llm_agent.ask` when the AI should look things up or
+act.
+
+This automation looks at the porch camera when the doorbell rings and gets typed fields
+back:
+
+<!-- ai-task-example: tests/test_ai_task.py checks this block against HA's action schema -->
+```yaml
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.doorbell
+    to: "on"
+actions:
+  - action: ai_task.generate_data
+    data:
+      task_name: porch check
+      entity_id: ai_task.llm_agent_anthropic_claude_sonnet_5_5
+      instructions: Is there a package on the porch, and how many people are in view?
+      structure:
+        package:
+          description: True when a package is visible
+          required: true
+          selector:
+            boolean:
+        people:
+          description: Number of people in view
+          required: true
+          selector:
+            number:
+      attachments:
+        - media_content_id: media-source://camera/camera.porch
+          media_content_type: image/jpeg
+    response_variable: porch
+  - if: "{{ porch.data.package }}"
+    then:
+      - action: notify.mobile_app_phone
+        data:
+          message: "Package on the porch, {{ porch.data.people | int }} people in view."
+```
+
+With a `structure`, the reply is checked against it and comes back as data
+(`porch.data.package` above). Providers with a structured output mode get the schema
+there, and it is always in the prompt as well. A reply that doesn't fit is sent back once
+to be fixed. If the second reply doesn't fit either, the action fails and says what was
+wrong. Without a `structure`, `data` is the reply text.
+
+Attachments must be pictures (camera snapshots, image entities, or files in your media
+folders), up to 20 MB each, and the model has to be able to see images. Other file types
+are refused.
+
+`ai_task.generate_image` is offered only on OpenAI, Google Gemini and OpenRouter
+providers. If the provider's default model is an image model, that model is used.
+Otherwise OpenAI uses `gpt-image-2.5-flare`, and Gemini and OpenRouter use Gemini 2.5
+Flash Image. OpenAI doesn't take attachments with an image request here. Anthropic, Ollama
+and the ChatGPT subscription can't make pictures.
+
+AI Task calls are not counted in the panel's cost figures or the daily spend cap.
+
 ## Safety and approvals
 
 All settings are under **Settings → Devices & services → LLM Agent → Configure → Settings**.
