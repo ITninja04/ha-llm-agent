@@ -36,6 +36,55 @@ async def test_setup_registers_admin_panel_and_assist_agent(hass: HomeAssistant)
     assert PANEL_URL not in hass.data["frontend_panels"]
 
 
+async def _save_settings(hass: HomeAssistant, entry: MockConfigEntry, **section: Any) -> None:
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    flow = await hass.config_entries.options.async_configure(
+        flow["flow_id"], {"next_step_id": "settings"}
+    )
+    flow = await hass.config_entries.options.async_configure(
+        flow["flow_id"], {"approval_mode": "ask_risky", **section}
+    )
+    assert flow["type"] == "create_entry"
+    await hass.async_block_till_done()
+
+
+async def test_settings_save_keeps_the_panel_through_the_reload(hass: HomeAssistant) -> None:
+    """The panel saves settings through the options flow, which reloads the entry. A
+    reload that removed the panel for a moment sent the open browser to the default
+    dashboard, so the panel must stay registered at every panels_updated event."""
+    entry = await _setup(hass)
+    before = entry.runtime_data
+    seen: list[tuple[bool, bool | None]] = []
+
+    def on_panels(_event: Any) -> None:
+        panel = hass.data["frontend_panels"].get(PANEL_URL)
+        seen.append((panel is not None, panel.require_admin if panel else None))
+
+    hass.bus.async_listen("panels_updated", on_panels)
+    await _save_settings(hass, entry, cost={"max_steps": 31})
+    assert entry.runtime_data is not before  # it did reload
+    assert entry.runtime_data.options["max_steps"] == 31
+    assert seen and all(present for present, _ in seen)
+
+    # household chat changes who may open the panel: updated in place, still no gap
+    seen.clear()
+    await _save_settings(hass, entry, household={"household_chat": True})
+    assert seen and all(present for present, _ in seen)
+    assert hass.data["frontend_panels"][PANEL_URL].require_admin is False
+    module = hass.data["frontend_panels"][PANEL_URL].config["_panel_custom"]["module_url"]
+    assert module.endswith(f"?v={hass.data[f'{DOMAIN}_version']}")
+
+
+async def test_settings_save_removes_the_panel_when_the_reload_fails(
+    hass: HomeAssistant,
+) -> None:
+    """A panel kept for an entry that did not come back would open onto a dead API."""
+    entry = await _setup(hass)
+    with patch("custom_components.llm_agent.Agent", side_effect=RuntimeError("setup broke")):
+        await _save_settings(hass, entry, cost={"max_steps": 31})
+    assert PANEL_URL not in hass.data["frontend_panels"]
+
+
 async def test_ws_rejects_non_admin(hass: HomeAssistant, hass_ws_client, hass_admin_user) -> None:
     await _setup(hass)
     hass_admin_user.groups = []
