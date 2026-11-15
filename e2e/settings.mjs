@@ -121,6 +121,8 @@ export async function settingsSteps({ page, panel, browser, ha, tokens, shots, f
   // 21e. Open in Home Assistant goes to the integration's page in the same app
   await page.evaluate(() => (window.stillHere = true));
   if (!(await panel.locator(".prefs").count())) await gear().click();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${shots}/llm-agent-12-settings-gear.png` });
   await panel.getByRole("button", { name: "Open in Home Assistant" }).click();
   await page.waitForURL(/\/config\/integrations\/integration\/llm_agent$/, { timeout: 15000 });
   if (!(await page.evaluate(() => window.stillHere))) fail("Open in Home Assistant reloaded the page");
@@ -165,10 +167,15 @@ export async function settingsSteps({ page, panel, browser, ha, tokens, shots, f
     if (await memberPanel.locator(".composer").waitFor({ timeout: 5000 }).then(() => true, () => false))
       break;
   }
-  await memberPanel.getByRole("button", { name: "Panel settings" }).click();
-  await memberPanel.locator(".prefs").waitFor();
+  // the popover must be open while its entries are counted, or no entry proves nothing
+  const prefs = memberPanel.locator(".prefs");
+  for (let i = 0; i < 10 && !(await prefs.getByLabel("Theme").isVisible()); i++) {
+    if (!(await prefs.count())) await memberPanel.getByRole("button", { name: "Panel settings" }).click();
+    await member.waitForTimeout(500);
+  }
+  if (!(await prefs.getByLabel("Theme").isVisible())) fail("the member's panel settings did not open");
   for (const name of ["Integration settings", "Open in Home Assistant"])
-    if (await memberPanel.getByRole("button", { name }).count()) fail(`a member sees "${name}"`);
+    if (await prefs.getByRole("button", { name }).count()) fail(`a member sees "${name}"`);
   await member.screenshot({ path: `${shots}/llm-agent-12g-member-prefs.png` });
   await member.close();
 }
