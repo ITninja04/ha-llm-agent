@@ -938,6 +938,8 @@ var N = We(Ke), { I: qe } = Pe, Je = (e) => e, Ye = () => document.createComment
 	changes_undo_gone: "Undo expired",
 	changes_undo_gone_title: "Its undo copy was removed to save space",
 	tool_change_history: "change history",
+	tool_past_chats: "past chats",
+	tool_read_chat: "read chat",
 	usage: "Usage",
 	usage_view_title: "Spend and tokens over time, in every chat",
 	usage_days: "{n} days",

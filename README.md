@@ -112,6 +112,7 @@ the integration, so a ChatGPT provider signs in again.
 | "What is this device?" (with a photo) | Attach or paste up to three photos; it looks at them. Needs a model that can see images. |
 | "Why is this log full of errors?" (with a file) | Attach, drop or paste files: logs, YAML, JSON, CSV, code, PDF, or a zip of them. Text is read inside the chat; PDFs go to providers that read them. |
 | "Undo that" | Puts the file or dashboard back the way it was. |
+| "Do it like we did last week" | Looks back at its earlier chats: finds them by text, date or source and reads what was asked, what it tried and what you decided. It sees only the chats you can see in the panel. Voice (Assist) conversations are not saved, so it cannot look those up. |
 
 It also adds an **Assist conversation agent** for each provider, so you can use the same
 model with voice and text Assist. Assist uses Home Assistant's own tools, so there it can

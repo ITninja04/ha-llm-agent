@@ -221,6 +221,8 @@
   "changes_undo_gone": "撤销已过期",
   "changes_undo_gone_title": "其撤销副本已被删除以节省空间",
   "tool_change_history": "更改历史",
+  "tool_past_chats": "历史对话",
+  "tool_read_chat": "读取对话",
   "usage": "用量",
   "usage_view_title": "所有对话中随时间变化的花费和 token",
   "usage_days": "{n} 天",

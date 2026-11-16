@@ -221,6 +221,8 @@
   "changes_undo_gone": "Ongedaan maken verlopen",
   "changes_undo_gone_title": "De kopie om ongedaan te maken is verwijderd om ruimte te besparen",
   "tool_change_history": "wijzigingsgeschiedenis",
+  "tool_past_chats": "eerdere chats",
+  "tool_read_chat": "chat lezen",
   "usage": "Gebruik",
   "usage_view_title": "Kosten en tokens door de tijd, in alle chats",
   "usage_days": "{n} dagen",

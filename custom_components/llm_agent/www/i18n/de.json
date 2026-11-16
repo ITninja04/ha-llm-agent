@@ -221,6 +221,8 @@
   "changes_undo_gone": "Rückgängig abgelaufen",
   "changes_undo_gone_title": "Die Kopie zum Rückgängigmachen wurde entfernt, um Platz zu sparen",
   "tool_change_history": "Änderungsverlauf",
+  "tool_past_chats": "frühere Chats",
+  "tool_read_chat": "Chat lesen",
   "usage": "Nutzung",
   "usage_view_title": "Kosten und Tokens über die Zeit, in allen Chats",
   "usage_days": "{n} Tage",
