@@ -19,10 +19,10 @@
 // What is not true, so nobody relies on it:
 // - States are what the browser had when the page was read. They can be stale by the
 //   time the model acts, and the model is told to verify with tools.
-// - Strategy dashboards (generated, like the default "Overview" before it is taken
-//   over) have no cards in their saved config. Their entities are read from the
-//   generated config the dashboard element holds, when it is there; otherwise the page
-//   says it is generated and lists none.
+// - Generated dashboards (strategy dashboards, and HA's own Overview, Lights, Security,
+//   Climate and Maintenance panels) have no saved cards. Their entities are read from
+//   the generated config hui-root holds and from the cards actually drawn. A card that
+//   renders before the read is missed; one drawn nowhere is never listed.
 // - Home Assistant has no "sensitive" marker on elements (none in the 2026.10.2 build),
 //   so the page text walk cannot honour one. It never reads form field values at all,
 //   which keeps passwords and typed secrets out, and it skips the chat itself.
@@ -164,7 +164,8 @@ async function describe(h: PageHass): Promise<Omit<PageContext, "path">> {
   if (first === "developer-tools") return tools(second);
   if (first === "history" || first === "logbook") return timeline(h, first, query);
   const panel = h.panels?.[first];
-  if (panel?.component_name === "lovelace") return dashboard(h, first, second);
+  if (panel?.component_name === "lovelace" || GENERATED_PANELS.has(panel?.component_name ?? ""))
+    return dashboard(h, first, second, panel?.component_name === "lovelace");
   return other();
 }
 
@@ -186,10 +187,17 @@ function settings(parts: string[]): Omit<PageContext, "path"> {
 
 // ---- dashboards ------------------------------------------------------------------------
 
+// Home Assistant's own generated dashboards, which are panels of their own rather than
+// lovelace dashboards: "home" is the Overview people land on (2026.10.2 registers all five
+// in frontend/__init__.py, and ha-panel-home builds its view with the "home" strategy).
+// They have no saved config to fetch; their cards exist only once rendered.
+const GENERATED_PANELS = new Set(["home", "light", "security", "climate", "maintenance"]);
+
 async function dashboard(
   h: PageHass,
   urlPath: string,
   viewKey: string,
+  saved: boolean,
 ): Promise<Omit<PageContext, "path">> {
   const panel = h.panels?.[urlPath];
   // The default dashboard's panel has no title of its own; the sidebar shows "Overview".
@@ -198,15 +206,17 @@ async function dashboard(
     h.localize?.("panel.states") ||
     "Overview";
   let config: Json | undefined;
-  let generated = false;
-  try {
-    config = await h.connection.sendMessagePromise<Json>({
-      type: "lovelace/config",
-      url_path: urlPath === "lovelace" ? null : urlPath,
-    });
-  } catch {
-    // config_not_found: the default dashboard nobody has taken over, which is generated
-    generated = true;
+  let generated = !saved;
+  if (saved) {
+    try {
+      config = await h.connection.sendMessagePromise<Json>({
+        type: "lovelace/config",
+        url_path: urlPath === "lovelace" ? null : urlPath,
+      });
+    } catch {
+      // config_not_found: the default dashboard nobody has taken over, which is generated
+      generated = true;
+    }
   }
   if (config?.strategy) generated = true;
   // A generated dashboard's cards exist only in the config the dashboard element made.
@@ -231,21 +241,66 @@ async function dashboard(
   if (view) {
     ids = entityIds(h, view);
   }
+  // A generated view's config can still be a strategy that hui-view resolves only as it
+  // draws (the home Overview is: its favorites are not in the config hui-root holds), so
+  // what is on screen is read from the cards themselves.
+  if (generated || view?.strategy || !ids.length) {
+    ids = [...new Set([...ids, ...entityIds(h, { cards: renderedCards() })])];
+  }
   if (ids.length) {
     details.entities = ids.slice(0, MAX_VIEW_ENTITIES).map((id) => brief(h, id));
     if (ids.length > MAX_VIEW_ENTITIES) details.entities_total = ids.length;
-  } else if (generated && !view) {
+  } else if (generated) {
     details.note = "Generated dashboard; its cards could not be read, so no entities are listed.";
   }
-  const name = viewTitle && viewTitle !== dashTitle ? `${dashTitle}, ${viewTitle}` : dashTitle;
+  // A built-in generated panel opens on its first view, which the sidebar names by the
+  // panel alone: the Overview's first view is "overview" (seen in the e2e run, 2026.10.2),
+  // and "Overview, overview" on the chip says nothing more.
+  const sameName = viewTitle.toLowerCase() === dashTitle.toLowerCase();
+  const first = !saved && at === 0;
+  const name = viewTitle && !sameName && !first ? `${dashTitle}, ${viewTitle}` : dashTitle;
   return { kind: "dashboard", title: `Dashboard ${name}`, summary: name, details };
 }
 
-/** The config the open dashboard renders: for a strategy dashboard, the generated one. */
+/** The config the open dashboard renders: for a strategy dashboard, the generated one.
+ * hui-root holds it for lovelace dashboards and for the built-in generated panels alike
+ * (ha-panel-home passes its generated config to hui-root as `lovelace`). */
 function renderedConfig(): Json | null {
-  const el = deepFind("ha-panel-lovelace") as (Element & { lovelace?: { config?: Json } }) | null;
-  const config = el?.lovelace?.config;
-  return config && typeof config === "object" ? config : null;
+  for (const tag of ["hui-root", "ha-panel-lovelace"]) {
+    const el = deepFind(tag) as (Element & { lovelace?: { config?: Json } }) | null;
+    const config = el?.lovelace?.config;
+    if (config && typeof config === "object") return config;
+  }
+  return null;
+}
+
+/** The configs of the cards and badges drawn on the open view, through shadow roots:
+ * hui-card and hui-heading-badge keep theirs in `config`, the card elements themselves
+ * (hui-tile-card and the rest) in `_config` (property names from the 2026.10.2 build).
+ * A card hidden by a visibility condition is skipped with everything inside it, and
+ * other views are not in the page at all (hui-root draws only the open one). */
+function renderedCards(): Json[] {
+  const root = deepFind("hui-root");
+  if (!root) return [];
+  const out: Json[] = [];
+  const queue: (Element | ShadowRoot)[] = [root];
+  let visited = 0;
+  while (queue.length && visited++ < 20000) {
+    const node = queue.shift()!;
+    if (node instanceof Element && /^HUI-.*(CARD|BADGE)$/.test(node.tagName)) {
+      const el = node as Element & { config?: unknown; _config?: unknown };
+      const config = el.config ?? el._config;
+      // hui-card hides a card with the hidden attribute; a box test would also drop
+      // wrappers drawn with display: contents, which have no box of their own
+      const shown = !node.hasAttribute("hidden") && getComputedStyle(node).display !== "none";
+      if (shown && config && typeof config === "object") out.push(config as Json);
+      if (!shown) continue;
+    }
+    const sr = node instanceof Element ? node.shadowRoot : null;
+    if (sr) queue.push(sr);
+    for (const child of node.children) queue.push(child);
+  }
+  return out;
 }
 
 /** Every entity a view shows, in order, once each: cards, stacks, grids, sections,
@@ -479,7 +534,8 @@ function deepFind(selector: string): Element | null {
 
 function pageTitle(): string {
   // "Settings - Home Assistant" style titles: the part before the product name
-  const t = document.title.replace(/\s*[-|]\s*Home Assistant\s*$/i, "").trim();
+  // HA joins them with an en dash ("Overview \u2013 Home Assistant")
+  const t = document.title.replace(/\s*[-|\u2013\u2014]\s*Home Assistant\s*$/i, "").trim();
   return t || location.pathname;
 }
 

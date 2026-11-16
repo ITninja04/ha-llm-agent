@@ -80,6 +80,15 @@ await panel.getByRole("button", { name: "New chat" }).first().click();
 await fill("float question");
 await box.press("Enter");
 await panel.locator(".msg.assistant", { hasText: REPLY }).waitFor({ timeout: 30000 });
+// HA's generated Overview (the home panel) is a dashboard with what it shows: the stub
+// answers "I can see ..." only when the page block it received names the test switch
+const overview = await panel.evaluate((p) => p.pageContext);
+if (overview?.kind !== "dashboard" || overview?.summary !== "Overview")
+  fail(`Overview read as ${overview?.kind} "${overview?.summary}"`);
+if (!JSON.stringify(overview.details).includes("input_boolean.e2e_switch"))
+  fail(`Overview page context lists no test switch: ${JSON.stringify(overview.details)}`);
+const answer = await panel.locator(".msg.assistant").last().innerText();
+if (!/I can see the .* page\./.test(answer)) fail(`the page block on Overview did not name the test switch: ${answer}`);
 await setTheme("light");
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${shots}/llm-agent-float-2-open-light.png` });

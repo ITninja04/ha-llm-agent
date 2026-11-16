@@ -9,7 +9,7 @@ Standard library only. Replies depend on the last user message:
   "new dashboard" -> save_dashboard for the main dashboard, which is refused until the
                      dashboards reference is read; then read_reference, then the same
                      save_dashboard again (risky, shows a preview)
-  a message carrying the page block -> "I can see the <view title> page." when the block
+  a message carrying the page block -> "I can see the <view title or summary> page." when the block
                      names the test switch, so the browser test knows the model got the
                      dashboard's entities; another reply when it does not
   anything else -> a plain text reply
@@ -98,7 +98,9 @@ def page_reply(user: str) -> list[dict]:
     if SWITCH not in json.dumps(facts):
         return text("The page block did not name the test switch.")
     view = (facts.get("details") or {}).get("view") or {}
-    return text(f"I can see the {view.get('title', 'unknown')} page.")
+    # a generated panel (the Overview) is named by its summary when its view has no title
+    name = view.get("title") or facts.get("summary") or "unknown"
+    return text(f"I can see the {name} page.")
 
 
 def reply(messages: list[dict]) -> list[dict]:
