@@ -73,10 +73,12 @@ await setTheme("auto");
 // 3. dragged by the title bar, and back in the same place after a reload
 const bar = float.locator(".bar .name");
 const from = await bar.boundingBox();
-await page.mouse.move(from.x + 20, from.y + from.height / 2);
+const sx = from.x + 20;
+const sy = from.y + from.height / 2;
+await page.mouse.move(sx, sy);
 await page.mouse.down();
-await page.mouse.move(from.x - 200, from.y - 80, { steps: 8 });
-await page.mouse.move(from.x - 380, from.y - 120, { steps: 8 });
+await page.mouse.move(sx - 200, sy - 80, { steps: 8 });
+await page.mouse.move(sx - 400, sy - 120, { steps: 8 });
 await page.mouse.up();
 const moved = await rect();
 if (Math.abs(moved.x - (r.x - 400)) > 2 || Math.abs(moved.y - (r.y - 120)) > 2)
