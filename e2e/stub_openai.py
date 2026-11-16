@@ -9,6 +9,9 @@ Standard library only. Replies depend on the last user message:
   "new dashboard" -> save_dashboard for the main dashboard, which is refused until the
                      dashboards reference is read; then read_reference, then the same
                      save_dashboard again (risky, shows a preview)
+  a message carrying the page block -> "I can see the <view title> page." when the block
+                     names the test switch, so the browser test knows the model got the
+                     dashboard's entities; another reply when it does not
   anything else -> a plain text reply
 """
 
@@ -20,6 +23,8 @@ import json
 import sys
 
 SWITCH = "input_boolean.e2e_switch"
+# The first line of the page block (custom_components/llm_agent/page.py HEADING).
+PAGE_HEADING = "The page the user is looking at (from their browser, read-only):"
 # Call ids stay unique across a turn: the dashboard step calls save_dashboard twice.
 _ids = count()
 
@@ -87,6 +92,15 @@ def save_dashboard() -> list[dict]:
     return tool_call("save_dashboard", {"config": {"views": [{"title": "Home", "cards": cards}]}})
 
 
+def page_reply(user: str) -> list[dict]:
+    # the line after the heading is the page's facts as JSON
+    facts = json.loads(user.split(PAGE_HEADING + "\n\n", 1)[1].split("\n\n", 1)[0])
+    if SWITCH not in json.dumps(facts):
+        return text("The page block did not name the test switch.")
+    view = (facts.get("details") or {}).get("view") or {}
+    return text(f"I can see the {view.get('title', 'unknown')} page.")
+
+
 def reply(messages: list[dict]) -> list[dict]:
     last = messages[-1]
     user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
@@ -95,6 +109,8 @@ def reply(messages: list[dict]) -> list[dict]:
         return text(f"I can see {seen} photo.")
     if isinstance(user, str) and "<file-" in user and last["role"] == "user":
         return text("I read the attached file.")
+    if isinstance(user, str) and PAGE_HEADING in user and last["role"] == "user":
+        return page_reply(user)
     if last["role"] == "tool":
         if "new dashboard" in user and "Not run: read the reference page" in str(last["content"]):
             return tool_call("read_reference", {"page": "dashboards"})

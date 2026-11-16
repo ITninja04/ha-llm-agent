@@ -10,7 +10,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE="${1:-ghcr.io/home-assistant/home-assistant:2026.10.2}"
-HA_PORT=18123
+HA_PORT="${HA_PORT:-18123}"
 STUB_PORT="${STUB_PORT:-18089}"
 WORK="$(mktemp -d)"
 NAME="llm-agent-e2e-$(basename "$WORK" | tr -c "a-zA-Z0-9\n" "-" | tr "A-Z" "a-z")"
@@ -69,6 +69,9 @@ python3 "$ROOT/e2e/setup_ha.py" "http://127.0.0.1:$HA_PORT" "http://stub:$STUB_P
 cd "$ROOT/e2e"
 [[ -d node_modules ]] || npm install --no-audit --no-fund >/dev/null
 node panel.mjs "http://127.0.0.1:$HA_PORT" "$WORK/tokens.json" "$WORK/config" "${SHOTS:-$WORK}" \
+  || { docker logs "$NAME" 2>&1 | grep -i "llm_agent\|error" | tail -40; exit 1; }
+# The page chip: the page a person is on goes with the message, and can be left out.
+node pagecontext.mjs "http://127.0.0.1:$HA_PORT" "$WORK/tokens.json" "${SHOTS:-$WORK}" \
   || { docker logs "$NAME" 2>&1 | grep -i "llm_agent\|error" | tail -40; exit 1; }
 # The chat box again in WebKit (Safari, the iPhone app): its caret code differs per engine.
 node webkit.mjs "http://127.0.0.1:$HA_PORT" "$WORK/tokens.json" "${SHOTS:-$WORK}" \
