@@ -1097,24 +1097,27 @@ export const styles = css`
   .composer textarea {
     flex: none;
     box-sizing: border-box;
-    min-height: calc(1.5em + 10px);
-    max-height: 40vh;
-    max-height: 40dvh;
+    min-height: calc(3em + 10px);
+    max-height: 50vh;
+    max-height: 50dvh;
     overflow-y: auto;
   }
   /* The Markdown editor that takes the textarea's place (composer.ts). It keeps the
      textarea's type, padding and cap so swapping one for the other moves nothing. Its
      classes are TinyMDE's; none of TinyMDE's own stylesheet is loaded, because its fixed
      colours (black on white, red list markers) ignore the panel's themes. */
+  /* Two lines tall when empty and half the visible viewport at most (both asked for on
+     2026-11-15; it was one line and 40%). The extra bottom padding keeps the last line,
+     often the empty line inside a new code block, off the toolbar's edge. */
   .composer .box {
     font-size: 15px;
     line-height: 1.5;
-    padding: 6px 2px 4px;
+    padding: 6px 2px 10px;
     outline: none;
     box-sizing: border-box;
-    min-height: calc(1.5em + 10px);
-    max-height: 40vh;
-    max-height: 40dvh;
+    min-height: calc(3em + 16px);
+    max-height: 50vh;
+    max-height: 50dvh;
     overflow-y: auto;
     overflow-wrap: anywhere;
     cursor: text;
