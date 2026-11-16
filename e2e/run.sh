@@ -76,6 +76,9 @@ node pagecontext.mjs "http://127.0.0.1:$HA_PORT" "$WORK/tokens.json" "${SHOTS:-$
 # The chat box again in WebKit (Safari, the iPhone app): its caret code differs per engine.
 node webkit.mjs "http://127.0.0.1:$HA_PORT" "$WORK/tokens.json" "${SHOTS:-$WORK}" \
   || { docker logs "$NAME" 2>&1 | grep -i "llm_agent\|error" | tail -40; exit 1; }
+# The floating chat on ordinary HA pages. Last, because it turns the button off.
+node float.mjs "http://127.0.0.1:$HA_PORT" "$WORK/tokens.json" "${SHOTS:-$WORK}" \
+  || { docker logs "$NAME" 2>&1 | grep -i "llm_agent\|error" | tail -40; exit 1; }
 if docker logs "$NAME" 2>&1 | grep -q "Error.*llm_agent\|Traceback.*llm_agent"; then
   docker logs "$NAME" 2>&1 | grep -B2 -A20 "llm_agent" | tail -60
   echo "FAIL: errors from llm_agent in the HA log"; exit 1
