@@ -627,6 +627,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   page in Home Assistant.
 - **0.9.8 (released):** the chat box starts two lines tall and grows to half the window, code
   fences close themselves, and Enter inside a code block adds a line.
+- **0.9.9 (released):** the agent can look back at its earlier chats (past_chats, read_chat), and
+  change_history's until date now includes that whole day.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
