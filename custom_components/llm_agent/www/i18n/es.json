@@ -268,5 +268,10 @@
   "settings_saved": "Guardado.",
   "settings_reload_failed": "Guardado, pero LLM Agent no volvió a iniciarse. Ábrelo en Home Assistant para ver por qué.",
   "settings_back": "Volver al chat",
-  "settings_bad_json": "Esto no es JSON válido."
+  "settings_bad_json": "Esto no es JSON válido.",
+  "usage_all_time": "Total",
+  "usage_all_time_hint": "El total es la suma del coste de todos los chats guardados ({count} chats), más AI Tasks; los chats eliminados no se incluyen.",
+  "usage_since_filled": "Detalle por modelo desde {date}. Los días anteriores son totales diarios del registro del límite de gasto.",
+  "usage_earlier": "Antes del detalle por modelo",
+  "usage_earlier_hint": "solo totales diarios"
 }

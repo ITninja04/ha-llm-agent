@@ -226,3 +226,52 @@ async def test_providers_without_a_balance_api_are_never_called() -> None:
         assert got[kind]["status"] == "no_api"
         assert got[kind]["billing_url"].startswith("https://")
     assert json.dumps(got)  # sent over the websocket as is
+
+
+async def test_days_before_the_log_are_filled_from_the_cap_record(
+    hass: HomeAssistant, hass_ws_client
+) -> None:
+    """The log started with 0.9.6, so on its own the view showed a few hours of spend
+    against chats that had cost far more. Days up to the log's first day come from the
+    daily cap's record; a day after it never does, since the log has it in full."""
+    entry = await _setup(hass)
+    store = entry.runtime_data.store
+    today = date.fromisoformat(_today())
+    day = lambda n: (today - timedelta(days=n)).isoformat()  # noqa: E731
+    store.usage.since = day(5)
+    store.usage.add(day(5), "p1", "openai", "m", "chat", 10, 1, 0, 0, 0.10)
+    store.add_spend(day(10), 1.50)  # before the log: filled
+    store.add_spend(day(5), 0.40)  # the log's first day began earlier: the larger counts
+    store.add_spend(day(2), 9.00)  # after it: the log is complete, so not filled
+    store.add_spend(day(40), 7.00)  # outside the 30 days asked for
+
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "llm_agent/usage", "days": 30})
+    view = (await client.receive_json())["result"]
+    series = {d["day"]: d["cost"] for d in view["series"]}
+    assert series[day(10)] == 1.50
+    assert series[day(5)] == 0.40
+    assert series[day(2)] == 0
+    assert view["totals"]["month"] == 1.90
+    earlier = [r for r in view["breakdown"] if r["kind"] == "earlier"]
+    assert len(earlier) == 1 and earlier[0]["cost"] == 1.80  # 1.50 + (0.40 - 0.10)
+    assert view["filled_from"] == day(10)
+
+
+async def test_all_time_adds_up_every_saved_chat_and_ai_tasks(
+    hass: HomeAssistant, hass_ws_client
+) -> None:
+    """All time is the figure under each chat, summed: what was asked for instead of a
+    per-chat number. AI Tasks belong to no chat, so they come from the log."""
+    entry = await _setup(hass)
+    store = entry.runtime_data.store
+    for cost in (0.36, 1.20):
+        conv = await store.create("p1", "m", "ctx")
+        conv["usage"]["cost"] = cost
+        store.save(conv)
+    store.usage.add(_today(), "p1", "openai", "m", "task", 10, 1, 0, 0, 0.04)
+
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "llm_agent/usage", "days": 7})
+    view = (await client.receive_json())["result"]
+    assert view["all_time"] == {"total": 1.60, "chats": 1.56, "chat_count": 2, "tasks": 0.04}

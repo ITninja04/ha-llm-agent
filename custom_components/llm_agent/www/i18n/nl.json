@@ -268,5 +268,10 @@
   "settings_saved": "Opgeslagen.",
   "settings_reload_failed": "Opgeslagen, maar LLM Agent is niet opnieuw gestart. Open hem in Home Assistant om te zien waarom.",
   "settings_back": "Terug naar de chat",
-  "settings_bad_json": "Dit is geen geldige JSON."
+  "settings_bad_json": "Dit is geen geldige JSON.",
+  "usage_all_time": "Totaal",
+  "usage_all_time_hint": "Totaal is de kosten van alle opgeslagen chats bij elkaar ({count} chats), plus AI Tasks; verwijderde chats tellen niet mee.",
+  "usage_since_filled": "Details per model sinds {date}. Eerdere dagen zijn dagtotalen uit het register van de dagelijkse limiet.",
+  "usage_earlier": "Voor de modeldetails",
+  "usage_earlier_hint": "alleen dagtotalen"
 }

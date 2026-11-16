@@ -268,5 +268,10 @@
   "settings_saved": "Enregistré.",
   "settings_reload_failed": "Enregistré, mais LLM Agent n'a pas redémarré. Ouvrez-le dans Home Assistant pour voir pourquoi.",
   "settings_back": "Retour au chat",
-  "settings_bad_json": "Ce n'est pas du JSON valide."
+  "settings_bad_json": "Ce n'est pas du JSON valide.",
+  "usage_all_time": "Total",
+  "usage_all_time_hint": "Le total additionne le coût de tous les chats enregistrés ({count} chats), plus les AI Tasks ; les chats supprimés n'y figurent pas.",
+  "usage_since_filled": "Détail par modèle depuis le {date}. Les jours précédents sont des totaux quotidiens issus du suivi du plafond de dépense.",
+  "usage_earlier": "Avant le détail par modèle",
+  "usage_earlier_hint": "totaux quotidiens seulement"
 }

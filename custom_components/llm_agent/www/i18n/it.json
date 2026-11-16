@@ -268,5 +268,10 @@
   "settings_saved": "Salvato.",
   "settings_reload_failed": "Salvato, ma LLM Agent non è ripartito. Aprilo in Home Assistant per vedere perché.",
   "settings_back": "Torna alla chat",
-  "settings_bad_json": "Questo non è JSON valido."
+  "settings_bad_json": "Questo non è JSON valido.",
+  "usage_all_time": "Totale",
+  "usage_all_time_hint": "Il totale somma il costo di tutte le chat salvate ({count} chat), più gli AI Task; le chat eliminate non sono incluse.",
+  "usage_since_filled": "Dettaglio per modello dal {date}. I giorni precedenti sono totali giornalieri dal registro del limite di spesa.",
+  "usage_earlier": "Prima del dettaglio per modello",
+  "usage_earlier_hint": "solo totali giornalieri"
 }
