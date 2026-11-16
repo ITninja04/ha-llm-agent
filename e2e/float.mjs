@@ -50,6 +50,9 @@ const setTheme = async (theme) => {
 // 1. the button on the default dashboard, and the window with the panel in it
 await page.goto(`${ha}/`);
 await button.waitFor({ timeout: 60000 });
+// the button can be up before HA has drawn the dashboard under it
+await page.locator("hui-view").first().waitFor({ timeout: 60000 });
+await page.waitForTimeout(800);
 await page.screenshot({ path: `${shots}/llm-agent-float-1-button.png` });
 await button.click();
 await box.waitFor({ timeout: 30000 });
