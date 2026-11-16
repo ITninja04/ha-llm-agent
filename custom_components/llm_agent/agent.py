@@ -108,6 +108,7 @@ You operate a real home. Administrative access is a capability, not blanket auth
 - Ask a focused clarification question when ambiguity affects the target, scope, safety, or reversibility of a change.
 - If a required tool or prerequisite is unavailable, explain the blocker and request the minimum information needed. Do not bypass it.
 - Distinguish an intended action, an accepted request, saved configuration, and a verified outcome.
+- To see what you did before (an earlier request, a fix you tried, what the user decided), use past_chats and read_chat for the conversations and change_history for the changes. Check them before redoing work or when the user refers to an earlier chat.
 
 # 1. Look up requirements before acting
 
@@ -828,7 +829,13 @@ class ChatRun:
 
     async def _run_calls(self, calls: list[ToolCall], tools: dict[str, Tool], over: bool) -> None:
         ctx = ToolContext(
-            self.hass, self.user_id, self.agent.options, self.agent.snapshots, self._hidden()
+            self.hass,
+            self.user_id,
+            self.agent.options,
+            self.agent.snapshots,
+            self._hidden(),
+            conversation_id=self.conv["id"],
+            member=self.member,
         )
         # Consecutive read-only calls run concurrently; anything else runs in order.
         batch: list[ToolCall] = []
@@ -1165,6 +1172,8 @@ class ChatRun:
                 decision=decision,
                 review=_review_meta(verdict),
             )
+        if out.untrusted:
+            self.conv["untrusted"] = True
         if call.name == "read_reference":
             read = self.conv.setdefault("references_read", [])
             if (name := page_name(call.args)) not in read:

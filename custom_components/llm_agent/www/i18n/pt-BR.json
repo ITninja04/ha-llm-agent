@@ -221,6 +221,8 @@
   "changes_undo_gone": "Desfazer expirou",
   "changes_undo_gone_title": "A cópia para desfazer foi removida para economizar espaço",
   "tool_change_history": "histórico de alterações",
+  "tool_past_chats": "conversas anteriores",
+  "tool_read_chat": "ler conversa",
   "usage": "Uso",
   "usage_view_title": "Gastos e tokens ao longo do tempo, em todas as conversas",
   "usage_days": "{n} dias",

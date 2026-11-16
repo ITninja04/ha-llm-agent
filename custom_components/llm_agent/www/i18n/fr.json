@@ -221,6 +221,8 @@
   "changes_undo_gone": "Annulation expirée",
   "changes_undo_gone_title": "Sa copie d'annulation a été supprimée pour gagner de la place",
   "tool_change_history": "historique des modifications",
+  "tool_past_chats": "discussions précédentes",
+  "tool_read_chat": "lire une discussion",
   "usage": "Utilisation",
   "usage_view_title": "Dépenses et tokens dans le temps, dans toutes les conversations",
   "usage_days": "{n} jours",

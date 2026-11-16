@@ -221,6 +221,8 @@
   "changes_undo_gone": "Deshacer caducado",
   "changes_undo_gone_title": "Su copia para deshacer se eliminó para ahorrar espacio",
   "tool_change_history": "historial de cambios",
+  "tool_past_chats": "chats anteriores",
+  "tool_read_chat": "leer chat",
   "usage": "Uso",
   "usage_view_title": "Gasto y tokens a lo largo del tiempo, en todos los chats",
   "usage_days": "{n} días",

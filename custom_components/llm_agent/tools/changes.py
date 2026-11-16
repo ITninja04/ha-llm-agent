@@ -26,11 +26,15 @@ def _when(value: Any, key: str, end: bool = False) -> float | None:
     if value in (None, ""):
         return None
     text = str(value).strip()
-    moment: datetime | None = dt_util.parse_datetime(text)
-    if moment is None and (day := dt_util.parse_date(text)) is not None:
+    # The date first: parse_datetime also accepts a bare date, as midnight, which made
+    # until=2026-11-14 end at the start of that day instead of its end.
+    moment: datetime | None = None
+    if (day := dt_util.parse_date(text)) is not None:
         moment = datetime.combine(day, datetime.min.time())
         if end:
             moment += timedelta(days=1)
+    else:
+        moment = dt_util.parse_datetime(text)
     if moment is None:
         raise ToolError(f"{key} must be a date (2026-11-14) or date and time, got {text!r}")
     if moment.tzinfo is None:

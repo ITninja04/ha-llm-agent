@@ -205,3 +205,19 @@ async def test_a_change_a_rule_allowed_is_shown_as_rule_not_auto(
     await _run(hass, provider, "porch on", approval_mode="ask_all", approval_rules="allow light.*")
     rows = history.read_page(tmp_path / ".llm_agent", history.Filters(), 10)["changes"]
     assert [(r["tool"], r["approval"]) for r in rows] == [("call_service", "rule")]
+
+
+def test_until_a_bare_date_includes_that_whole_day() -> None:
+    """parse_datetime reads "2026-11-14" as midnight, so until=2026-11-14 used to end
+    as that day began and "what changed today" came back empty."""
+    from homeassistant.util import dt as dt_util
+
+    from custom_components.llm_agent.tools.changes import _when
+
+    since = _when("2026-11-14", "since")
+    until = _when("2026-11-14", "until", end=True)
+    assert since is not None and until is not None
+    assert until - since == 86400
+    start = dt_util.as_local(dt_util.utc_from_timestamp(since))
+    assert (start.year, start.month, start.day, start.hour) == (2026, 11, 14, 0)
+    assert _when("2026-11-14 10:30", "until", end=True) == since + 10.5 * 3600

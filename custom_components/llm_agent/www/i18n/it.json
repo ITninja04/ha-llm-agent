@@ -221,6 +221,8 @@
   "changes_undo_gone": "Annullamento scaduto",
   "changes_undo_gone_title": "La sua copia per annullare è stata rimossa per risparmiare spazio",
   "tool_change_history": "cronologia modifiche",
+  "tool_past_chats": "chat precedenti",
+  "tool_read_chat": "leggi chat",
   "usage": "Utilizzo",
   "usage_view_title": "Spesa e token nel tempo, in tutte le chat",
   "usage_days": "{n} giorni",

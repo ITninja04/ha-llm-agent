@@ -123,6 +123,7 @@ and OpenRouter (chat completions with the image modality); `image_model_for` in
 | system | check_config, reload domain, restart, read error log | restart (always runs check_config first and refuses if invalid) |
 | hacs | search, install, update (only if HACS is installed) | install/update; full backup first |
 | shell | run a command with a timeout, cwd `/config` | always; tool exists only when enabled in options (warning shown) |
+| chats | `past_chats` (find earlier chats by text, date, source) and `read_chat` (condensed transcript, paged at about 12000 characters); `tools/chats.py` | never (read). Same visibility as the panel (`store.Viewer`), and an id the person may not see reads as not found. Reading a chat that read outside content taints this one. Not in the lean set; household members get them for their own chats |
 
 Safety limits are settings (owner 2026-10-20: "idk if we want the limits so hard").
 They default to on and apply in every approval mode, including autopilot:

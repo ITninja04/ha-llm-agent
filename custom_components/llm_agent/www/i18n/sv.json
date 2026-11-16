@@ -221,6 +221,8 @@
   "changes_undo_gone": "Ångra har gått ut",
   "changes_undo_gone_title": "Kopian för att ångra togs bort för att spara utrymme",
   "tool_change_history": "ändringshistorik",
+  "tool_past_chats": "tidigare chattar",
+  "tool_read_chat": "läs chatt",
   "usage": "Användning",
   "usage_view_title": "Kostnad och tokens över tid, i alla chattar",
   "usage_days": "{n} dagar",

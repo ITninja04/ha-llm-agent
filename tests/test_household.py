@@ -222,7 +222,8 @@ async def test_member_chat_gets_only_member_tools_and_no_admin_context(
 ) -> None:
     _, _, provider, _ = await _chat(hass, [reply_text("Hi.")], member=True, user_id="kid")
     names = {t.name for t in provider.calls[0]["tools"]}
-    assert names == {"home_entities", "home_history", "home_control"}
+    # past_chats and read_chat show a member only their own chats (tests/test_chats.py)
+    assert names == {"home_entities", "home_history", "home_control", "past_chats", "read_chat"}
     assert "admin access" not in provider.calls[0]["system"]
     assert "Reference pages" not in provider.calls[0]["system"]
 

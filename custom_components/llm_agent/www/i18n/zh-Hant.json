@@ -221,6 +221,8 @@
   "changes_undo_gone": "復原已過期",
   "changes_undo_gone_title": "其復原副本已被移除以節省空間",
   "tool_change_history": "變更歷史",
+  "tool_past_chats": "歷史對話",
+  "tool_read_chat": "讀取對話",
   "usage": "用量",
   "usage_view_title": "所有對話中隨時間變化的花費和 token",
   "usage_days": "{n} 天",

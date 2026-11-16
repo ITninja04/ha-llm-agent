@@ -2,8 +2,8 @@
 
 Members are Home Assistant users who are not admins. Their chat can answer questions about
 and control only the entities the household exposed to Assist (Settings > Voice
-assistants > Expose), the same set a voice assistant sees. It has no settings, files,
-automations, notes or web tools.
+assistants > Expose), the same set a voice assistant sees, and look back at the
+member's own earlier chats. It has no settings, files, automations, notes or web tools.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from homeassistant.helpers import area_registry as ar
 
 from ..approval import Risk, classify_service
 from . import Tool, ToolContext, ToolError, ToolOutput, list_arg, num_arg, obj
+from .chats import PastChats, ReadChat
 from .states import TARGET_KEYS, CallService, GetHistory, compact_state, entity_area
 
 ASSISTANT = "conversation"
@@ -300,4 +301,6 @@ def _strings(value: Any) -> list[str]:
 
 
 def member_tools() -> list[Tool]:
-    return [HomeEntities(), HomeHistory(), HomeControl()]
+    # The chat tools check ctx.member themselves and show a member only their own
+    # chats, exactly what the panel's chat list shows them.
+    return [HomeEntities(), HomeHistory(), HomeControl(), PastChats(), ReadChat()]

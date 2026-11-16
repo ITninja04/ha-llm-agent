@@ -221,6 +221,8 @@
   "changes_undo_gone": "Cofnięcie wygasło",
   "changes_undo_gone_title": "Kopia do cofnięcia została usunięta, aby zaoszczędzić miejsce",
   "tool_change_history": "historia zmian",
+  "tool_past_chats": "wcześniejsze czaty",
+  "tool_read_chat": "czytaj czat",
   "usage": "Użycie",
   "usage_view_title": "Wydatki i tokeny w czasie, we wszystkich czatach",
   "usage_days": "{n} dni",
