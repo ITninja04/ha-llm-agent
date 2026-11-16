@@ -183,12 +183,14 @@
             "data": {
               "household_chat": "Permitir chatear a los miembros del hogar",
               "member_daily_cap": "Límite diario por miembro",
-              "approval_phone": "Aprobar desde este teléfono"
+              "approval_phone": "Aprobar desde este teléfono",
+              "float_button": "Botón de chat flotante"
             },
             "data_description": {
               "household_chat": "Los usuarios que no son administradores también tienen el panel de IA, con sus propios chats. Solo pueden ver y controlar los dispositivos expuestos a Assist (Ajustes > Asistentes de voz > Exponer), nunca ajustes, archivos, notas ni automatizaciones, y los modos de aprobación nunca omiten preguntarles. Sus acciones arriesgadas (cerraduras, alarmas, puertas de garaje) necesitan la aprobación de un administrador en el teléfono indicado abajo.",
               "member_daily_cap": "Gasto estimado que cada miembro puede usar al día; 0 = sin límite. El límite diario de arriba sigue aplicándose a todos.",
-              "approval_phone": "La acción notify del teléfono de un administrador con la aplicación de Home Assistant, p. ej. notify.mobile_app_pixel_8. Las aprobaciones llegan allí con botones Aprobar y Denegar cuando nadie tiene el chat abierto, tras un minuto sin respuesta en el panel, para automatizaciones (llm_agent.ask) y para acciones arriesgadas de los miembros. Solo cuentan las pulsaciones desde el teléfono de un administrador."
+              "approval_phone": "La acción notify del teléfono de un administrador con la aplicación de Home Assistant, p. ej. notify.mobile_app_pixel_8. Las aprobaciones llegan allí con botones Aprobar y Denegar cuando nadie tiene el chat abierto, tras un minuto sin respuesta en el panel, para automatizaciones (llm_agent.ask) y para acciones arriesgadas de los miembros. Solo cuentan las pulsaciones desde el teléfono de un administrador.",
+              "float_button": "Un botón de chat redondo en la esquina inferior derecha de cada página de Home Assistant, para todos los que pueden abrir el panel de IA. Abre los mismos chats en una ventana pequeña que sabe en qué página estás. Desactívalo para ocultarlo a todos."
             }
           },
           "reviewer": {

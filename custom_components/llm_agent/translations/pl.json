@@ -183,12 +183,14 @@
             "data": {
               "household_chat": "Pozwól domownikom czatować",
               "member_daily_cap": "Dzienny limit na domownika",
-              "approval_phone": "Zatwierdzaj z tego telefonu"
+              "approval_phone": "Zatwierdzaj z tego telefonu",
+              "float_button": "Pływający przycisk czatu"
             },
             "data_description": {
               "household_chat": "Użytkownicy bez uprawnień administratora też mają panel AI, z własnymi czatami. Mogą widzieć i kontrolować tylko urządzenia udostępnione Assist (Ustawienia > Asystenci głosowi > Udostępnij), nigdy ustawienia, pliki, notatki czy automatyzacje, a tryby zatwierdzania nigdy nie pomijają pytań dla nich. Ich ryzykowne działania (zamki, alarmy, bramy garażowe) wymagają zatwierdzenia przez administratora na poniższym telefonie.",
               "member_daily_cap": "Szacunkowe wydatki dostępne dla każdego domownika dziennie; 0 = bez limitu. Powyższy dzienny limit nadal dotyczy wszystkich.",
-              "approval_phone": "Akcja notify telefonu administratora z aplikacją Home Assistant, np. notify.mobile_app_pixel_8. Prośby o zatwierdzenie trafiają tam z przyciskami Zatwierdź i Odrzuć, gdy nikt nie ma otwartego czatu, po minucie bez odpowiedzi w panelu, dla automatyzacji (llm_agent.ask) i dla ryzykownych działań domowników. Liczą się tylko naciśnięcia z telefonu administratora."
+              "approval_phone": "Akcja notify telefonu administratora z aplikacją Home Assistant, np. notify.mobile_app_pixel_8. Prośby o zatwierdzenie trafiają tam z przyciskami Zatwierdź i Odrzuć, gdy nikt nie ma otwartego czatu, po minucie bez odpowiedzi w panelu, dla automatyzacji (llm_agent.ask) i dla ryzykownych działań domowników. Liczą się tylko naciśnięcia z telefonu administratora.",
+              "float_button": "Okrągły przycisk czatu w prawym dolnym rogu każdej strony Home Assistant, dla wszystkich, którzy mogą otworzyć panel AI. Otwiera te same czaty w małym oknie, które wie, na jakiej stronie jesteś. Wyłącz, aby ukryć go dla wszystkich."
             }
           },
           "reviewer": {

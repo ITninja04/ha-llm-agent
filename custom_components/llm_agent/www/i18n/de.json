@@ -273,5 +273,9 @@
   "usage_all_time_hint": "Gesamt ist die Summe der Kosten aller gespeicherten Chats ({count} Chats) plus AI Tasks; gelöschte Chats sind nicht enthalten.",
   "usage_since_filled": "Details pro Modell seit {date}. Frühere Tage sind Tagessummen aus dem Protokoll des Tageslimits.",
   "usage_earlier": "Vor den Modelldetails",
-  "usage_earlier_hint": "nur Tagessummen"
+  "usage_earlier_hint": "nur Tagessummen",
+  "float_minimize": "Minimieren",
+  "float_restore": "Wiederherstellen",
+  "float_full_panel": "Ganzes Panel öffnen",
+  "float_resize": "Größe ändern"
 }

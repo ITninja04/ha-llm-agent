@@ -183,12 +183,14 @@
             "data": {
               "household_chat": "Huisgenoten laten chatten",
               "member_daily_cap": "Dagelijkse limiet per huisgenoot",
-              "approval_phone": "Goedkeuren vanaf deze telefoon"
+              "approval_phone": "Goedkeuren vanaf deze telefoon",
+              "float_button": "Zwevende chatknop"
             },
             "data_description": {
               "household_chat": "Gebruikers die geen beheerder zijn krijgen ook het AI-paneel, met hun eigen chats. Ze kunnen alleen apparaten zien en bedienen die aan Assist zijn blootgesteld (Instellingen > Spraakassistenten > Blootstellen), nooit instellingen, bestanden, notities of automatiseringen. Goedkeuringsmodi slaan de vragen voor hen nooit over. Hun riskante acties (sloten, alarmen, garagedeuren) hebben goedkeuring van een beheerder nodig op de onderstaande telefoon.",
               "member_daily_cap": "Geschatte uitgaven die elke huisgenoot per dag mag gebruiken; 0 = geen limiet. De dagelijkse limiet hierboven blijft voor iedereen samen gelden.",
-              "approval_phone": "De notify-actie van de telefoon van een beheerder met de Home Assistant-app, bijvoorbeeld notify.mobile_app_pixel_8. Goedkeuringsverzoeken gaan daarheen met knoppen Goedkeuren en Weigeren als niemand de chat open heeft, na een minuut zonder antwoord in het paneel, voor automatiseringen (llm_agent.ask) en voor riskante acties van huisgenoten. Alleen tikken vanaf de telefoon van een beheerder tellen."
+              "approval_phone": "De notify-actie van de telefoon van een beheerder met de Home Assistant-app, bijvoorbeeld notify.mobile_app_pixel_8. Goedkeuringsverzoeken gaan daarheen met knoppen Goedkeuren en Weigeren als niemand de chat open heeft, na een minuut zonder antwoord in het paneel, voor automatiseringen (llm_agent.ask) en voor riskante acties van huisgenoten. Alleen tikken vanaf de telefoon van een beheerder tellen.",
+              "float_button": "Een ronde chatknop rechtsonder op elke Home Assistant-pagina, voor iedereen die het AI-paneel mag openen. Hij opent dezelfde chats in een klein venster dat weet op welke pagina je bent. Zet hem uit om hem voor iedereen te verbergen."
             }
           },
           "reviewer": {

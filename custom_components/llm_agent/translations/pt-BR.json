@@ -183,12 +183,14 @@
             "data": {
               "household_chat": "Permitir que moradores conversem",
               "member_daily_cap": "Limite diário por morador",
-              "approval_phone": "Aprovar por este celular"
+              "approval_phone": "Aprovar por este celular",
+              "float_button": "Botão de chat flutuante"
             },
             "data_description": {
               "household_chat": "Usuários que não são administradores também têm o painel de IA, com suas próprias conversas. Eles só podem ver e controlar os dispositivos expostos ao Assist (Configurações > Assistentes de voz > Expor), nunca configurações, arquivos, notas ou automações, e os modos de aprovação nunca deixam de perguntar a eles. Suas ações arriscadas (fechaduras, alarmes, portas de garagem) precisam da aprovação de um administrador no celular abaixo.",
               "member_daily_cap": "Gasto estimado que cada morador pode usar por dia; 0 = sem limite. O limite diário acima continua valendo para todos.",
-              "approval_phone": "A ação notify do celular de um administrador com o aplicativo do Home Assistant, por exemplo notify.mobile_app_pixel_8. As aprovações chegam lá com os botões Aprovar e Negar quando ninguém está com a conversa aberta, após um minuto sem resposta no painel, para automações (llm_agent.ask) e para ações arriscadas dos moradores. Só contam os toques vindos do celular de um administrador."
+              "approval_phone": "A ação notify do celular de um administrador com o aplicativo do Home Assistant, por exemplo notify.mobile_app_pixel_8. As aprovações chegam lá com os botões Aprovar e Negar quando ninguém está com a conversa aberta, após um minuto sem resposta no painel, para automações (llm_agent.ask) e para ações arriscadas dos moradores. Só contam os toques vindos do celular de um administrador.",
+              "float_button": "Um botão de chat redondo no canto inferior direito de cada página do Home Assistant, para todos que podem abrir o painel de IA. Ele abre as mesmas conversas em uma janela pequena que sabe em qual página você está. Desligue para ocultá-lo para todos."
             }
           },
           "reviewer": {

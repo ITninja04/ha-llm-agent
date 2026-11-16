@@ -273,5 +273,9 @@
   "usage_all_time_hint": "Totalt är kostnaden för alla sparade chattar sammanlagt ({count} chattar), plus AI Tasks; borttagna chattar räknas inte.",
   "usage_since_filled": "Detaljer per modell sedan {date}. Tidigare dagar är dagssummor från utgiftsgränsens register.",
   "usage_earlier": "Före modelldetaljer",
-  "usage_earlier_hint": "endast dagssummor"
+  "usage_earlier_hint": "endast dagssummor",
+  "float_minimize": "Minimera",
+  "float_restore": "Återställ",
+  "float_full_panel": "Öppna hela panelen",
+  "float_resize": "Ändra storlek"
 }

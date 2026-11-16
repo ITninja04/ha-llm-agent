@@ -324,6 +324,9 @@ class MarkdownBox implements ComposerBox {
   readonly #shield = (ev: Event): void => {
     const key = ev as KeyboardEvent;
     if (key.ctrlKey || key.altKey || key.metaKey) return;
+    // The shortcuts this guards against are letters. Esc goes on out, as it did from the
+    // textarea, because the floating window around an embedded panel closes on it.
+    if (key.key === "Escape") return;
     if (key.composedPath()[0] === this.el) key.stopPropagation();
   };
 

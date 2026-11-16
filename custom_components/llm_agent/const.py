@@ -10,6 +10,8 @@ NAME = "LLM Agent"
 PANEL_URL = "llm-agent"
 PANEL_ELEMENT = "llm-agent-panel"
 STATIC_URL = "/llm_agent_static"
+# The small script HA loads on every page, which draws the floating chat button.
+FLOAT_LOADER = "llm-agent-float"
 
 # options keys
 CONF_PROVIDERS = "providers"
@@ -81,12 +83,14 @@ CONF_TOOL_RULES = "approval_rules"  # allow / ask / deny lines, in every approva
 CONF_HOUSEHOLD = "household_chat"  # non-admin users get a limited chat
 CONF_MEMBER_DAILY_CAP = "member_daily_cap"  # USD per member per day, 0 = no cap
 CONF_APPROVAL_PHONE = "approval_phone"  # notify action of the phone that approves
+CONF_FLOAT_BUTTON = "float_button"  # the chat button on every HA page
 
 DEFAULT_OPTIONS = {
     CONF_TOOL_RULES: "",
     CONF_HOUSEHOLD: False,
     CONF_MEMBER_DAILY_CAP: 0.5,
     CONF_APPROVAL_PHONE: "",
+    CONF_FLOAT_BUTTON: True,
     CONF_APPROVAL_MODE: MODE_ASK_RISKY,
     CONF_REVIEWER_PROVIDER: SAME_PROVIDER,
     CONF_REVIEWER_MODEL: "",

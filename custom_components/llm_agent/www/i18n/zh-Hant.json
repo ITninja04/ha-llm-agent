@@ -273,5 +273,9 @@
   "usage_all_time_hint": "全部為所有已儲存對話的費用總和（{count} 個對話），另加 AI Task；已刪除的對話不計入。",
   "usage_since_filled": "自 {date} 起按模型細分。此前的日期為每日支出上限紀錄中的每日總額。",
   "usage_earlier": "按模型細分之前",
-  "usage_earlier_hint": "僅每日總額"
+  "usage_earlier_hint": "僅每日總額",
+  "float_minimize": "最小化",
+  "float_restore": "還原",
+  "float_full_panel": "開啟完整面板",
+  "float_resize": "調整大小"
 }

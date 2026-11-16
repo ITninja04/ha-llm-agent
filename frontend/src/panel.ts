@@ -62,6 +62,10 @@ class LlmAgentPanel extends LitElement {
   /** The page the person is on, set by the floating chat. The full panel at /llm-agent
    * never sets it, so it shows no page chip. */
   @property({ attribute: false }) pageContext?: PageContext;
+  /** Drawn inside the floating chat window (float.ts) rather than as HA's panel: the
+   * narrow layout at any width, since the window is phone sized, and no HA menu button,
+   * which would open HA's sidebar from inside a window on top of it. */
+  @property({ type: Boolean, reflect: true }) embedded = false;
 
   @state() private info?: Info;
   @state() private convs: ConvSummary[] = [];
@@ -122,6 +126,11 @@ class LlmAgentPanel extends LitElement {
   private started = false;
   private stickToBottom = true;
   private renderTimer?: number;
+
+  /** The phone layout: chats behind a button, the composer without the keys hint. */
+  private get slim(): boolean {
+    return this.narrow || this.embedded;
+  }
 
   private get ws() {
     return this.hass!.connection;
@@ -1086,18 +1095,22 @@ class LlmAgentPanel extends LitElement {
     if (this.info && !this.info.providers.length) {
       return html`<div class="empty">${t("no_provider")}</div>`;
     }
-    const listOpen = this.narrow ? this.showList : this.prefs.listOpen;
+    const listOpen = this.slim ? this.showList : this.prefs.listOpen;
     const lastUser = this.convId ? this.lastUserIndex() : -1;
     return html`
       <div
-        class="layout ${this.narrow ? "narrow" : ""}"
+        class="layout ${this.slim ? "narrow" : ""}"
         @click=${this.closePrefsOutside}
         @keydown=${(e: KeyboardEvent) => {
           if (e.key === "Escape") {
             // Esc stops a reply from anywhere in the panel, unless it closed a popover
-            // or the @ list (those prevent the default) first
-            if (this.running && !e.defaultPrevented && !e.isComposing && !this.showPrefs)
+            // or the @ list (those prevent the default) first. Using the key marks it
+            // used too, so the floating window around an embedded panel stays open.
+            if (this.running && !e.defaultPrevented && !e.isComposing && !this.showPrefs) {
+              e.preventDefault();
               void this.stop();
+            }
+            if (this.showPrefs) e.preventDefault();
             this.showPrefs = false;
           }
         }}
@@ -1110,22 +1123,26 @@ class LlmAgentPanel extends LitElement {
           @drop=${this.onDrop}
         >
           <header>
-            <ha-menu-button
-              .hass=${this.hass}
-              .narrow=${this.narrow}
-            ></ha-menu-button>
+            ${
+              this.embedded
+                ? nothing
+                : html`<ha-menu-button
+                    .hass=${this.hass}
+                    .narrow=${this.narrow}
+                  ></ha-menu-button>`
+            }
             <button
               class="icon"
               title=${listOpen ? t("hide_chats") : t("show_chats")}
               aria-label=${t("conversations")}
               aria-expanded=${listOpen}
               @click=${() =>
-                this.narrow
+                this.slim
                   ? (this.showList = !this.showList)
                   : this.setPref("listOpen", !this.prefs.listOpen)}
             >
               <ha-icon
-                icon=${this.narrow ? "mdi:forum-outline" : "mdi:dock-left"}
+                icon=${this.slim ? "mdi:forum-outline" : "mdi:dock-left"}
               ></ha-icon>
             </button>
             <div class="title">${this.showChanges ? t(this.view === "notes" ? "home_notes" : this.view) : chatName(this.chatTitle)}</div>
@@ -1847,7 +1864,7 @@ class LlmAgentPanel extends LitElement {
         <textarea
           rows="1"
           placeholder=${
-            this.narrow
+            this.slim
               ? t("composer_placeholder")
               : `${t("composer_placeholder")} (${t(this.prefs.send === "ctrl" ? "keys_ctrl" : "keys_enter")})`
           }

@@ -273,5 +273,9 @@
   "usage_all_time_hint": "All time is every saved chat's cost added up ({count} chats), plus AI Tasks. Deleted chats are not in it.",
   "usage_since_filled": "Model detail since {date}. Days before that are daily totals from the spend cap's record.",
   "usage_earlier": "Before model detail",
-  "usage_earlier_hint": "daily totals only"
+  "usage_earlier_hint": "daily totals only",
+  "float_minimize": "Minimize",
+  "float_restore": "Restore",
+  "float_full_panel": "Open the full panel",
+  "float_resize": "Resize"
 }

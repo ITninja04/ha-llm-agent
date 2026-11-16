@@ -52,6 +52,7 @@ from .const import (
     CONF_COMPACT_AT,
     CONF_DAILY_CAP,
     CONF_EXTRA_PROMPT,
+    CONF_FLOAT_BUTTON,
     CONF_HOME_SUMMARY,
     CONF_HOUSEHOLD,
     CONF_KEEP_TURNS,
@@ -149,7 +150,10 @@ SECTIONS: dict[str, tuple[bool, list[str]]] = {
     ),
     "connection": (True, [CONF_TIMEOUT, CONF_RETRIES]),
     "rules": (True, [CONF_TOOL_RULES]),
-    "household": (True, [CONF_HOUSEHOLD, CONF_MEMBER_DAILY_CAP, CONF_APPROVAL_PHONE]),
+    "household": (
+        True,
+        [CONF_HOUSEHOLD, CONF_MEMBER_DAILY_CAP, CONF_APPROVAL_PHONE, CONF_FLOAT_BUTTON],
+    ),
     "reviewer": (True, [CONF_REVIEWER_PROVIDER, CONF_REVIEWER_MODEL, CONF_ALWAYS_ASK]),
     "web": (
         True,

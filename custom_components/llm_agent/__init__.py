@@ -21,9 +21,11 @@ from .agent import Agent
 from .chatgpt_auth import get_auth
 from .const import (
     CONF_AUTO_DELETE_DAYS,
+    CONF_FLOAT_BUTTON,
     CONF_HOUSEHOLD,
     DEFAULT_OPTIONS,
     DOMAIN,
+    FLOAT_LOADER,
     NAME,
     PANEL_ELEMENT,
     PANEL_URL,
@@ -36,6 +38,8 @@ PLATFORMS = [Platform.AI_TASK, Platform.CONVERSATION]
 _REGISTERED = f"{DOMAIN}_registered"
 # Set while a settings save reloads the entry, so the unload keeps the panel.
 _KEEP_PANEL = f"{DOMAIN}_keep_panel"
+# The floating button's loader URL as registered with the frontend, or absent.
+_FLOAT_URL = f"{DOMAIN}_float_url"
 
 type LLMAgentConfigEntry = ConfigEntry[Agent]
 
@@ -101,6 +105,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> 
             require_admin=require_admin,
         )
 
+    _sync_float_button(
+        hass,
+        f"{STATIC_URL}/{FLOAT_LOADER}.js?v={version}"
+        if setting(options, CONF_FLOAT_BUTTON)
+        else None,
+    )
+
     async def _auto_delete(_now: object = None) -> None:
         days = setting(options, CONF_AUTO_DELETE_DAYS)
         if days:
@@ -127,6 +138,28 @@ async def _async_update_listener(hass: HomeAssistant, entry: LLMAgentConfigEntry
         hass.data.pop(_KEEP_PANEL, None)
         if entry.state is not ConfigEntryState.LOADED:  # the setup after it failed
             frontend.async_remove_panel(hass, PANEL_URL, warn_if_unknown=False)
+            _sync_float_button(hass, None)
+
+
+def _sync_float_button(hass: HomeAssistant, url: str | None) -> None:
+    """Make the frontend's extra module list hold `url` (or none of ours).
+
+    HA sends every open browser each add and remove, and the loader listens for its own
+    URL, so turning the button off hides it on open pages without a reload. A settings
+    save keeps the URL the way it keeps the panel (see _async_update_listener), so open
+    pages are not sent a remove and an add of the same module for nothing. HA's remove
+    takes an unknown URL without complaint but still notifies every browser, so only a
+    URL this integration added is removed.
+    """
+    current = hass.data.get(_FLOAT_URL)
+    if current == url:
+        return
+    if current is not None:
+        frontend.remove_extra_js_url(hass, current)
+        hass.data.pop(_FLOAT_URL, None)
+    if url is not None:
+        frontend.add_extra_js_url(hass, url)
+        hass.data[_FLOAT_URL] = url
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> bool:
@@ -144,6 +177,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) ->
     await agent.store.flush()
     if not hass.data.get(_KEEP_PANEL):
         frontend.async_remove_panel(hass, PANEL_URL, warn_if_unknown=False)
+        _sync_float_button(hass, None)
     hass.data.pop(DOMAIN, None)
     return True
 
