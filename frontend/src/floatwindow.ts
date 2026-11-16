@@ -59,7 +59,7 @@ const CSS = `
     --w-muted: var(--secondary-text-color, #656d76);
     --w-line: var(--divider-color, rgba(127,127,127,.2));
     --w-hover: color-mix(in srgb, var(--w-text) 8%, transparent);
-    position: fixed; z-index: 5; display: flex; flex-direction: column;
+    position: fixed; z-index: 5; display: flex; flex-direction: column; box-sizing: border-box;
     background: var(--w-bg); color: var(--w-text); border: 1px solid var(--w-line);
     border-radius: 14px; overflow: hidden; pointer-events: auto;
     box-shadow: 0 2px 8px rgba(0,0,0,.12), 0 18px 48px rgba(0,0,0,.24);
