@@ -64,6 +64,7 @@ from .const import (
     MODE_YOLO,
     setting,
 )
+from .page import UNTRUSTED_NOTE as PAGE_UNTRUSTED_NOTE, label as page_label, render as render_page
 from .phone import MAX_TEXT as PHONE_MAX_TEXT, PhoneApprovals, phone_service
 from .providers import ProviderConfig, ProviderError, make_provider
 from .providers.base import Done, TextDelta, ToolCall, Usage, scrub
@@ -162,6 +163,7 @@ Do not blindly resubmit the rejected request or work around the check. Any retry
 - Use an action compatible with the entity's domain and documented integration behavior. For example, `input_boolean.x` uses `input_boolean.turn_on`, not `switch.turn_on`.
 - When another integration provides the appropriate control entity, use it. For example, Music Assistant playback may require Music Assistant's `media_player` entity rather than the speaker's native entity. Follow the integration reference.
 - Treat `unknown` and `unavailable` as uncertainty, not as the entity's usual state.
+- If the message comes with the page the user is looking at, use it to resolve 'this', 'here' and 'these', and still verify state with tools before acting.
 
 # 3. Make minimal, validated changes
 
@@ -538,6 +540,7 @@ class ChatRun:
         images: list[dict[str, str]] | None = None,
         attached: Prepared | None = None,
         language: str | None = None,
+        page: dict[str, Any] | None = None,
     ) -> None:
         conv = self.conv
         agent = self.agent
@@ -614,6 +617,13 @@ class ChatRun:
             # read outside content: every change asks first, except in YOLO mode.
             conv["untrusted"] = True
             conv["untrusted_files"] = True
+        if page:
+            # Kept with the message, so a later "and the other one?" still knows which
+            # page the question was about. It is the person's own Home Assistant data,
+            # so unlike a file it does not count as outside content; its page text and
+            # selection are wrapped as untrusted inside the block (page.py).
+            user["page"] = render_page(page)
+            user["page_label"] = page_label(page)
         conv["messages"].append(user)
         conv.pop("stopped", None)
         if conv["title"] == "New chat":
@@ -1452,6 +1462,8 @@ def _provider_view(msg: dict[str, Any]) -> dict[str, Any]:
         }
     if msg["role"] == "user":
         content = msg["content"]
+        if msg.get("page"):
+            content = f"{content}\n\n{msg['page']}"
         if msg.get("attachments"):
             # File text joins the message as text: every adapter takes that, and the
             # block opens with its own untrusted-content note.
@@ -1482,12 +1494,15 @@ SHORT_ARG = 300
 _ARG_MARK = " …(shortened)"
 _RESULT_MARK = " …(older result shortened)"
 _FILES_MARK = " (older file contents left out, ask for the files again if needed)"
+SHORT_PAGE = 400
+_PAGE_MARK = " (older page details left out)"
 
 
 def _history_chars(messages: list[dict[str, Any]]) -> int:
     total = 0
     for m in messages:
         total += len(m.get("content") or "") + len(m.get("attachments") or "")
+        total += len(m.get("page") or "")
         for c in m.get("tool_calls") or []:
             total += len(json.dumps(c.get("args", {}), default=str))
     return total
@@ -1501,6 +1516,20 @@ def _shorten_args(value: Any) -> Any:
     if isinstance(value, list):
         return [_shorten_args(v) for v in value]
     return value
+
+
+def _short_page(page: str | None) -> str | None:
+    """An old turn's page block cut to its start: the heading, path and title come
+    first, so the turn still says which page it was about. The page text and selection
+    are dropped whole rather than cut, so no untrusted block is left without its end."""
+    if not page or page.endswith(_PAGE_MARK):
+        return None
+    head = page.split("\n\n" + PAGE_UNTRUSTED_NOTE, 1)[0]
+    if len(head) > SHORT_PAGE:
+        head = head[:SHORT_PAGE]
+    elif head == page:
+        return None
+    return head + _PAGE_MARK
 
 
 def compact_history(
@@ -1540,6 +1569,9 @@ def compact_history(
                 if short != c.get("args"):
                     c["args"] = short
                     changed = True
+        if m["role"] == "user" and (short := _short_page(m.get("page"))) is not None:
+            m["page"] = short
+            changed = True
     conv["compacted_upto"] = boundary
     return changed
 

@@ -45,6 +45,7 @@ from .const import (
     NOTES_MAX,
     setting,
 )
+from .page import PAGE_SCHEMA, PageError, check as check_page
 from .providers.models import PROVIDER_NAMES, suggestions
 from .store import Refused, Viewer
 from .tools import ToolContext, ToolError
@@ -390,6 +391,9 @@ def _public(conv: dict[str, Any]) -> dict[str, Any]:
                 item["photos"] = m["photos"]
             if m.get("files"):
                 item["files"] = m["files"]
+            if m.get("page_label"):
+                # what the model was told the person was looking at, under the message
+                item["page"] = m["page_label"]
             messages.append(item)
         elif m["role"] == "assistant":
             messages.append(
@@ -579,6 +583,8 @@ def _file(value: Any) -> dict[str, str]:
         vol.Optional("images", default=list): vol.All([_photo], vol.Length(max=MAX_PHOTOS)),
         # Other files (text, logs, configs, PDFs, zip and gzip archives); see attachments.py.
         vol.Optional("files", default=list): vol.All([_file], vol.Length(max=MAX_FILES)),
+        # The page the person is looking at, from the floating chat; see page.py.
+        vol.Optional("page"): PAGE_SCHEMA,
         # The panel's language (the user's profile setting), for replies
         vol.Optional("language"): vol.All(
             str, vol.Match(r"^[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})*$")
@@ -617,6 +623,13 @@ async def ws_chat(
     except ToolError as err:
         connection.send_error(msg["id"], "no_provider", str(err))
         return
+    page = None
+    if msg.get("page"):
+        try:
+            page = check_page(msg["page"])
+        except PageError as err:
+            connection.send_error(msg["id"], "page_too_large", str(err))
+            return
     attached = None
     if msg["files"]:
         # A small configured context window gets at most a third of it as file text.
@@ -671,6 +684,7 @@ async def ws_chat(
                 images=msg["images"],
                 attached=attached,
                 language=msg.get("language"),
+                page=page,
             )
         finally:
             # a newer run may already own this chat (stop, then send again)
