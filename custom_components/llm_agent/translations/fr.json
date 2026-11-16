@@ -183,12 +183,14 @@
             "data": {
               "household_chat": "Laisser les membres du foyer discuter",
               "member_daily_cap": "Limite quotidienne par membre",
-              "approval_phone": "Approuver depuis ce téléphone"
+              "approval_phone": "Approuver depuis ce téléphone",
+              "float_button": "Bouton de discussion flottant"
             },
             "data_description": {
               "household_chat": "Les utilisateurs qui ne sont pas administrateurs ont aussi le panneau IA, avec leurs propres discussions. Ils peuvent voir et contrôler uniquement les appareils exposés à Assist (Paramètres > Assistants vocaux > Exposer), jamais les paramètres, fichiers, notes ou automatisations, et les modes d'approbation ne sautent jamais les demandes pour eux. Leurs actions risquées (serrures, alarmes, portes de garage) nécessitent l'approbation d'un administrateur sur le téléphone ci-dessous.",
               "member_daily_cap": "Dépense estimée autorisée par membre et par jour ; 0 = aucune limite. Le plafond quotidien ci-dessus s'applique toujours à tout le monde.",
-              "approval_phone": "L'action notify du téléphone d'un administrateur avec l'application Home Assistant, par exemple notify.mobile_app_pixel_8. Les demandes y sont envoyées avec les boutons Approuver et Refuser quand personne n'a la discussion ouverte, après une minute sans réponse dans le panneau, pour les automatisations (llm_agent.ask) et pour les actions risquées des membres. Seuls les appuis depuis le téléphone d'un administrateur comptent."
+              "approval_phone": "L'action notify du téléphone d'un administrateur avec l'application Home Assistant, par exemple notify.mobile_app_pixel_8. Les demandes y sont envoyées avec les boutons Approuver et Refuser quand personne n'a la discussion ouverte, après une minute sans réponse dans le panneau, pour les automatisations (llm_agent.ask) et pour les actions risquées des membres. Seuls les appuis depuis le téléphone d'un administrateur comptent.",
+              "float_button": "Un bouton de discussion rond en bas à droite de chaque page de Home Assistant, pour toutes les personnes qui peuvent ouvrir le panneau IA. Il ouvre les mêmes discussions dans une petite fenêtre qui sait sur quelle page vous êtes. Désactivez-le pour le masquer pour tout le monde."
             }
           },
           "reviewer": {

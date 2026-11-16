@@ -183,12 +183,14 @@
             "data": {
               "household_chat": "Consenti ai membri della casa di chattare",
               "member_daily_cap": "Limite giornaliero per membro",
-              "approval_phone": "Approva da questo telefono"
+              "approval_phone": "Approva da questo telefono",
+              "float_button": "Pulsante chat mobile"
             },
             "data_description": {
               "household_chat": "Anche gli utenti non amministratori hanno il pannello IA, con le proprie chat. Possono vedere e controllare solo i dispositivi esposti ad Assist (Impostazioni > Assistenti vocali > Esponi), mai impostazioni, file, note o automazioni, e le modalità di approvazione non saltano mai le conferme per loro. Le loro azioni rischiose (serrature, allarmi, porte del garage) richiedono l'approvazione di un amministratore sul telefono indicato sotto.",
               "member_daily_cap": "Spesa stimata che ogni membro può usare al giorno; 0 = nessun limite. Il limite giornaliero sopra si applica comunque a tutti.",
-              "approval_phone": "L'azione notify del telefono di un amministratore con l'app Home Assistant, ad es. notify.mobile_app_pixel_8. Le approvazioni arrivano lì con i pulsanti Approva e Rifiuta quando nessuno ha la chat aperta, dopo un minuto senza risposta nel pannello, per le automazioni (llm_agent.ask) e per le azioni rischiose dei membri. Contano solo le pressioni dal telefono di un amministratore."
+              "approval_phone": "L'azione notify del telefono di un amministratore con l'app Home Assistant, ad es. notify.mobile_app_pixel_8. Le approvazioni arrivano lì con i pulsanti Approva e Rifiuta quando nessuno ha la chat aperta, dopo un minuto senza risposta nel pannello, per le automazioni (llm_agent.ask) e per le azioni rischiose dei membri. Contano solo le pressioni dal telefono di un amministratore.",
+              "float_button": "Un pulsante chat rotondo in basso a destra in ogni pagina di Home Assistant, per chiunque possa aprire il pannello IA. Apre le stesse chat in una piccola finestra che sa in quale pagina ti trovi. Disattivalo per nasconderlo a tutti."
             }
           },
           "reviewer": {

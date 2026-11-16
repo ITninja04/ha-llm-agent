@@ -183,12 +183,14 @@
             "data": {
               "household_chat": "Låt hushållsmedlemmar chatta",
               "member_daily_cap": "Daglig gräns per medlem",
-              "approval_phone": "Godkänn från den här telefonen"
+              "approval_phone": "Godkänn från den här telefonen",
+              "float_button": "Flytande chattknapp"
             },
             "data_description": {
               "household_chat": "Användare som inte är administratörer får också AI-panelen med egna chattar. De kan bara se och styra enheter som exponerats för Assist (Inställningar > Röstassistenter > Exponera), aldrig inställningar, filer, anteckningar eller automationer. Godkännandelägen hoppar aldrig över att fråga dem. Deras riskfyllda åtgärder (lås, larm, garageportar) kräver en administratörs godkännande på telefonen nedan.",
               "member_daily_cap": "Uppskattad utgift som varje medlem får använda per dag; 0 = ingen gräns. Den dagliga gränsen ovan gäller fortfarande för alla tillsammans.",
-              "approval_phone": "notify-åtgärden för en administratörs telefon med Home Assistant-appen, till exempel notify.mobile_app_pixel_8. Godkännandeförfrågningar skickas dit med knapparna Godkänn och Neka när ingen har chatten öppen, efter en minut utan svar i panelen, för automationer (llm_agent.ask) och för medlemmars riskfyllda åtgärder. Bara tryck från en administratörs telefon räknas."
+              "approval_phone": "notify-åtgärden för en administratörs telefon med Home Assistant-appen, till exempel notify.mobile_app_pixel_8. Godkännandeförfrågningar skickas dit med knapparna Godkänn och Neka när ingen har chatten öppen, efter en minut utan svar i panelen, för automationer (llm_agent.ask) och för medlemmars riskfyllda åtgärder. Bara tryck från en administratörs telefon räknas.",
+              "float_button": "En rund chattknapp nere till höger på varje Home Assistant-sida, för alla som kan öppna AI-panelen. Den öppnar samma chattar i ett litet fönster som vet vilken sida du är på. Stäng av den för att dölja den för alla."
             }
           },
           "reviewer": {

@@ -353,3 +353,54 @@ async def test_ws_truncate_is_admin_only(
     )
     assert (await client.receive_json())["error"]["code"] == "unauthorized"
     assert conv["messages"] == [{"role": "user", "content": "first"}]
+
+
+def _modules(hass: HomeAssistant) -> set[str]:
+    """The extra modules HA writes into every page it serves (index.html)."""
+    return set(hass.data["frontend_extra_module_url"].urls)
+
+
+def _loader(hass: HomeAssistant) -> str:
+    return f"/llm_agent_static/llm-agent-float.js?v={hass.data[f'{DOMAIN}_version']}"
+
+
+async def test_float_button_loader_is_on_every_page_until_unload(hass: HomeAssistant) -> None:
+    """Without the module in HA's list no page draws the chat button; left in after an
+    unload, every page would load a button whose chat has no backend."""
+    entry = await _setup(hass)
+    assert _loader(hass) in _modules(hass)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert not any("llm-agent-float" in url for url in _modules(hass))
+
+
+async def test_float_button_option_off_registers_no_loader(hass: HomeAssistant) -> None:
+    entry = await _setup(hass, float_button=False)
+    assert not any("llm-agent-float" in url for url in _modules(hass))
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_float_button_follows_the_option_on_open_pages(
+    hass: HomeAssistant, hass_ws_client
+) -> None:
+    """Open browsers learn of changes through frontend/subscribe_extra_js. A settings save
+    that does not touch the option must send them nothing (a remove and an add would make
+    every page load the module again), and turning it off must send the remove the loader
+    hides itself on."""
+    entry = await _setup(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "frontend/subscribe_extra_js"})
+    assert (await client.receive_json())["success"]
+
+    await _save_settings(hass, entry, cost={"max_steps": 31})
+    await client.send_json_auto_id({"type": "ping"})
+    assert (await client.receive_json())["type"] == "pong"  # no event came before it
+
+    await _save_settings(hass, entry, household={"float_button": False})
+    event = (await client.receive_json())["event"]
+    assert event == {"change_type": "removed", "item": {"type": "module", "url": _loader(hass)}}
+    assert not any("llm-agent-float" in url for url in _modules(hass))
+
+    await _save_settings(hass, entry, household={"float_button": True})
+    event = (await client.receive_json())["event"]
+    assert event == {"change_type": "added", "item": {"type": "module", "url": _loader(hass)}}
+    assert _loader(hass) in _modules(hass)

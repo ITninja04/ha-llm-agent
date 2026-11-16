@@ -183,12 +183,14 @@
             "data": {
               "household_chat": "允許家庭成員聊天",
               "member_daily_cap": "每位成員的每日限額",
-              "approval_phone": "透過此手機核准"
+              "approval_phone": "透過此手機核准",
+              "float_button": "浮動聊天按鈕"
             },
             "data_description": {
               "household_chat": "非管理員使用者也能使用 AI 面板，並擁有各自的對話。他們只能查看和控制公開給 Assist 的裝置（設定 > 語音助理 > 公開），無法存取設定、檔案、筆記或自動化，且任何核准模式都不會略過對他們的詢問。他們的高風險操作（門鎖、警報器、車庫門）需要管理員在下方指定的手機上核准。",
               "member_daily_cap": "每位成員每天可使用的估算費用；0 = 無限制。上方的每日支出上限仍適用於所有人。",
-              "approval_phone": "裝有 Home Assistant 應用程式的管理員手機的 notify 動作，例如 notify.mobile_app_pixel_8。在無人開啟對話、面板中超過一分鐘未回覆、自動化（llm_agent.ask）請求核准或成員進行高風險操作時，核准請求會傳送到該手機，附有「核准」和「拒絕」按鈕。僅管理員手機上的點選有效。"
+              "approval_phone": "裝有 Home Assistant 應用程式的管理員手機的 notify 動作，例如 notify.mobile_app_pixel_8。在無人開啟對話、面板中超過一分鐘未回覆、自動化（llm_agent.ask）請求核准或成員進行高風險操作時，核准請求會傳送到該手機，附有「核准」和「拒絕」按鈕。僅管理員手機上的點選有效。",
+              "float_button": "在每個 Home Assistant 頁面右下角顯示一個圓形聊天按鈕，所有能開啟 AI 面板的人都看得到。它會在一個小視窗中開啟相同的聊天，並知道你目前所在的頁面。關閉後對所有人隱藏。"
             }
           },
           "reviewer": {

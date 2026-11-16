@@ -183,12 +183,14 @@
             "data": {
               "household_chat": "Haushaltsmitglieder dürfen chatten",
               "member_daily_cap": "Tägliches Limit pro Mitglied",
-              "approval_phone": "Auf diesem Telefon genehmigen"
+              "approval_phone": "Auf diesem Telefon genehmigen",
+              "float_button": "Schwebende Chat-Schaltfläche"
             },
             "data_description": {
               "household_chat": "Benutzer ohne Administratorrechte erhalten ebenfalls das KI-Panel mit eigenen Chats. Sie können nur für Assist freigegebene Geräte sehen und steuern (Einstellungen > Sprachassistenten > Verfügbar machen), niemals Einstellungen, Dateien, Notizen oder Automationen. Genehmigungsmodi überspringen bei ihnen nie die Rückfragen. Ihre riskanten Aktionen (Schlösser, Alarmanlagen, Garagentore) brauchen die Genehmigung eines Administrators auf dem unten gewählten Telefon.",
               "member_daily_cap": "Geschätzte Ausgaben, die jedes Mitglied pro Tag nutzen darf; 0 = kein Limit. Das tägliche Limit oben gilt weiterhin für alle zusammen.",
-              "approval_phone": "Die notify-Aktion des Telefons eines Administrators mit der Home Assistant-App, z. B. notify.mobile_app_pixel_8. Genehmigungen werden mit den Schaltflächen „Genehmigen“ und „Ablehnen“ dorthin gesendet, wenn niemand den Chat geöffnet hat, nach einer Minute ohne Antwort im Panel, für Automationen (llm_agent.ask) und für riskante Aktionen von Mitgliedern. Nur Betätigungen auf dem Telefon eines Administrators zählen."
+              "approval_phone": "Die notify-Aktion des Telefons eines Administrators mit der Home Assistant-App, z. B. notify.mobile_app_pixel_8. Genehmigungen werden mit den Schaltflächen „Genehmigen“ und „Ablehnen“ dorthin gesendet, wenn niemand den Chat geöffnet hat, nach einer Minute ohne Antwort im Panel, für Automationen (llm_agent.ask) und für riskante Aktionen von Mitgliedern. Nur Betätigungen auf dem Telefon eines Administrators zählen.",
+              "float_button": "Eine runde Chat-Schaltfläche unten rechts auf jeder Home Assistant-Seite, für alle, die das KI-Panel öffnen dürfen. Sie öffnet dieselben Chats in einem kleinen Fenster, das weiß, auf welcher Seite du bist. Ausschalten blendet sie für alle aus."
             }
           },
           "reviewer": {

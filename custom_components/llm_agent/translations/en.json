@@ -183,12 +183,14 @@
             "data": {
               "household_chat": "Let household members chat",
               "member_daily_cap": "Daily limit per member",
-              "approval_phone": "Approve from this phone"
+              "approval_phone": "Approve from this phone",
+              "float_button": "Floating chat button"
             },
             "data_description": {
               "household_chat": "Users who aren't admins get the AI panel too, with their own chats. They can see and control only the devices exposed to Assist (Settings > Voice assistants > Expose), never settings, files, notes or automations, and approval modes never skip asking for them. Their risky actions (locks, alarms, garage doors) need an admin's approval on the phone below.",
               "member_daily_cap": "Estimated spend each member may use per day; 0 = no limit. The daily cap above still applies to everyone.",
-              "approval_phone": "The notify action of an admin's phone with the Home Assistant app, e.g. notify.mobile_app_pixel_8. Approvals go there with Approve and Deny buttons when nobody has the chat open, after a minute unanswered in the panel, for automations (llm_agent.ask) and for members' risky actions. Only presses from an admin's phone count."
+              "approval_phone": "The notify action of an admin's phone with the Home Assistant app, e.g. notify.mobile_app_pixel_8. Approvals go there with Approve and Deny buttons when nobody has the chat open, after a minute unanswered in the panel, for automations (llm_agent.ask) and for members' risky actions. Only presses from an admin's phone count.",
+              "float_button": "A round chat button in the bottom right corner of every Home Assistant page, for everyone who can open the AI panel. It opens the same chats in a small window that knows which page you are on. Turn it off to hide it for everyone."
             }
           },
           "reviewer": {
