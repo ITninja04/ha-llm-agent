@@ -223,6 +223,21 @@ class ShadowEditor extends Editor {
   }
 }
 
+// A Markdown code fence line: three or more backticks or tildes, indented at most three
+// spaces. Opening and closing fences are told apart by counting, not by their text.
+const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+
+/** True when `caret` sits inside a code block that is still open there: an odd number of
+ * fence lines come before the caret's line. Opening and closing fences of different
+ * lengths are not matched up, which only matters for fences nested inside fences. */
+export function insideFence(text: string, caret: number): boolean {
+  let open = false;
+  for (const line of text.slice(0, caret).split("\n").slice(0, -1)) {
+    if (FENCE.test(line)) open = !open;
+  }
+  return open;
+}
+
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 class MarkdownBox implements ComposerBox {
@@ -234,6 +249,8 @@ class MarkdownBox implements ComposerBox {
   /** The text was replaced while the box was not focused: focusing puts the caret at
    * the end, as a textarea does, instead of wherever the old text had it. */
   #caretToEnd = true;
+  /** The text at the last change, to tell a typed newline from any other edit. */
+  #last = "";
 
   constructor(
     readonly source: HTMLTextAreaElement,
@@ -277,8 +294,31 @@ class MarkdownBox implements ComposerBox {
     this.el = el;
     this.setPlaceholder(source.placeholder);
     this.#ed.addEventListener("change", () => {
-      if (!this.#quiet) on.onChange();
+      if (this.#quiet) return;
+      this.#closeFence();
+      on.onChange();
     });
+  }
+
+  /** Enter after an opening fence adds the closing one, with the caret on an empty line
+   * between and an empty line after it. Without it, everything typed below an open fence
+   * is code until the closing fence is typed, and the shaded block running off the bottom
+   * of the box looked like the box was broken (reported 2026-11-15). Only when the edit was
+   * a single typed newline, the line above is a fence that opens a block, and no fence
+   * further down would end up paired with it. */
+  #closeFence(): void {
+    const prev = this.#last;
+    const now = this.value;
+    this.#last = now;
+    if (now.length !== prev.length + 1) return;
+    const at = this.selectionStart;
+    if (now[at - 1] !== "\n" || now.slice(0, at - 1) + now.slice(at) !== prev) return;
+    const start = now.lastIndexOf("\n", at - 2) + 1;
+    const fence = FENCE.exec(now.slice(start, at - 1));
+    if (!fence || insideFence(now, start)) return;
+    if (now.slice(at).split("\n").some((line) => FENCE.test(line))) return;
+    this.value = `${now.slice(0, at)}\n${fence[1]}\n${now.slice(at)}`;
+    this.setSelectionRange(at, at);
   }
 
   readonly #shield = (ev: Event): void => {
@@ -294,6 +334,7 @@ class MarkdownBox implements ComposerBox {
   set value(text: string) {
     const focused = (this.el.getRootNode() as ShadowRoot | Document).activeElement === this.el;
     this.#quiet = true;
+    this.#last = text;
     try {
       this.#ed.setContent(text);
     } finally {

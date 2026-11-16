@@ -212,20 +212,40 @@ await box.press("Escape");
 await panel.getByRole("button", { name: "New chat" }).first().click();
 await fill("");
 const oneLine = (await box.boundingBox()).height;
-await fill("one\ntwo\nthree\nfour");
+// empty, the box is two lines tall (Ozzie asked for twice the old one line)
+const lineHeight = await box.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+if (oneLine < lineHeight * 2) fail(`empty composer is under two lines: ${oneLine}px, line ${lineHeight}px`);
+await fill("one\ntwo\nthree\nfour\nfive\nsix");
 const fourLines = (await box.boundingBox()).height;
-if (fourLines < oneLine * 2) fail(`composer did not grow: ${oneLine}px for one line, ${fourLines}px for four`);
+if (fourLines < oneLine * 2) fail(`composer did not grow: ${oneLine}px empty, ${fourLines}px for six lines`);
 await fill(Array.from({ length: 200 }, (_, i) => `line ${i}`).join("\n"));
 const capped = await box.evaluate((el) => ({
   height: el.getBoundingClientRect().height,
   scrolls: el.scrollHeight > el.clientHeight,
   viewport: window.innerHeight,
 }));
-if (capped.height > capped.viewport * 0.41) fail(`composer passed its cap: ${capped.height}px of ${capped.viewport}px`);
+if (capped.height > capped.viewport * 0.51) fail(`composer passed its cap: ${capped.height}px of ${capped.viewport}px`);
 if (!capped.scrolls) fail("a capped composer does not scroll");
 await page.screenshot({ path: `${shots}/llm-agent-8b-composer-capped.png` });
 await fill("");
 if ((await box.boundingBox()).height > oneLine + 1) fail("composer did not shrink back when emptied");
+
+// 10b2. Enter after an opening ``` closes the code block, with the caret on an empty line
+// inside and an empty line after it; Enter inside a code block is a new line, not a send
+await fill("");
+await box.pressSequentially("Hey I found this:");
+await box.press("Shift+Enter");
+await box.pressSequentially("```");
+await box.press("Shift+Enter");
+if ((await value()) !== "Hey I found this:\n```\n\n```\n") fail(`fence not closed: ${JSON.stringify(await value())}`);
+await box.pressSequentially("x = 1");
+await box.press("Enter");
+await box.pressSequentially("y = 2");
+if ((await value()) !== "Hey I found this:\n```\nx = 1\ny = 2\n```\n")
+  fail(`Enter inside a code block: ${JSON.stringify(await value())}`);
+if (await panel.locator(".msg.user").count()) fail("Enter inside a code block sent the message");
+await page.screenshot({ path: `${shots}/llm-agent-8c-composer-fence.png` });
+await fill("");
 
 // 10c. a text file goes with the message as a chip and reaches the model as text
 await panel.getByLabel("Attach photos or files").setInputFiles({

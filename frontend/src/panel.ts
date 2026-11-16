@@ -10,7 +10,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { repeat } from "lit/directives/repeat.js";
 import { has, type Key, loadLanguage, t } from "./i18n";
 import { renderMarkdown } from "./markdown";
-import { type ComposerBox, makeBox } from "./composer";
+import { type ComposerBox, insideFence, makeBox } from "./composer";
 import { Mentions, withChips } from "./mentions";
 import "./preview";
 import "./changes";
@@ -982,6 +982,9 @@ class LlmAgentPanel extends LitElement {
     if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
       const modifier = ev.ctrlKey || ev.metaKey;
       if (this.prefs.send === "ctrl" && !modifier) return; // plain Enter is a new line
+      // Inside a code block Enter is a new line too: code is typed line by line, and half
+      // a block is never what someone meant to send. Ctrl or Cmd+Enter still sends.
+      if (!modifier && this.input && insideFence(this.input.value, this.input.selectionStart)) return;
       ev.preventDefault();
       void this.send();
     }

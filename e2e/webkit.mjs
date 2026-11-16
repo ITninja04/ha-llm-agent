@@ -51,6 +51,21 @@ await box.press("ArrowLeft");
 await box.pressSequentially("X");
 if ((await value()) !== "hello thXere") fail(`typing landed in the wrong place: ${JSON.stringify(await value())}`);
 
+// Enter after an opening ``` closes the code block, with the caret on an empty line
+// inside and an empty line after it; Enter inside a code block is a new line, not a send
+await fill("");
+await box.pressSequentially("Hey I found this:");
+await box.press("Shift+Enter");
+await box.pressSequentially("```");
+await box.press("Shift+Enter");
+if ((await value()) !== "Hey I found this:\n```\n\n```\n") fail(`fence not closed: ${JSON.stringify(await value())}`);
+await box.pressSequentially("x = 1");
+await box.press("Enter");
+await box.pressSequentially("y = 2");
+if ((await value()) !== "Hey I found this:\n```\nx = 1\ny = 2\n```\n")
+  fail(`Enter inside a code block: ${JSON.stringify(await value())}`);
+if ((await userTexts()).length) fail("Enter inside a code block sent the message");
+
 // Shift+Enter is a new line, Enter during IME composition never sends, Enter sends
 await fill("");
 if (!(await send.isDisabled())) fail("Send is clickable with an empty box");
@@ -84,7 +99,7 @@ const capped = await box.evaluate((el) => ({
   viewport: window.innerHeight,
 }));
 if (capped.height <= oneLine * 2) fail(`composer did not grow: ${capped.height}px`);
-if (capped.height > capped.viewport * 0.41) fail(`composer passed its cap: ${capped.height}px`);
+if (capped.height > capped.viewport * 0.51) fail(`composer passed its cap: ${capped.height}px`);
 if (!capped.scrolls) fail("a capped composer does not scroll");
 await fill("");
 if ((await box.boundingBox()).height > oneLine + 1) fail("composer did not shrink back when emptied");
