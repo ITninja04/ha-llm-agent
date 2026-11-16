@@ -985,7 +985,12 @@ var M = Ge(qe), { I: Je } = Fe, Ye = (e) => e, Xe = () => document.createComment
 	settings_saved: "Saved.",
 	settings_reload_failed: "Saved, but LLM Agent did not start again. Open it in Home Assistant to see why.",
 	settings_back: "Back to chat",
-	settings_bad_json: "This isn't valid JSON."
+	settings_bad_json: "This isn't valid JSON.",
+	usage_all_time: "All time",
+	usage_all_time_hint: "All time is every saved chat's cost added up ({count} chats), plus AI Tasks. Deleted chats are not in it.",
+	usage_since_filled: "Model detail since {date}. Days before that are daily totals from the spend cap's record.",
+	usage_earlier: "Before model detail",
+	usage_earlier_hint: "daily totals only"
 }, at = [
 	"de",
 	"es",
@@ -7228,12 +7233,12 @@ td small{display:block;color:var(--muted)}
 		return C`<div class="bar" role="tablist">${i(7)}${i(30)}${i(90)}</div>${r ? C`<p class="err">${P("usage_error", { error: r })}</p>` : w}${e ? this.body(e) : w}${t?.map((e) => this.balance(e))}`;
 	}
 	body(e) {
-		let t = (e, t) => C`<div>${e}<b>${this.money(t)}</b></div>`, n = e.cap > 0 ? Math.round(e.cap_used / e.cap * 100) : 0;
-		return C`<div class="tot">${t(P("usage_today"), e.totals.today)}${t(P("usage_week"), e.totals.week)}${t(P("usage_month"), e.totals.month)}</div>${e.cap > 0 ? C`<p>${P("usage_cap", {
+		let t = (e, t, n = "") => C`<div title=${n}>${e}<b>${this.money(t)}</b></div>`, n = e.all_time, r = e.cap > 0 ? Math.round(e.cap_used / e.cap * 100) : 0;
+		return C`<div class="tot">${t(P("usage_today"), e.totals.today)}${t(P("usage_week"), e.totals.week)}${t(P("usage_month"), e.totals.month)}${t(P("usage_all_time"), n.total, P("usage_all_time_hint", { count: n.chat_count }))}</div>${e.cap > 0 ? C`<p>${P("usage_cap", {
 			cap: this.money(e.cap),
 			used: this.money(e.cap_used),
-			pct: n
-		})}</p>` : w}${this.chart(e.series)}<p>${e.since ? P("usage_since", { date: this.date(e.since) }) : P("usage_none")} ${P("usage_estimate")}</p>${e.breakdown.length ? this.table(e.breakdown) : w}`;
+			pct: r
+		})}</p>` : w}${this.chart(e.series)}<p>${e.since ? e.filled_from ? P("usage_since_filled", { date: this.date(e.since) }) : P("usage_since", { date: this.date(e.since) }) : P("usage_none")} ${P("usage_all_time_hint", { count: n.chat_count })} ${P("usage_estimate")}</p>${e.breakdown.length ? this.table(e.breakdown) : w}`;
 	}
 	chart(e) {
 		let t = Math.max(...e.map((e) => e.cost), 0), n = e.length;
@@ -7244,7 +7249,7 @@ td small{display:block;color:var(--muted)}
 	}
 	table(e) {
 		let t = (e) => e.kind === "task" ? P("usage_kind_task") : e.kind === "review" ? P("usage_kind_review") : "";
-		return C`<div class="tb"><table><thead><tr><th>${P("usage_model")}</th><th>${P("usage_in")}</th><th>${P("usage_out")}</th><th>${P("usage_col_cached")}</th><th>${P("usage_calls")}</th><th>${P("usage_cost")}</th></tr></thead><tbody>${e.map((e) => C`<tr class=${e.kind}><td>${e.model}<small>${e.provider_name ?? e.provider_type}${t(e) ? C`, ${t(e)}` : w}</small></td><td>${this.num(e.input)}</td><td>${this.num(e.output)}</td><td title=${`${e.cache_read} / ${e.cache_write}`}>${this.num(e.cache_read + e.cache_write)}</td><td>${e.calls}</td><td>${e.unpriced === e.calls ? P("usage_no_price") : this.money(e.cost)}${e.unpriced && e.unpriced < e.calls ? C`<small>${P("usage_unpriced", { n: e.unpriced })}</small>` : w}</td></tr>`)}</tbody></table></div>`;
+		return C`<div class="tb"><table><thead><tr><th>${P("usage_model")}</th><th>${P("usage_in")}</th><th>${P("usage_out")}</th><th>${P("usage_col_cached")}</th><th>${P("usage_calls")}</th><th>${P("usage_cost")}</th></tr></thead><tbody>${e.map((e) => e.kind === "earlier" ? C`<tr class="earlier"><td>${P("usage_earlier")}<small>${P("usage_earlier_hint")}</small></td><td></td><td></td><td></td><td></td><td>${this.money(e.cost)}</td></tr>` : C`<tr class=${e.kind}><td>${e.model}<small>${e.provider_name ?? e.provider_type}${t(e) ? C`, ${t(e)}` : w}</small></td><td>${this.num(e.input)}</td><td>${this.num(e.output)}</td><td title=${`${e.cache_read} / ${e.cache_write}`}>${this.num(e.cache_read + e.cache_write)}</td><td>${e.calls}</td><td>${e.unpriced === e.calls ? P("usage_no_price") : this.money(e.cost)}${e.unpriced && e.unpriced < e.calls ? C`<small>${P("usage_unpriced", { n: e.unpriced })}</small>` : w}</td></tr>`)}</tbody></table></div>`;
 	}
 	balance(e) {
 		return C`<p class="bal">${e.status === "ok" ? e.remaining != null && e.limit != null ? P("balance_left", {

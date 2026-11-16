@@ -19,7 +19,7 @@ interface Row {
   provider_type: string;
   provider_name: string | null;
   model: string;
-  kind: "chat" | "review" | "task";
+  kind: "chat" | "review" | "task" | "earlier";
   input: number;
   output: number;
   cache_read: number;

@@ -945,12 +945,21 @@ def ws_usage(
             "provider_type": "",
             "model": "",
             "kind": "earlier",
-            **dict.fromkeys(("input", "output", "cache_read", "cache_write", "calls", "unpriced"), 0),
+            **dict.fromkeys(
+                ("input", "output", "cache_read", "cache_write", "calls", "unpriced"), 0
+            ),
             "cost": earlier,
         }
     chats, chat_count = agent.store.chat_costs()
     # AI Task calls never belong to a chat, so they are added from the log.
-    tasks = round(sum(r["cost"] for r in agent.store.usage.rows("0000-01-01", today.isoformat()) if r["kind"] == "task"), 6)
+    tasks = round(
+        sum(
+            r["cost"]
+            for r in agent.store.usage.rows("0000-01-01", today.isoformat())
+            if r["kind"] == "task"
+        ),
+        6,
+    )
     names = {p.id: p.name for p in agent.providers()}
     connection.send_result(
         msg["id"],
@@ -962,7 +971,12 @@ def ws_usage(
                 for d in (since(days - i) for i in range(days))
             ],
             "totals": {"today": total(1), "week": total(7), "month": total(30)},
-            "all_time": {"total": round(chats + tasks, 6), "chats": chats, "chat_count": chat_count, "tasks": tasks},
+            "all_time": {
+                "total": round(chats + tasks, 6),
+                "chats": chats,
+                "chat_count": chat_count,
+                "tasks": tasks,
+            },
             # the first day filled from the cap's record, when any was
             "filled_from": min(filled) if filled else None,
             # The cap counts chats and reviews only (store.spent), never AI Tasks, so it
