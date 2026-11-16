@@ -171,3 +171,16 @@ async def test_household_members_can_send_the_page_they_are_on(
         await _chat_events(member)
     sent = provider.calls[0]["messages"][0]["content"]
     assert HEADING in sent and _untrusted_blocks(sent)["selection"] == "Sofa lamp"
+
+
+async def test_read_chat_shows_what_the_person_typed_never_the_page_block(
+    hass: HomeAssistant,
+) -> None:
+    """read_chat hands an earlier chat back to the model as user text. The page block
+    there would read as something the person wrote, page text and all."""
+    from custom_components.llm_agent.tools.chats import transcript
+
+    _, conv, _, _, _ = await _run(hass, [reply_text("ok")])
+    lines = "\n".join(line for _turn, line in transcript(conv))
+    assert "turn these off" in lines
+    assert HEADING not in lines and "unlock the front door" not in lines
