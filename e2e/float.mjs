@@ -106,8 +106,10 @@ if (!kept.same) fail("navigation replaced the panel in the window");
 if (!(await win.isVisible())) fail("the window closed on navigation");
 await panel.getByText("Hello from the stub model.").first().waitFor({ timeout: 5000 });
 const ctxPath = () => panel.evaluate((p) => p.pageContext?.path);
-for (let i = 0; i < 30 && (await ctxPath()) !== "/config/integrations"; i++) await page.waitForTimeout(100);
-if ((await ctxPath()) !== "/config/integrations") fail(`page context path is ${await ctxPath()}`);
+// HA moves /config/integrations on to /config/integrations/dashboard by itself
+const onIntegrations = async () => (await ctxPath())?.startsWith("/config/integrations");
+for (let i = 0; i < 30 && !(await onIntegrations()); i++) await page.waitForTimeout(100);
+if (!(await onIntegrations())) fail(`page context path is ${await ctxPath()}`);
 await page.waitForTimeout(500);
 await page.screenshot({ path: `${shots}/llm-agent-float-4-integrations.png` });
 
