@@ -268,5 +268,10 @@
   "settings_saved": "Gespeichert.",
   "settings_reload_failed": "Gespeichert, aber LLM Agent ist nicht wieder gestartet. Öffne es in Home Assistant, um den Grund zu sehen.",
   "settings_back": "Zurück zum Chat",
-  "settings_bad_json": "Das ist kein gültiges JSON."
+  "settings_bad_json": "Das ist kein gültiges JSON.",
+  "usage_all_time": "Gesamt",
+  "usage_all_time_hint": "Gesamt ist die Summe der Kosten aller gespeicherten Chats ({count} Chats) plus AI Tasks; gelöschte Chats sind nicht enthalten.",
+  "usage_since_filled": "Details pro Modell seit {date}. Frühere Tage sind Tagessummen aus dem Protokoll des Tageslimits.",
+  "usage_earlier": "Vor den Modelldetails",
+  "usage_earlier_hint": "nur Tagessummen"
 }

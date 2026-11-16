@@ -120,6 +120,17 @@ class ConversationStore:
     def spent(self, day: str) -> float:
         return self._spend.get(day, 0.0)
 
+    def spend_days(self) -> dict[str, float]:
+        """The daily cap's record: chat and reviewer spend per local day, the last
+        SPEND_DAYS days. Older than the usage log, so it covers the days before it."""
+        return dict(self._spend)
+
+    def chat_costs(self) -> tuple[float, int]:
+        """Every saved chat's estimated cost added up, and how many chats. The same
+        figure each chat shows under its composer. Deleted chats are gone from it."""
+        costs = [c.get("cost") or 0.0 for c in self._index.values()]
+        return round(sum(costs), 6), len(costs)
+
     def user_spent(self, user_id: str | None, day: str) -> float:
         return self._user_spend.get(user_id or "", {}).get(day, 0.0)
 

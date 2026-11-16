@@ -268,5 +268,10 @@
   "settings_saved": "Saved.",
   "settings_reload_failed": "Saved, but LLM Agent did not start again. Open it in Home Assistant to see why.",
   "settings_back": "Back to chat",
-  "settings_bad_json": "This isn't valid JSON."
+  "settings_bad_json": "This isn't valid JSON.",
+  "usage_all_time": "All time",
+  "usage_all_time_hint": "All time is every saved chat's cost added up ({count} chats), plus AI Tasks. Deleted chats are not in it.",
+  "usage_since_filled": "Model detail since {date}. Days before that are daily totals from the spend cap's record.",
+  "usage_earlier": "Before model detail",
+  "usage_earlier_hint": "daily totals only"
 }

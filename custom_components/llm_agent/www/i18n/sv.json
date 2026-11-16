@@ -268,5 +268,10 @@
   "settings_saved": "Sparat.",
   "settings_reload_failed": "Sparat, men LLM Agent startade inte igen. Öppna den i Home Assistant för att se varför.",
   "settings_back": "Tillbaka till chatten",
-  "settings_bad_json": "Det här är inte giltig JSON."
+  "settings_bad_json": "Det här är inte giltig JSON.",
+  "usage_all_time": "Totalt",
+  "usage_all_time_hint": "Totalt är kostnaden för alla sparade chattar sammanlagt ({count} chattar), plus AI Tasks; borttagna chattar räknas inte.",
+  "usage_since_filled": "Detaljer per modell sedan {date}. Tidigare dagar är dagssummor från utgiftsgränsens register.",
+  "usage_earlier": "Före modelldetaljer",
+  "usage_earlier_hint": "endast dagssummor"
 }

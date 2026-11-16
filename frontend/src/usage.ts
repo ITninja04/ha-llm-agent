@@ -19,7 +19,7 @@ interface Row {
   provider_type: string;
   provider_name: string | null;
   model: string;
-  kind: "chat" | "review" | "task";
+  kind: "chat" | "review" | "task" | "earlier";
   input: number;
   output: number;
   cache_read: number;
@@ -34,6 +34,8 @@ interface Data {
   since: string | null;
   series: { day: string; cost: number }[];
   totals: { today: number; week: number; month: number };
+  all_time: { total: number; chats: number; chat_count: number; tasks: number };
+  filled_from: string | null;
   cap: number;
   cap_used: number;
   breakdown: Row[];
@@ -140,11 +142,16 @@ td small{display:block;color:var(--muted)}
   }
 
   private body(u: Data): TemplateResult {
-    const tot = (label: string, v: number) => html`<div>${label}<b>${this.money(v)}</b></div>`;
+    const tot = (label: string, v: number, hint = "") => html`<div title=${hint}>${label}<b>${this.money(v)}</b></div>`;
+    const all = u.all_time;
     const pct = u.cap > 0 ? Math.round((u.cap_used / u.cap) * 100) : 0;
-    return html`<div class="tot">${tot(t("usage_today"), u.totals.today)}${tot(t("usage_week"), u.totals.week)}${tot(t("usage_month"), u.totals.month)}</div>${u.cap > 0
+    return html`<div class="tot">${tot(t("usage_today"), u.totals.today)}${tot(t("usage_week"), u.totals.week)}${tot(t("usage_month"), u.totals.month)}${tot(t("usage_all_time"), all.total, t("usage_all_time_hint", { count: all.chat_count }))}</div>${u.cap > 0
       ? html`<p>${t("usage_cap", { cap: this.money(u.cap), used: this.money(u.cap_used), pct })}</p>`
-      : nothing}${this.chart(u.series)}<p>${u.since ? t("usage_since", { date: this.date(u.since) }) : t("usage_none")} ${t("usage_estimate")}</p>${u.breakdown.length
+      : nothing}${this.chart(u.series)}<p>${u.since
+      ? u.filled_from
+        ? t("usage_since_filled", { date: this.date(u.since) })
+        : t("usage_since", { date: this.date(u.since) })
+      : t("usage_none")} ${t("usage_all_time_hint", { count: all.chat_count })} ${t("usage_estimate")}</p>${u.breakdown.length
       ? this.table(u.breakdown)
       : nothing}`;
   }
@@ -163,7 +170,9 @@ td small{display:block;color:var(--muted)}
   private table(rows: Row[]): TemplateResult {
     const kind = (r: Row) => (r.kind === "task" ? t("usage_kind_task") : r.kind === "review" ? t("usage_kind_review") : "");
     return html`<div class="tb"><table><thead><tr><th>${t("usage_model")}</th><th>${t("usage_in")}</th><th>${t("usage_out")}</th><th>${t("usage_col_cached")}</th><th>${t("usage_calls")}</th><th>${t("usage_cost")}</th></tr></thead><tbody>${rows.map(
-      (r) => html`<tr class=${r.kind}><td>${r.model}<small>${r.provider_name ?? r.provider_type}${kind(r) ? html`, ${kind(r)}` : nothing}</small></td><td>${this.num(r.input)}</td><td>${this.num(r.output)}</td><td title=${`${r.cache_read} / ${r.cache_write}`}>${this.num(r.cache_read + r.cache_write)}</td><td>${r.calls}</td><td>${r.unpriced === r.calls
+      (r) => r.kind === "earlier"
+        ? html`<tr class="earlier"><td>${t("usage_earlier")}<small>${t("usage_earlier_hint")}</small></td><td></td><td></td><td></td><td></td><td>${this.money(r.cost)}</td></tr>`
+        : html`<tr class=${r.kind}><td>${r.model}<small>${r.provider_name ?? r.provider_type}${kind(r) ? html`, ${kind(r)}` : nothing}</small></td><td>${this.num(r.input)}</td><td>${this.num(r.output)}</td><td title=${`${r.cache_read} / ${r.cache_write}`}>${this.num(r.cache_read + r.cache_write)}</td><td>${r.calls}</td><td>${r.unpriced === r.calls
         ? t("usage_no_price")
         : this.money(r.cost)}${r.unpriced && r.unpriced < r.calls ? html`<small>${t("usage_unpriced", { n: r.unpriced })}</small>` : nothing}</td></tr>`,
     )}</tbody></table></div>`;

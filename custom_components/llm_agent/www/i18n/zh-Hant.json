@@ -268,5 +268,10 @@
   "settings_saved": "已儲存。",
   "settings_reload_failed": "已儲存，但 LLM Agent 未能重新啟動。請在 Home Assistant 中開啟查看原因。",
   "settings_back": "返回聊天",
-  "settings_bad_json": "這不是有效的 JSON。"
+  "settings_bad_json": "這不是有效的 JSON。",
+  "usage_all_time": "全部",
+  "usage_all_time_hint": "全部為所有已儲存對話的費用總和（{count} 個對話），另加 AI Task；已刪除的對話不計入。",
+  "usage_since_filled": "自 {date} 起按模型細分。此前的日期為每日支出上限紀錄中的每日總額。",
+  "usage_earlier": "按模型細分之前",
+  "usage_earlier_hint": "僅每日總額"
 }

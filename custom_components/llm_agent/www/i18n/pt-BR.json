@@ -268,5 +268,10 @@
   "settings_saved": "Salvo.",
   "settings_reload_failed": "Salvo, mas o LLM Agent não iniciou novamente. Abra no Home Assistant para ver o motivo.",
   "settings_back": "Voltar ao chat",
-  "settings_bad_json": "Isto não é um JSON válido."
+  "settings_bad_json": "Isto não é um JSON válido.",
+  "usage_all_time": "Total",
+  "usage_all_time_hint": "O total soma o custo de todos os chats salvos ({count} chats), mais AI Tasks; chats excluídos não entram.",
+  "usage_since_filled": "Detalhe por modelo desde {date}. Os dias anteriores são totais diários do registro do limite de gastos.",
+  "usage_earlier": "Antes do detalhe por modelo",
+  "usage_earlier_hint": "só totais diários"
 }

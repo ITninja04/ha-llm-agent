@@ -901,6 +901,19 @@ def ws_usage(
     per_day: dict[str, float] = {}
     for row in rows:
         per_day[row["day"]] = per_day.get(row["day"], 0.0) + row["cost"]
+    # The usage log only started with 0.9.6, so on its own it showed a few hours of spend
+    # against chats that had cost far more ("the billing usage is wrong", 2026-11-15). The
+    # daily cap's record goes back 31 days, per day, without a model split. Days up to and
+    # including the log's first day take the larger of the two: that first day began
+    # before the log did. What is filled this way shows as its own breakdown row.
+    first_logged = agent.store.usage.since
+    filled: dict[str, float] = {}
+    for day, cost in agent.store.spend_days().items():
+        if first <= day and (first_logged is None or day <= first_logged):
+            extra = round(cost - per_day.get(day, 0.0), 6)
+            if extra > 0:
+                filled[day] = extra
+                per_day[day] = cost
 
     def since(n: int) -> str:
         return (today - timedelta(days=n - 1)).isoformat()
@@ -926,6 +939,27 @@ def ws_usage(
         for k in ("input", "output", "cache_read", "cache_write", "calls", "unpriced"):
             group[k] += row[k]
         group["cost"] = round(group["cost"] + row["cost"], 6)
+    if earlier := round(sum(c for d, c in filled.items() if d >= start), 6):
+        groups[("", "", "earlier")] = {
+            "provider_id": "",
+            "provider_type": "",
+            "model": "",
+            "kind": "earlier",
+            **dict.fromkeys(
+                ("input", "output", "cache_read", "cache_write", "calls", "unpriced"), 0
+            ),
+            "cost": earlier,
+        }
+    chats, chat_count = agent.store.chat_costs()
+    # AI Task calls never belong to a chat, so they are added from the log.
+    tasks = round(
+        sum(
+            r["cost"]
+            for r in agent.store.usage.rows("0000-01-01", today.isoformat())
+            if r["kind"] == "task"
+        ),
+        6,
+    )
     names = {p.id: p.name for p in agent.providers()}
     connection.send_result(
         msg["id"],
@@ -937,6 +971,14 @@ def ws_usage(
                 for d in (since(days - i) for i in range(days))
             ],
             "totals": {"today": total(1), "week": total(7), "month": total(30)},
+            "all_time": {
+                "total": round(chats + tasks, 6),
+                "chats": chats,
+                "chat_count": chat_count,
+                "tasks": tasks,
+            },
+            # the first day filled from the cap's record, when any was
+            "filled_from": min(filled) if filled else None,
             # The cap counts chats and reviews only (store.spent), never AI Tasks, so it
             # is sent as the cap sees it rather than taken from the totals above.
             "cap": setting(agent.options, CONF_DAILY_CAP),

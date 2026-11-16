@@ -268,5 +268,10 @@
   "settings_saved": "Zapisano.",
   "settings_reload_failed": "Zapisano, ale LLM Agent nie uruchomił się ponownie. Otwórz go w Home Assistant, aby sprawdzić dlaczego.",
   "settings_back": "Wróć do czatu",
-  "settings_bad_json": "To nie jest poprawny JSON."
+  "settings_bad_json": "To nie jest poprawny JSON.",
+  "usage_all_time": "Łącznie",
+  "usage_all_time_hint": "Łącznie to suma kosztów wszystkich zapisanych czatów ({count} czatów) plus AI Tasks; usunięte czaty nie są wliczane.",
+  "usage_since_filled": "Szczegóły według modelu od {date}. Wcześniejsze dni to sumy dzienne z rejestru dziennego limitu.",
+  "usage_earlier": "Przed szczegółami modeli",
+  "usage_earlier_hint": "tylko sumy dzienne"
 }
