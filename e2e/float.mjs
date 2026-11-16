@@ -33,6 +33,8 @@ const win = float.locator(".win");
 const panel = float.locator("llm-agent-panel");
 const { box, fill } = composer(page, panel);
 const rect = () => win.boundingBox();
+// the stub answers a message that carries a page about the page (stub_openai.py page_reply)
+const REPLY = /Hello from the stub model\.|I can see the .* page\.|The page block did not name the test switch\./;
 /** HA's own way between pages (history.pushState plus location-changed), no reload. */
 const navigate = (path) =>
   page.evaluate((p) => {
@@ -67,7 +69,7 @@ if ((await chip.getAttribute("title"))?.split("\n")[0] !== here)
 await panel.getByRole("button", { name: "New chat" }).first().click();
 await fill("float question");
 await box.press("Enter");
-await panel.locator(".msg.assistant", { hasText: "Hello from the stub model." }).waitFor({ timeout: 30000 });
+await panel.locator(".msg.assistant", { hasText: REPLY }).waitFor({ timeout: 30000 });
 await setTheme("light");
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${shots}/llm-agent-float-2-open-light.png` });
@@ -110,7 +112,7 @@ const kept = await page.evaluate(() => {
 if (kept.reloaded) fail("navigation reloaded the page");
 if (!kept.same) fail("navigation replaced the panel in the window");
 if (!(await win.isVisible())) fail("the window closed on navigation");
-await panel.getByText("Hello from the stub model.").first().waitFor({ timeout: 5000 });
+await panel.locator(".msg.assistant", { hasText: REPLY }).first().waitFor({ timeout: 5000 });
 const ctxPath = () => panel.evaluate((p) => p.pageContext?.path);
 // HA moves /config/integrations on to /config/integrations/dashboard by itself
 const onIntegrations = async () => (await ctxPath())?.startsWith("/config/integrations");
