@@ -253,11 +253,12 @@ async function dashboard(
   } else if (generated) {
     details.note = "Generated dashboard; its cards could not be read, so no entities are listed.";
   }
-  // A built-in generated panel has one view, and the sidebar names it by the panel alone
-  // ("Overview"), so a view title there would only add noise to the chip.
-  const oneView = !saved && views.length <= 1;
-  const name =
-    viewTitle && viewTitle !== dashTitle && !oneView ? `${dashTitle}, ${viewTitle}` : dashTitle;
+  // A built-in generated panel opens on its first view, which the sidebar names by the
+  // panel alone: the Overview's first view is "overview" (seen in the e2e run, 2026.10.2),
+  // and "Overview, overview" on the chip says nothing more.
+  const sameName = viewTitle.toLowerCase() === dashTitle.toLowerCase();
+  const first = !saved && at === 0;
+  const name = viewTitle && !sameName && !first ? `${dashTitle}, ${viewTitle}` : dashTitle;
   return { kind: "dashboard", title: `Dashboard ${name}`, summary: name, details };
 }
 

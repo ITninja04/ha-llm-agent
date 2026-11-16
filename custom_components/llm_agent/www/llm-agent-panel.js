@@ -7612,7 +7612,7 @@ async function La(e, t, n, r) {
 	}), s && (m.generated = !0);
 	let h = [];
 	f?.strategy && (m.view_generated = !0), f && (h = Ba(e, f)), (s || f?.strategy || !h.length) && (h = [.../* @__PURE__ */ new Set([...h, ...Ba(e, { cards: za() })])]), h.length ? (m.entities = h.slice(0, Ca).map((t) => Ya(e, t)), h.length > Ca && (m.entities_total = h.length)) : s && (m.note = "Generated dashboard; its cards could not be read, so no entities are listed.");
-	let g = !r && l.length <= 1, _ = p && p !== a && !g ? `${a}, ${p}` : a;
+	let g = p.toLowerCase() === a.toLowerCase(), _ = p && !g && (r || d !== 0) ? `${a}, ${p}` : a;
 	return {
 		kind: "dashboard",
 		title: `Dashboard ${_}`,
