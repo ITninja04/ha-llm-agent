@@ -273,5 +273,9 @@
   "usage_all_time_hint": "Łącznie to suma kosztów wszystkich zapisanych czatów ({count} czatów) plus AI Tasks; usunięte czaty nie są wliczane.",
   "usage_since_filled": "Szczegóły według modelu od {date}. Wcześniejsze dni to sumy dzienne z rejestru dziennego limitu.",
   "usage_earlier": "Przed szczegółami modeli",
-  "usage_earlier_hint": "tylko sumy dzienne"
+  "usage_earlier_hint": "tylko sumy dzienne",
+  "float_minimize": "Minimalizuj",
+  "float_restore": "Przywróć",
+  "float_full_panel": "Otwórz pełny panel",
+  "float_resize": "Zmień rozmiar"
 }

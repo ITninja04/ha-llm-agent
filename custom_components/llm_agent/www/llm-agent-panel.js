@@ -990,7 +990,11 @@ var M = Ge(qe), { I: Je } = Fe, Ye = (e) => e, Xe = () => document.createComment
 	usage_all_time_hint: "All time is every saved chat's cost added up ({count} chats), plus AI Tasks. Deleted chats are not in it.",
 	usage_since_filled: "Model detail since {date}. Days before that are daily totals from the spend cap's record.",
 	usage_earlier: "Before model detail",
-	usage_earlier_hint: "daily totals only"
+	usage_earlier_hint: "daily totals only",
+	float_minimize: "Minimize",
+	float_restore: "Restore",
+	float_full_panel: "Open the full panel",
+	float_resize: "Resize"
 }, at = [
 	"de",
 	"es",
@@ -4996,7 +5000,7 @@ var Fi = (e) => e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), Ii = class {
 	}
 	#s = (e) => {
 		let t = e;
-		t.ctrlKey || t.altKey || t.metaKey || t.composedPath()[0] === this.el && t.stopPropagation();
+		t.ctrlKey || t.altKey || t.metaKey || t.key !== "Escape" && t.composedPath()[0] === this.el && t.stopPropagation();
 	};
 	get value() {
 		return this.#e.getContent();
@@ -5335,6 +5339,10 @@ var Qi = s`
       sans-serif;
     font-size: 15px;
     -webkit-font-smoothing: antialiased;
+  }
+  /* inside the floating window, which sets the size */
+  :host([embedded]) {
+    height: 100%;
   }
   :host([data-theme="light"]) {
     --bg: #f6f7f9;
@@ -7875,7 +7883,7 @@ var co = /* @__PURE__ */ new Set([
 	cost: 0
 }, $ = class extends k {
 	constructor(...e) {
-		super(...e), this.narrow = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = lo, this.running = !1, this.announce = "", this.editAt = -1, this.hasText = !1, this.photos = [], this.files = [], this.dragging = !1, this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.picked = new zi(), this.prefs = So(), this.showPrefs = !1, this.showSettings = !1, this.showChanges = !1, this.view = "changes", this.mentionIndex = 0, this.pageOff = !1, this.mentionStart = -1, this.gen = 0, this.started = !1, this.stickToBottom = !0, this.onReady = () => {
+		super(...e), this.narrow = !1, this.embedded = !1, this.convs = [], this.query = "", this.previews = /* @__PURE__ */ new Set(), this.hits = null, this.convId = null, this.chatTitle = "New chat", this.items = [], this.usage = lo, this.running = !1, this.announce = "", this.editAt = -1, this.hasText = !1, this.photos = [], this.files = [], this.dragging = !1, this.photoGen = 0, this.providerId = "", this.model = "", this.fetched = {}, this.showList = !1, this.loadError = "", this.mentions = [], this.picked = new zi(), this.prefs = So(), this.showPrefs = !1, this.showSettings = !1, this.showChanges = !1, this.view = "changes", this.mentionIndex = 0, this.pageOff = !1, this.mentionStart = -1, this.gen = 0, this.started = !1, this.stickToBottom = !0, this.onReady = () => {
 			this.running && this.convId && this.open(this.convId).catch(() => void 0);
 		}, this.reloaded = async () => {
 			try {
@@ -7888,6 +7896,9 @@ var co = /* @__PURE__ */ new Set([
 	}
 	static {
 		this.styles = Qi;
+	}
+	get slim() {
+		return this.narrow || this.embedded;
 	}
 	get ws() {
 		return this.hass.connection;
@@ -8486,13 +8497,13 @@ var co = /* @__PURE__ */ new Set([
 	render() {
 		if (this.loadError) return C`<div class="empty">${P("load_error", { error: this.loadError })}</div>`;
 		if (this.info && !this.info.providers.length) return C`<div class="empty">${P("no_provider")}</div>`;
-		let e = this.narrow ? this.showList : this.prefs.listOpen, t = this.convId ? this.lastUserIndex() : -1;
+		let e = this.slim ? this.showList : this.prefs.listOpen, t = this.convId ? this.lastUserIndex() : -1;
 		return C`
       <div
-        class="layout ${this.narrow ? "narrow" : ""}"
+        class="layout ${this.slim ? "narrow" : ""}"
         @click=${this.closePrefsOutside}
         @keydown=${(e) => {
-			e.key === "Escape" && (this.running && !e.defaultPrevented && !e.isComposing && !this.showPrefs && this.stop(), this.showPrefs = !1);
+			e.key === "Escape" && (this.running && !e.defaultPrevented && !e.isComposing && !this.showPrefs && (e.preventDefault(), this.stop()), this.showPrefs && e.preventDefault(), this.showPrefs = !1);
 		}}
       >
         ${e ? this.renderList() : w}
@@ -8503,19 +8514,19 @@ var co = /* @__PURE__ */ new Set([
           @drop=${this.onDrop}
         >
           <header>
-            <ha-menu-button
-              .hass=${this.hass}
-              .narrow=${this.narrow}
-            ></ha-menu-button>
+            ${this.embedded ? w : C`<ha-menu-button
+                    .hass=${this.hass}
+                    .narrow=${this.narrow}
+                  ></ha-menu-button>`}
             <button
               class="icon"
               title=${P(e ? "hide_chats" : "show_chats")}
               aria-label=${P("conversations")}
               aria-expanded=${e}
-              @click=${() => this.narrow ? this.showList = !this.showList : this.setPref("listOpen", !this.prefs.listOpen)}
+              @click=${() => this.slim ? this.showList = !this.showList : this.setPref("listOpen", !this.prefs.listOpen)}
             >
               <ha-icon
-                icon=${this.narrow ? "mdi:forum-outline" : "mdi:dock-left"}
+                icon=${this.slim ? "mdi:forum-outline" : "mdi:dock-left"}
               ></ha-icon>
             </button>
             <div class="title">${this.showChanges ? P(this.view === "notes" ? "home_notes" : this.view) : Io(this.chatTitle)}</div>
@@ -8996,7 +9007,7 @@ var co = /* @__PURE__ */ new Set([
       <div class="composer ${this.dragging ? "dragging" : ""}">
         <textarea
           rows="1"
-          placeholder=${this.narrow ? P("composer_placeholder") : `${P("composer_placeholder")} (${P(this.prefs.send === "ctrl" ? "keys_ctrl" : "keys_enter")})`}
+          placeholder=${this.slim ? P("composer_placeholder") : `${P("composer_placeholder")} (${P(this.prefs.send === "ctrl" ? "keys_ctrl" : "keys_enter")})`}
         ></textarea>
         ${this.mentions.length ? C`<ul class="mentions" role="listbox">
                 ${this.mentions.map((e, t) => C`<li
@@ -9126,7 +9137,10 @@ var co = /* @__PURE__ */ new Set([
     </footer>`;
 	}
 };
-Q([A({ attribute: !1 })], $.prototype, "hass", void 0), Q([A({ type: Boolean })], $.prototype, "narrow", void 0), Q([A({ attribute: !1 })], $.prototype, "pageContext", void 0), Q([j()], $.prototype, "info", void 0), Q([j()], $.prototype, "convs", void 0), Q([j()], $.prototype, "query", void 0), Q([j()], $.prototype, "previews", void 0), Q([j()], $.prototype, "hits", void 0), Q([j()], $.prototype, "convId", void 0), Q([j()], $.prototype, "chatTitle", void 0), Q([j()], $.prototype, "items", void 0), Q([j()], $.prototype, "usage", void 0), Q([j()], $.prototype, "running", void 0), Q([j()], $.prototype, "announce", void 0), Q([j()], $.prototype, "editAt", void 0), Q([j()], $.prototype, "hasText", void 0), Q([j()], $.prototype, "photos", void 0), Q([j()], $.prototype, "files", void 0), Q([j()], $.prototype, "dragging", void 0), Q([j()], $.prototype, "providerId", void 0), Q([j()], $.prototype, "model", void 0), Q([j()], $.prototype, "fetched", void 0), Q([j()], $.prototype, "showList", void 0), Q([j()], $.prototype, "loadError", void 0), Q([j()], $.prototype, "mentions", void 0), Q([j()], $.prototype, "prefs", void 0), Q([j()], $.prototype, "showPrefs", void 0), Q([j()], $.prototype, "showSettings", void 0), Q([j()], $.prototype, "showChanges", void 0), Q([j()], $.prototype, "view", void 0), Q([j()], $.prototype, "mentionIndex", void 0), Q([j()], $.prototype, "pageOff", void 0), Q([Ue(".composer textarea")], $.prototype, "source", void 0), Q([Ue(".messages")], $.prototype, "scroller", void 0);
+Q([A({ attribute: !1 })], $.prototype, "hass", void 0), Q([A({ type: Boolean })], $.prototype, "narrow", void 0), Q([A({ attribute: !1 })], $.prototype, "pageContext", void 0), Q([A({
+	type: Boolean,
+	reflect: !0
+})], $.prototype, "embedded", void 0), Q([j()], $.prototype, "info", void 0), Q([j()], $.prototype, "convs", void 0), Q([j()], $.prototype, "query", void 0), Q([j()], $.prototype, "previews", void 0), Q([j()], $.prototype, "hits", void 0), Q([j()], $.prototype, "convId", void 0), Q([j()], $.prototype, "chatTitle", void 0), Q([j()], $.prototype, "items", void 0), Q([j()], $.prototype, "usage", void 0), Q([j()], $.prototype, "running", void 0), Q([j()], $.prototype, "announce", void 0), Q([j()], $.prototype, "editAt", void 0), Q([j()], $.prototype, "hasText", void 0), Q([j()], $.prototype, "photos", void 0), Q([j()], $.prototype, "files", void 0), Q([j()], $.prototype, "dragging", void 0), Q([j()], $.prototype, "providerId", void 0), Q([j()], $.prototype, "model", void 0), Q([j()], $.prototype, "fetched", void 0), Q([j()], $.prototype, "showList", void 0), Q([j()], $.prototype, "loadError", void 0), Q([j()], $.prototype, "mentions", void 0), Q([j()], $.prototype, "prefs", void 0), Q([j()], $.prototype, "showPrefs", void 0), Q([j()], $.prototype, "showSettings", void 0), Q([j()], $.prototype, "showChanges", void 0), Q([j()], $.prototype, "view", void 0), Q([j()], $.prototype, "mentionIndex", void 0), Q([j()], $.prototype, "pageOff", void 0), Q([Ue(".composer textarea")], $.prototype, "source", void 0), Q([Ue(".messages")], $.prototype, "scroller", void 0);
 var uo = "llm-agent-prefs";
 async function fo(e) {
 	try {

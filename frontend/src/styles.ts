@@ -53,6 +53,10 @@ export const styles = css`
     font-size: 15px;
     -webkit-font-smoothing: antialiased;
   }
+  /* inside the floating window, which sets the size */
+  :host([embedded]) {
+    height: 100%;
+  }
   :host([data-theme="light"]) {
     --bg: #f6f7f9;
     --surface: #ffffff;

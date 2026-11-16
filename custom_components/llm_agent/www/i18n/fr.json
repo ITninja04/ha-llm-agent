@@ -273,5 +273,9 @@
   "usage_all_time_hint": "Le total additionne le coût de tous les chats enregistrés ({count} chats), plus les AI Tasks ; les chats supprimés n'y figurent pas.",
   "usage_since_filled": "Détail par modèle depuis le {date}. Les jours précédents sont des totaux quotidiens issus du suivi du plafond de dépense.",
   "usage_earlier": "Avant le détail par modèle",
-  "usage_earlier_hint": "totaux quotidiens seulement"
+  "usage_earlier_hint": "totaux quotidiens seulement",
+  "float_minimize": "Réduire",
+  "float_restore": "Restaurer",
+  "float_full_panel": "Ouvrir le panneau complet",
+  "float_resize": "Redimensionner"
 }

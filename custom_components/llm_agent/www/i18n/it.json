@@ -273,5 +273,9 @@
   "usage_all_time_hint": "Il totale somma il costo di tutte le chat salvate ({count} chat), più gli AI Task; le chat eliminate non sono incluse.",
   "usage_since_filled": "Dettaglio per modello dal {date}. I giorni precedenti sono totali giornalieri dal registro del limite di spesa.",
   "usage_earlier": "Prima del dettaglio per modello",
-  "usage_earlier_hint": "solo totali giornalieri"
+  "usage_earlier_hint": "solo totali giornalieri",
+  "float_minimize": "Riduci a icona",
+  "float_restore": "Ripristina",
+  "float_full_panel": "Apri il pannello completo",
+  "float_resize": "Ridimensiona"
 }

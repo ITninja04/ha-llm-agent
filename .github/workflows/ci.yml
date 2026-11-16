@@ -50,7 +50,11 @@ jobs:
       - run: npm run build
         working-directory: frontend
       - name: Committed bundle matches the source
-        run: git diff --exit-code -- custom_components/llm_agent/www
+        # status as well as diff: a new build output that was never committed is
+        # untracked, and git diff passes over untracked files
+        run: |
+          git diff --exit-code -- custom_components/llm_agent/www
+          test -z "$(git status --porcelain -- custom_components/llm_agent/www)" || { git status --short; exit 1; }
       - name: Panel stays within its size budget (95 kB gzipped)
         run: |
           size=$(gzip -9c custom_components/llm_agent/www/llm-agent-panel.js | wc -c)
@@ -69,6 +73,13 @@ jobs:
           # Minify does not help: Vite's lib mode with es output keeps the whitespace
           # either way.
           test "$size" -le 97280
+      - name: Floating chat loader stays within its size budget (6 kB gzipped)
+        run: |
+          size=$(gzip -9c custom_components/llm_agent/www/llm-agent-float.js | wc -c)
+          echo "loader: $size bytes gzipped"
+          # HA loads this file on every page of every dashboard, chat or not, so it must
+          # stay a button; the window and the panel load only when it is clicked.
+          test "$size" -le 6144
 
   hassfest:
     runs-on: ubuntu-latest
