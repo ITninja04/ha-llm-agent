@@ -1,3 +1,5 @@
+import type { PageContext } from "./pagecontext";
+
 export interface HassConnection {
   sendMessagePromise<T = unknown>(msg: Record<string, unknown>): Promise<T>;
   subscribeMessage<T = unknown>(
@@ -111,6 +113,11 @@ export type Item =
       /** Files sent with this message. `data` is there only in the session that sent
        * them, so a retry can send them again; a reloaded chat has names and sizes. */
       files?: AttachedFile[];
+      /** The page chip's summary when the message went with the page the person was
+       * on, so they can tell later what the model saw. */
+      page?: string;
+      /** The page itself, this session only, so a retry sends the same page. */
+      pageData?: PageContext;
     }
   | { kind: "assistant"; text: string }
   | {
@@ -153,7 +160,7 @@ export interface Conversation {
 }
 
 export type StoredMessage =
-  | { role: "user"; content: string; photos?: number; files?: FileInfo[] }
+  | { role: "user"; content: string; photos?: number; files?: FileInfo[]; page?: string }
   | { role: "assistant"; content: string; tool_calls: ToolCallInfo[] }
   | {
       role: "tool";

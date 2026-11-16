@@ -512,6 +512,21 @@ export const styles = css`
   .row.reply {
     flex-wrap: wrap;
   }
+  /* what page the model was given with this message, under the bubble */
+  .row.user:has(.page-note) {
+    flex-wrap: wrap;
+  }
+  .page-note {
+    flex-basis: 100%;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 0.8em;
+    --mdc-icon-size: 14px;
+  }
   .msg-actions.acts {
     flex-basis: 100%;
     margin: -10px 0 0 -5px;
@@ -1010,6 +1025,35 @@ export const styles = css`
   footer {
     padding: 8px max(20px, calc((100% - 780px) / 2)) 14px;
     flex: none;
+  }
+  /* The page the floating chat sends with the next message; a click leaves it out. */
+  .page-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    margin: 0 0 6px 4px;
+    padding: 3px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: inherit;
+    font: inherit;
+    font-size: 0.85em;
+    cursor: pointer;
+    --mdc-icon-size: 16px;
+  }
+  .page-chip span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .page-chip.off {
+    background: transparent;
+    color: var(--muted);
+  }
+  .page-chip.off span {
+    text-decoration: line-through;
   }
   .composer {
     position: relative;
