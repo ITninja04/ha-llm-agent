@@ -828,7 +828,13 @@ class ChatRun:
 
     async def _run_calls(self, calls: list[ToolCall], tools: dict[str, Tool], over: bool) -> None:
         ctx = ToolContext(
-            self.hass, self.user_id, self.agent.options, self.agent.snapshots, self._hidden()
+            self.hass,
+            self.user_id,
+            self.agent.options,
+            self.agent.snapshots,
+            self._hidden(),
+            conversation_id=self.conv["id"],
+            member=self.member,
         )
         # Consecutive read-only calls run concurrently; anything else runs in order.
         batch: list[ToolCall] = []
@@ -1165,6 +1171,8 @@ class ChatRun:
                 decision=decision,
                 review=_review_meta(verdict),
             )
+        if out.untrusted:
+            self.conv["untrusted"] = True
         if call.name == "read_reference":
             read = self.conv.setdefault("references_read", [])
             if (name := page_name(call.args)) not in read:

@@ -171,11 +171,18 @@ class ConversationStore:
         return sorted(chats, key=lambda c: c.get("updated", 0), reverse=True)
 
     async def search(
-        self, query: str, limit: int = 30, viewer: Viewer | None = None
+        self,
+        query: str,
+        limit: int = 30,
+        viewer: Viewer | None = None,
+        keep: Callable[[dict[str, Any]], bool] | None = None,
+        width: int = 60,
     ) -> list[dict[str, Any]]:
         """Chats whose title or messages contain `query` (case-insensitive), newest first,
-        each with a short snippet. Reads chats from disk one at a time without caching
-        them, so memory stays flat."""
+        each with a short snippet of `width` characters either side of the hit. `keep`
+        narrows the chats searched (the past_chats tool's dates and source) before any
+        is read, so a narrow filter reads few files. Reads chats from disk one at a time
+        without caching them, so memory stays flat."""
         needle = query.strip().lower()
         if not needle:
             return []
@@ -183,16 +190,27 @@ class ConversationStore:
         for summary in self.list(viewer):
             if len(found) >= limit:
                 break
-            conv_id = summary["id"]
-            conv = self._cache.get(conv_id) or await self._conv_store(conv_id).async_load()
-            snippet = _snippet(summary.get("title", ""), needle)
+            if keep is not None and not keep(summary):
+                continue
+            conv = await self.peek(summary["id"])
+            snippet = _snippet(summary.get("title", ""), needle, width)
             for msg in (conv or {}).get("messages", []):
                 if snippet or msg.get("role") not in ("user", "assistant"):
                     continue
-                snippet = _snippet(str(msg.get("display") or msg.get("content") or ""), needle)
+                text = str(msg.get("display") or msg.get("content") or "")
+                snippet = _snippet(text, needle, width)
             if snippet:
                 found.append({**summary, "snippet": snippet})
         return found
+
+    async def peek(self, conv_id: str) -> dict[str, Any] | None:
+        """A chat for reading only, without adding it to the cache. The past_chats and
+        read_chat tools look through many old chats; going through get() would push the
+        chats people have open out of memory. Do not change what this returns: when the
+        chat is cached it is the shared object a running turn writes to."""
+        if conv_id not in self._index:
+            return None
+        return self._cache.get(conv_id) or await self._conv_store(conv_id).async_load()
 
     async def get(self, conv_id: str) -> dict[str, Any] | None:
         if conv_id in self._cache:

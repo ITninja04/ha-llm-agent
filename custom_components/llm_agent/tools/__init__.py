@@ -171,6 +171,11 @@ class ToolContext:
     snapshots: Snapshots
     # True for entities the household's rules deny in this chat (members' tools hide them)
     hidden: Callable[[str], bool] | None = None
+    # The chat this call runs in, so past_chats can leave it out
+    conversation_id: str | None = None
+    # A household member's chat (not an admin's): past_chats and read_chat then show
+    # only that person's own chats, as the panel does
+    member: bool = False
 
 
 @dataclass(slots=True)
@@ -180,6 +185,10 @@ class ToolOutput:
     snapshot_id: str | None = None
     # Pictures for vision models: {"media_type": "image/jpeg", "data": base64 text}
     images: list[dict[str, str]] = field(default_factory=list)
+    # This result carries outside text even though the tool is not always untrusted
+    # (read_chat on a chat that had read web pages or files): the chat counts as
+    # tainted from here on, as after a web fetch.
+    untrusted: bool = False
 
 
 @dataclass(slots=True)
@@ -285,6 +294,7 @@ def build_tools(options: dict[str, Any]) -> list[Tool]:
     from . import (
         camera,
         changes,
+        chats,
         config_items,
         dashboards,
         debug,
@@ -309,6 +319,7 @@ def build_tools(options: dict[str, Any]) -> list[Tool]:
         *files.TOOLS,
         *system.TOOLS,
         *changes.TOOLS,
+        *chats.TOOLS,
         *notes.TOOLS,
         *websocket.TOOLS,
         *reference.TOOLS,
