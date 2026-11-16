@@ -57,6 +57,13 @@ if (await button.isVisible()) fail("the button stayed up with the window open");
 let r = await rect();
 if (Math.round(r.width) !== 420 || Math.round(r.height) !== 620) fail(`window is ${r.width}x${r.height}, not 420x620`);
 if ((await panel.getAttribute("embedded")) === null) fail("the panel in the window is not embedded");
+// the title bar's buttons are in the title bar: the loader's own button styles once
+// pulled them out to the corner of the screen, where nobody would find them
+for (const name of ["Minimize", "Open the full panel", "Close"]) {
+  const b = await float.getByRole("button", { name }).boundingBox();
+  if (!b || b.x < r.x || b.x + b.width > r.x + r.width || b.y < r.y || b.y + b.height > r.y + 44)
+    fail(`"${name}" is not in the title bar: ${JSON.stringify(b)} in ${JSON.stringify(r)}`);
+}
 if (await panel.locator("nav").isVisible().catch(() => false)) fail("the chat list sidebar shows in the window");
 // the window tells the panel which page it is on, and the composer shows it as a chip
 const chip = panel.locator(".page-chip");
@@ -195,7 +202,7 @@ await page.locator("ha-config-integrations").waitFor({ state: "attached", timeou
 await button.waitFor({ timeout: 10000 });
 await page.waitForTimeout(1500);
 const overlap = await page.evaluate(() => {
-  const btn = document.querySelector("llm-agent-float").shadowRoot.querySelector("button").getBoundingClientRect();
+  const btn = document.querySelector("llm-agent-float").shadowRoot.querySelector(".fab").getBoundingClientRect();
   const found = [];
   const walk = (root) => {
     for (const el of root.querySelectorAll("*")) {

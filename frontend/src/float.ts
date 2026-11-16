@@ -84,7 +84,8 @@ class LlmAgentFloat extends HTMLElement {
     super();
     this.#root.innerHTML = `<style>
       :host { position: fixed; z-index: 5; inset: auto 0 0 auto; pointer-events: none; }
-      button {
+      /* by class: the window is appended to this same shadow root, with buttons of its own */
+      .fab {
         pointer-events: auto; position: fixed; width: 56px; height: 56px; border-radius: 50%;
         right: calc(${GAP}px + var(--safe-area-inset-right, 0px));
         bottom: calc(var(--lift, ${GAP}px) + var(--safe-area-inset-bottom, 0px));
@@ -93,10 +94,10 @@ class LlmAgentFloat extends HTMLElement {
         box-shadow: 0 2px 6px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.18);
         --mdc-icon-size: 26px;
       }
-      button:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary-color, #03a9f4) 45%, transparent); outline-offset: 2px; }
+      .fab:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary-color, #03a9f4) 45%, transparent); outline-offset: 2px; }
       [hidden] { display: none !important; }
-    </style><button part="button" aria-label="LLM Agent" title="LLM Agent" hidden><ha-icon icon="mdi:robot-outline"></ha-icon></button>`;
-    this.#button = this.#root.querySelector("button")!;
+    </style><button class="fab" part="button" aria-label="LLM Agent" title="LLM Agent" hidden><ha-icon icon="mdi:robot-outline"></ha-icon></button>`;
+    this.#button = this.#root.querySelector(".fab")!;
     this.#button.addEventListener("click", () => void this.open("open"));
   }
 
