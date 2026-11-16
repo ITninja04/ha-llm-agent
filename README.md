@@ -629,6 +629,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   fences close themselves, and Enter inside a code block adds a line.
 - **0.9.9 (released):** the agent can look back at its earlier chats (past_chats, read_chat), and
   change_history's until date now includes that whole day.
+- **0.9.10 (released):** the Usage view has an all-time total, and the days before it started
+  tracking by model come from the daily cap's record.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
