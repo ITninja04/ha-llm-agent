@@ -633,6 +633,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   tracking by model come from the daily cap's record.
 - **0.10.0 (released):** a floating chat on every Home Assistant page, and each message can carry
   the page you are looking at (dashboard entities, the editor you are in, an open entity).
+- **0.10.1 (released):** page context on Home Assistant's default Overview includes the entities
+  shown there.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
