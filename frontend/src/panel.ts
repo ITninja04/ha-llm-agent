@@ -17,6 +17,7 @@ import "./changes";
 import "./notes";
 import "./usage";
 import { openInHa } from "./settings";
+import { type PageContext, currentSelection } from "./pagecontext";
 import { styles } from "./styles";
 import type {
   ChatEvent,
@@ -48,11 +49,19 @@ const EMPTY_USAGE: Usage = {
   cost: 0,
 };
 
+// The floating chat (and the e2e test) read the page with the same collector the chip
+// shows, from this one bundle.
+export { collectPageContext } from "./pagecontext";
+export type { PageContext } from "./pagecontext";
+
 class LlmAgentPanel extends LitElement {
   static styles = styles;
 
   @property({ attribute: false }) hass?: Hass;
   @property({ type: Boolean }) narrow = false;
+  /** The page the person is on, set by the floating chat. The full panel at /llm-agent
+   * never sets it, so it shows no page chip. */
+  @property({ attribute: false }) pageContext?: PageContext;
 
   @state() private info?: Info;
   @state() private convs: ConvSummary[] = [];
@@ -98,6 +107,8 @@ class LlmAgentPanel extends LitElement {
   @state() private showChanges = false;
   @state() private view: "changes" | "notes" | "usage" = "changes";
   @state() private mentionIndex = 0;
+  /** The page chip switched off for the next messages. On again when the page changes. */
+  @state() private pageOff = false;
   private mentionStart = -1;
 
   @query(".composer textarea") private source?: HTMLTextAreaElement;
@@ -155,6 +166,26 @@ class LlmAgentPanel extends LitElement {
       mine && mine.provider_id === p.id && mine.model
         ? mine.model
         : p.default_model;
+  }
+
+  protected willUpdate(changed: PropertyValues): void {
+    if (changed.has("pageContext")) {
+      const old = changed.get("pageContext") as PageContext | undefined;
+      const now = this.pageContext;
+      if (old?.path !== now?.path || old?.summary !== now?.summary) this.pageOff = false;
+    }
+  }
+
+  /** The page to send with a message: the chip's page with the latest selection, or
+   * nothing when the chip is off or there is no page. */
+  private pageToSend(): PageContext | undefined {
+    const page = this.pageContext;
+    if (!page || this.pageOff) return undefined;
+    const selection = currentSelection();
+    const details = { ...page.details };
+    if (selection) details.selection = selection;
+    else delete details.selection;
+    return { ...page, details };
   }
 
   protected updated(changed: PropertyValues): void {
@@ -488,6 +519,11 @@ class LlmAgentPanel extends LitElement {
         : this.photos;
     const files =
       retry !== undefined ? (prev?.kind === "user" && prev.files) || [] : this.files;
+    // a retry asks the same question about the same page
+    const page =
+      retry !== undefined && prev?.kind === "user" && prev.pageData
+        ? prev.pageData
+        : this.pageToSend();
     let text = retry ?? this.composed.trim();
     // the server needs some text; file names make a better chat title than a placeholder
     if (!text && files.length) text = `(${files.map((f) => f.name).join(", ")})`;
@@ -541,6 +577,8 @@ class LlmAgentPanel extends LitElement {
         text,
         images: photos.length ? photos : undefined,
         files: files.length ? files : undefined,
+        page: page?.summary,
+        pageData: page,
       },
       { kind: "assistant", text: "" },
     ];
@@ -579,6 +617,7 @@ class LlmAgentPanel extends LitElement {
           files: files.length
             ? files.map(({ name, data }) => ({ name, data }))
             : undefined,
+          page,
         },
         // a reconnect must never send the message again
         { resubscribe: false },
@@ -1503,6 +1542,13 @@ class LlmAgentPanel extends LitElement {
           <div class="msg user md">
             ${this.renderPhotos(item)}${unsafeHTML(withChips(renderMarkdown(item.text), this.hass))}
           </div>
+          ${
+            item.page
+              ? html`<div class="page-note">
+                  <ha-icon icon="mdi:file-eye-outline"></ha-icon>${t("page_sent", { page: item.page })}
+                </div>`
+              : nothing
+          }
         </div>`;
       case "assistant":
         if (!item.text) {
@@ -1782,7 +1828,21 @@ class LlmAgentPanel extends LitElement {
   private renderComposer(): TemplateResult {
     const p = this.provider;
     const listId = "models";
+    const page = this.pageContext;
     return html`<footer>
+      ${
+        page
+          ? html`<button
+              class="page-chip ${this.pageOff ? "off" : ""}"
+              aria-pressed=${!this.pageOff}
+              title=${`${page.path}\n${t(this.pageOff ? "page_chip_off" : "page_chip_on")}`}
+              @click=${() => (this.pageOff = !this.pageOff)}
+            >
+              <ha-icon icon=${this.pageOff ? "mdi:file-remove-outline" : "mdi:file-eye-outline"}></ha-icon>
+              <span>${t("page_chip", { page: page.summary })}</span>
+            </button>`
+          : nothing
+      }
       <div class="composer ${this.dragging ? "dragging" : ""}">
         <textarea
           rows="1"
@@ -2212,7 +2272,13 @@ function toItems(messages: StoredMessage[]): Item[] {
   >();
   for (const m of messages) {
     if (m.role === "user")
-      items.push({ kind: "user", text: m.content, photos: m.photos, files: m.files });
+      items.push({
+        kind: "user",
+        text: m.content,
+        photos: m.photos,
+        files: m.files,
+        page: m.page,
+      });
     else if (m.role === "assistant") {
       if (m.content) items.push({ kind: "assistant", text: m.content });
       for (const c of m.tool_calls)
