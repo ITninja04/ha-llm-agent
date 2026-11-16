@@ -631,6 +631,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   change_history's until date now includes that whole day.
 - **0.9.10 (released):** the Usage view has an all-time total, and the days before it started
   tracking by model come from the daily cap's record.
+- **0.10.0 (released):** a floating chat on every Home Assistant page, and each message can carry
+  the page you are looking at (dashboard entities, the editor you are in, an open entity).
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
