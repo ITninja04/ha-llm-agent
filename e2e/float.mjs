@@ -56,6 +56,12 @@ let r = await rect();
 if (Math.round(r.width) !== 420 || Math.round(r.height) !== 620) fail(`window is ${r.width}x${r.height}, not 420x620`);
 if ((await panel.getAttribute("embedded")) === null) fail("the panel in the window is not embedded");
 if (await panel.locator("nav").isVisible().catch(() => false)) fail("the chat list sidebar shows in the window");
+// the window tells the panel which page it is on, and the composer shows it as a chip
+const chip = panel.locator(".page-chip");
+await chip.waitFor({ timeout: 10000 });
+const here = await page.evaluate(() => location.pathname + location.search);
+if ((await chip.getAttribute("title"))?.split("\n")[0] !== here)
+  fail(`chip on ${here} is for ${await chip.getAttribute("title")}`);
 
 // 2. a message and its reply, in the same store as the panel
 await panel.getByRole("button", { name: "New chat" }).first().click();
@@ -110,6 +116,10 @@ const ctxPath = () => panel.evaluate((p) => p.pageContext?.path);
 const onIntegrations = async () => (await ctxPath())?.startsWith("/config/integrations");
 for (let i = 0; i < 30 && !(await onIntegrations()); i++) await page.waitForTimeout(100);
 if (!(await onIntegrations())) fail(`page context path is ${await ctxPath()}`);
+for (let i = 0; i < 30 && !(await chip.getAttribute("title"))?.startsWith("/config/integrations"); i++)
+  await page.waitForTimeout(100);
+if (!(await chip.getAttribute("title"))?.startsWith("/config/integrations"))
+  fail(`the chip did not follow navigation: ${await chip.getAttribute("title")}`);
 await page.waitForTimeout(500);
 await page.screenshot({ path: `${shots}/llm-agent-float-4-integrations.png` });
 
