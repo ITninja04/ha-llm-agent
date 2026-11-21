@@ -526,6 +526,25 @@ class HomeNotes:
     ) -> dict[str, Any]:
         """Add a note (no id) or change one. Raises Refused. `new_id` names a new note,
         so an undo snapshot can be written before the note exists."""
+        old, new_text, on = self._check_note(note_id, text, enabled)
+        note = self._put(
+            self.notes, old, {"text": new_text, "enabled": on}, by, user_id, new_id or new_note_id()
+        )
+        self._changed()
+        return note
+
+    def check_note(
+        self, note_id: str | None, text: str | None = None, enabled: bool | None = None
+    ) -> None:
+        """Raise Refused if save_note would, without saving. The AI's suggestion card
+        calls this before it is shown: checking only on apply had a person approve three
+        cards in a row on 2026-11-18 that could never be saved, because 34 characters
+        were left."""
+        self._check_note(note_id, text, enabled)
+
+    def _check_note(
+        self, note_id: str | None, text: str | None, enabled: bool | None
+    ) -> tuple[dict[str, Any] | None, str, bool]:
         old = self._find(self.notes, note_id, "note")
         if old is None and len(self.notes) >= NOTES_COUNT_MAX:
             raise Refused(
@@ -538,20 +557,31 @@ class HomeNotes:
             if len(new_text) > NOTE_MAX:
                 raise Refused(
                     f"A note can be at most {NOTE_MAX} characters; this one has "
-                    f"{len(new_text)}. Shorten it, or put longer text in the knowledge base."
+                    f"{len(new_text)}. Put longer text, history or steps in the knowledge "
+                    "base instead, and keep a note to the one current fact."
                 )
         on = (old.get("enabled", True) if old else True) if enabled is None else enabled
         if on and len(new_text) > (left := self.room(exclude=note_id)):
-            raise Refused(
-                f"Enabled notes can use {NOTES_MAX} characters in all and {max(left, 0)} "
-                f"are left; this note has {len(new_text)}. Shorten it, or disable or "
-                "remove another note."
-            )
-        note = self._put(
-            self.notes, old, {"text": new_text, "enabled": on}, by, user_id, new_id or new_note_id()
+            raise Refused(self._no_room(max(left, 0), len(new_text), note_id))
+        return old, new_text, on
+
+    def _no_room(self, left: int, size: int, exclude: str | None) -> str:
+        # The old message said "Shorten it", and the model did exactly that, three times
+        # for one fact, and then gave up without storing it. So it names the two ways out
+        # that keep the fact whole, with the ids the model needs to act on the second.
+        longest = sorted(
+            (n for n in self.notes if n.get("enabled") and n["id"] != exclude),
+            key=lambda n: len(n["text"]),
+            reverse=True,
+        )[:3]
+        names = ", ".join(f"{n['id']} ({len(n['text'])} characters)" for n in longest)
+        return (
+            f"Enabled notes can use {NOTES_MAX} characters in all and {left} are left; "
+            f"this note has {size}. Do not cut it down to fit. Put it in the knowledge "
+            "base instead, where longer reference, history and steps belong, or make room "
+            "by editing or disabling an older note."
+            + (f" Longest enabled notes: {names}." if names else "")
         )
-        self._changed()
-        return note
 
     def remove_note(self, note_id: str) -> None:
         self._remove(self.notes, note_id, "note")

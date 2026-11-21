@@ -23,7 +23,7 @@ from custom_components.llm_agent.tools import ToolContext, ToolError, build_tool
 from custom_components.llm_agent.tools.system import restore_snapshot
 
 from .conftest import entry_options
-from .test_agent import ScriptedProvider, reply_text
+from .test_agent import ScriptedProvider, reply_text, reply_tool
 from .test_init import _setup
 
 
@@ -335,6 +335,114 @@ async def test_an_approved_add_that_no_longer_fits_is_refused_with_the_room_left
         home.save_note(None, "z" * NOTE_MAX)
     with pytest.raises(ToolError, match="are left"):
         await tool.run(ctx, args)
+
+
+def _fill_live_notes(home) -> dict[str, int]:
+    """The notes as they were on the live install on 2026-11-20: eight notes, 34
+    characters left. Returns each id's length."""
+    sizes = [152, 380, 216, 156, 408, 167, 334, 153]
+    for size in sizes:
+        home.save_note(None, "x" * min(size, NOTE_MAX))
+    # three migrated notes were over the per-note limit, which the migration keeps
+    for note, size in zip(home.notes, sizes, strict=True):
+        note["text"] = "x" * size
+    assert home.room() == 34
+    return {n["id"]: len(n["text"]) for n in home.notes}
+
+
+async def test_a_note_that_cannot_fit_is_refused_before_the_card_with_the_ways_out(
+    hass: HomeAssistant, tmp_path: Path
+) -> None:
+    # The live failure: three cards approved in a row for a 240, 184 and 160 character
+    # note with 34 left, each refused only after approval, each answered by a shorter
+    # rewrite, and the fact never stored.
+    hass.config.config_dir = str(tmp_path)
+    entry = await _setup(hass)
+    sizes = _fill_live_notes(entry.runtime_data.store.home)
+    ctx = ToolContext(hass, None, entry_options(), Snapshots(hass))
+    tool = _tool()
+    args = tool.check_args({"action": "add", "text": "k" * 240})
+    with pytest.raises(ToolError) as refused:
+        await tool.preview(ctx, args)
+    text = str(refused.value)
+    assert "34 are left; this note has 240" in text
+    assert "knowledge base" in text and "change_knowledge" in text
+    assert "editing or disabling an older note" in text
+    assert "Shorten it" not in text
+    longest = sorted(sizes, key=sizes.get, reverse=True)[:3]
+    assert f"{longest[0]} (408 characters), {longest[1]} (380 characters), " in text
+    assert f"{longest[2]} (334 characters)" in text
+    # Disabling or removing a note is never refused for room.
+    for action in ("disable", "remove"):
+        await tool.preview(ctx, tool.check_args({"action": action, "id": longest[0]}))
+
+
+async def test_a_chat_gets_the_refusal_at_once_and_no_card_is_shown(
+    hass: HomeAssistant, hass_ws_client
+) -> None:
+    entry = await _setup(hass)
+    _fill_live_notes(entry.runtime_data.store.home)
+    client = await hass_ws_client(hass)
+    provider = ScriptedProvider(
+        [
+            reply_tool("c1", "change_home_note", {"action": "add", "text": "k" * 184}),
+            reply_text("Saved it as knowledge instead."),
+        ]
+    )
+    events = []
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        await client.send_json_auto_id({"type": "llm_agent/chat", "text": "remember this"})
+        assert (await client.receive_json())["success"]
+        while (event := (await client.receive_json())["event"])["type"] != "done":
+            events.append(event)
+    assert not [e for e in events if e["type"] == "approval"]
+    result = next(m for m in provider.calls[1]["messages"] if m["role"] == "tool")
+    assert "34 are left; this note has 184" in str(result["content"])
+    assert "change_knowledge" in str(result["content"])
+
+
+async def test_a_note_over_the_per_note_limit_is_pointed_at_the_knowledge_base(
+    hass: HomeAssistant,
+) -> None:
+    with pytest.raises(ToolError) as too_long:
+        _tool().check_args({"action": "add", "text": "x" * (NOTE_MAX + 1)})
+    assert "change_knowledge" in str(too_long.value)
+    store = ConversationStore(hass)
+    await store.async_load()
+    with pytest.raises(Refused) as refused:  # the panel's words: no tool names
+        store.home.save_note(None, "x" * (NOTE_MAX + 1))
+    assert "knowledge base" in str(refused.value)
+    assert "change_knowledge" not in str(refused.value)
+
+
+async def test_the_prompt_shows_the_room_left_and_where_longer_facts_go(
+    hass: HomeAssistant, hass_ws_client
+) -> None:
+    entry = await _setup(hass)
+    home = entry.runtime_data.store.home
+    home.save_note(None, "Office is upstairs.")
+    client = await hass_ws_client(hass)
+    system = await _chat_system(hass, client)
+    left = NOTES_MAX - len("Office is upstairs.")
+    assert f"The [id] is for change_home_note. {left} of {NOTES_MAX} characters left):" in system
+    # No entries yet, and the knowledge base is still named, with when to use it.
+    assert (
+        "Home knowledge base: empty. Put longer reference about this home there with "
+        "change_knowledge: anything over about 200 characters" in system
+    )
+    # Section 6 routes long facts and history to the knowledge base.
+    assert "A note is one short, current fact." in system
+    assert "A fact longer than about 200 characters." in system
+    assert "dated events, backup file paths, how something was fixed" in system
+    assert "do not cut it down until it fits" in system
+
+    home.save_entry(None, "Boiler", "Zones and timers", "Zone 2 is upstairs.")
+    system = await _chat_system(hass, client)
+    assert "knowledge base: empty" not in system
+    assert (
+        "read an entry with read_knowledge when a question touches it. Add longer "
+        "reference, history and steps with change_knowledge.):" in system
+    )
 
 
 async def test_undo_of_a_change_from_before_the_note_list_still_works(

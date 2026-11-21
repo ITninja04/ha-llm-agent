@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 import json
+import logging
 from typing import Any, Literal
 
 from homeassistant.components import conversation
@@ -22,11 +23,19 @@ from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 import probatio
 
-from .const import DOMAIN, NAME
+from .const import CONF_MAX_REPLY_TOKENS, DOMAIN, NAME, RANGES, setting
 from .providers import ProviderConfig, ProviderError, make_provider
-from .providers.base import Done, TextDelta, ToolCall, ToolSpec
+from .providers.base import Done, TextDelta, ToolCall, ToolSpec, Usage
+
+_LOGGER = logging.getLogger(__name__)
 
 MAX_ITERATIONS = 10
+# Spoken when a reasoning model spends its whole reply length thinking twice. Raised as an
+# error so Assist says it, instead of answering with silence.
+THINKING_LIMIT = (
+    "The model used its whole reply length on thinking and gave no answer. Raise Maximum "
+    "reply length in the LLM Agent settings, under Cost and limits."
+)
 VOICE_PROMPT = (
     "You are a voice assistant for Home Assistant. Answer briefly in plain sentences "
     "without markdown; replies may be spoken aloud."
@@ -83,22 +92,52 @@ class LLMAgentConversationEntity(
         provider = make_provider(async_get_clientsession(self.hass), self.provider_config)
         api = chat_log.llm_api
         specs = [_tool_spec(t, api.custom_serializer) for t in api.tools] if api else []
+        # The same budget and the same one retry as a panel chat. A fixed 2048 used to be
+        # sent here, and on reasoning models (deepseek-flash via OpenRouter, measured
+        # 2026-11-20 in the panel at 16,000) thinking counts against it, so a voice reply
+        # could stop with nothing to say and no sign why. The voice prompt is what keeps
+        # spoken answers short. The limit only stops runaway thinking.
+        budget = setting(self.entry.runtime_data.options, CONF_MAX_REPLY_TOKENS)
+        ceiling = int(RANGES[CONF_MAX_REPLY_TOKENS][1])
+        raised = False
+        model = self.provider_config.default_model
         for _ in range(MAX_ITERATIONS):
             system, messages = _chat_log_to_messages(chat_log)
             stream = provider.stream(
-                model=self.provider_config.default_model,
+                model=model,
                 system=system,
                 messages=messages,
                 tools=specs,
-                max_tokens=2048,
+                max_tokens=budget,
             )
+            seen = _Seen()
             try:
                 async for _content in chat_log.async_add_delta_content_stream(
-                    self.entity_id, _to_deltas(stream, self.provider_config.type)
+                    self.entity_id, _to_deltas(stream, self.provider_config.type, seen)
                 ):
                     pass
             except ProviderError as err:
                 raise HomeAssistantError(str(err)) from err
+            if seen.stop in ("max_tokens", "length") and not seen.calls:
+                _LOGGER.warning(
+                    "Voice reply from %s/%s stopped at the length limit of %d tokens: "
+                    "out=%d, of which thinking=%d, visible characters=%d",
+                    self.provider_config.type,
+                    model,
+                    budget,
+                    seen.usage.output_tokens,
+                    seen.usage.reasoning_tokens,
+                    seen.chars,
+                )
+                if not seen.text.strip():
+                    if raised or budget >= ceiling:
+                        raise HomeAssistantError(THINKING_LIMIT)
+                    # Drop the empty reply so the retry starts from the same history.
+                    last = chat_log.content[-1] if chat_log.content else None
+                    if isinstance(last, conversation.AssistantContent) and not last.content:
+                        chat_log.content.pop()
+                    raised, budget = True, min(budget * 2, ceiling)
+                    continue
             if not chat_log.unresponded_tool_results:
                 break
         return conversation.async_get_result_from_chat_log(user_input, chat_log)
@@ -114,18 +153,40 @@ def _tool_spec(tool: llm.Tool, serializer: Any) -> ToolSpec:
     return ToolSpec(tool.name, tool.description or tool.name, schema)
 
 
+class _Seen:
+    """What one streamed reply held, for deciding whether it stopped at the length
+    limit with nothing to say."""
+
+    def __init__(self) -> None:
+        self.text = ""
+        self.calls = 0
+        self.stop: str | None = None
+        self.usage = Usage()
+
+    @property
+    def chars(self) -> int:
+        return len(self.text)
+
+
 async def _to_deltas(
-    stream: AsyncIterator[Any], provider_type: str
+    stream: AsyncIterator[Any], provider_type: str, seen: _Seen | None = None
 ) -> AsyncIterator[dict[str, Any]]:
+    seen = seen or _Seen()
     yield {"role": "assistant"}
     calls: list[llm.ToolInput] = []
     async for event in stream:
         if isinstance(event, TextDelta):
+            seen.text += event.text
             yield {"content": event.text}
         elif isinstance(event, ToolCall):
             calls.append(llm.ToolInput(tool_name=event.name, tool_args=event.args, id=event.id))
-        elif isinstance(event, Done) and event.raw:
-            yield {"native": event.raw}
+        elif isinstance(event, Usage):
+            seen.usage = event
+        elif isinstance(event, Done):
+            seen.stop = event.stop_reason
+            if event.raw:
+                yield {"native": event.raw}
+    seen.calls = len(calls)
     if calls:
         yield {"tool_calls": calls}
 

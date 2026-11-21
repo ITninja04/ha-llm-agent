@@ -96,7 +96,7 @@
             "data_description": {
               "daily_spend_cap": "Stop and ask once today's estimated cost passes this amount. 0 means no cap. Models with unknown prices are not counted.",
               "max_steps": "The turn stops (and offers Continue) after this many tool calls.",
-              "max_reply_tokens": "The longest single reply the model may write. Large dashboards need room; 16,000 is plenty for most.",
+              "max_reply_tokens": "The longest single reply the model may write, in the panel and in Assist. Large dashboards need room; 16,000 is plenty for most.",
               "price_overrides": "Per-model prices in USD per million tokens, keyed by model id, each with input, output and optional cache_read. Example: my-model with input 1 and output 4. Used only for the cost estimate. Built-in prices were checked on {prices_checked}; OpenRouter prices come live from OpenRouter."
             }
           },
