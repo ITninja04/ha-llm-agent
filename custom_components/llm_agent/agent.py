@@ -43,13 +43,8 @@ from .const import (
     CONF_KEEP_TURNS,
     CONF_LOG_PROMPTS,
     CONF_MANAGER,
-    CONF_MANAGER_CONTINUES,
-    CONF_MANAGER_DONE,
-    CONF_MANAGER_DRIFTING,
     CONF_MANAGER_EVERY,
     CONF_MANAGER_MODEL,
-    CONF_MANAGER_REPEAT,
-    CONF_MANAGER_RESUME,
     CONF_MANAGER_STUCK,
     CONF_MAX_CHATS,
     CONF_MAX_REPLY_TOKENS,
@@ -76,7 +71,7 @@ from .const import (
     RANGES,
     setting,
 )
-from .manager import JevDecider, Thresholds, Watch, with_steers
+from .manager import JevDecider, Watch, with_steers
 from .page import UNTRUSTED_NOTE as PAGE_UNTRUSTED_NOTE, label as page_label, render as render_page
 from .phone import MAX_TEXT as PHONE_MAX_TEXT, PhoneApprovals, phone_service
 from .providers import ProviderConfig, ProviderError, make_provider
@@ -693,7 +688,6 @@ class ChatRun:
         budget = setting(options, CONF_MAX_REPLY_TOKENS)
         raised = False
         watch = self._watch(text)
-        base_steps = max_steps  # what one auto-continue at the limit adds
         check: asyncio.Task[Any] | None = None
         try:
             if images:
@@ -820,38 +814,14 @@ class ChatRun:
                     break
                 elif cut:
                     self._stopped("length")
-                said = "".join(text_parts)
-                if watch and not calls and steps and done.stop_reason != "refusal":
-                    at = "length" if cut else "empty" if not said.strip() else None
-                    if at and conv["messages"][-2]["role"] == "tool":
-                        record = await self._manage(watch, at, steps, max_steps, said)
-                        if record and record["action"] == "continue":
-                            # The empty reply goes, and the next request ends on the tool
-                            # result that now carries the steer, as if it had just come.
-                            conv["messages"].pop()
-                            self._attach(record, conv["messages"][-1])
-                            continue
-                        if record:
-                            self._attach(record, conv["messages"][-1])
                 if not calls:
                     if steps > max_steps and not conv.get("stopped"):
                         self._stopped("tool_limit")
                     break
-                record, check_at = None, None
-                if watch:
+                if watch and watch.due_every(steps, len(calls), max_steps):
+                    # Runs while the tools run: its answer is for the next step.
                     pending = [(c.name, c.args) for c in calls]
-                    check_at = watch.due(steps, pending, max_steps)
-                    if check_at == "tool_limit":
-                        # Asked before any call is refused, so a continue lets these run
-                        # as if the limit had been higher, and the model never sees one.
-                        record = await self._manage(
-                            watch, check_at, steps, max_steps, said, pending
-                        )
-                        if record and record["action"] == "continue":
-                            max_steps += base_steps
-                    elif check_at:
-                        # Runs while the tools run: its answer is for the next step.
-                        check = asyncio.ensure_future(watch.ask(check_at, max_steps, pending))
+                    check = asyncio.ensure_future(watch.ask(max_steps, pending))
                 steps += len(calls)
                 over = steps > max_steps
                 await self._run_calls(calls, tools, over)
@@ -859,13 +829,14 @@ class ChatRun:
                     watch.record(
                         [(c.id, c.name, c.args) for c in calls],
                         conv["messages"][-len(calls) :],
-                        said,
+                        "".join(text_parts),
                     )
-                    if check is not None and check_at:
+                    record = None
+                    if check is not None:
                         task, check = check, None
-                        record = await self._manage(
-                            watch, check_at, steps, max_steps, said, None, task
-                        )
+                        record = await self._manage(watch, "every", steps, task)
+                    elif watch.due_failing(max_steps):
+                        record = await self._manage(watch, "failing", steps, watch.ask(max_steps))
                     if record:
                         self._attach(record, conv["messages"][-1])
                 agent.store.save(conv)
@@ -959,35 +930,20 @@ class ChatRun:
             pconf.api_key or "",
             options.get(CONF_MANAGER_MODEL) or DEFAULT_OPTIONS[CONF_MANAGER_MODEL],
         )
-        thresholds = Thresholds(
-            stuck=setting(options, CONF_MANAGER_STUCK),
-            drifting=setting(options, CONF_MANAGER_DRIFTING),
-            repeat=setting(options, CONF_MANAGER_REPEAT),
-            done=setting(options, CONF_MANAGER_DONE),
-            resume=setting(options, CONF_MANAGER_RESUME),
-        )
         return Watch(
             decider,
-            thresholds,
+            setting(options, CONF_MANAGER_STUCK),
             setting(options, CONF_MANAGER_EVERY),
-            setting(options, CONF_MANAGER_CONTINUES),
             request,
         )
 
     async def _manage(
-        self,
-        watch: Watch,
-        at: str,
-        calls: int,
-        limit: int,
-        said: str,
-        pending: list[tuple[str, Any]] | None = None,
-        task: Awaitable[Any] | None = None,
+        self, watch: Watch, at: str, calls: int, task: Awaitable[Any]
     ) -> dict[str, Any] | None:
         """One Manager check: await its answer, count what it cost, show the note. None is
         no decision, and the turn goes on as it would with the Manager off."""
         try:
-            decision = await (task or watch.ask(at, limit, pending, said))
+            decision = await task
         except Exception:
             _LOGGER.debug("Manager check failed", exc_info=True)
             return None

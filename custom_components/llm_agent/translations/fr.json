@@ -212,23 +212,13 @@
               "manager": "Superviseur",
               "manager_model": "Modèle du superviseur",
               "manager_every": "Vérifier tous les",
-              "manager_stuck_at": "Seuil : bloqué",
-              "manager_drifting_at": "Seuil : hors sujet",
-              "manager_repeat_at": "Seuil : se répète",
-              "manager_done_at": "Seuil : terminé",
-              "manager_resume_at": "Seuil : continuer seul",
-              "manager_max_continues": "Continuations automatiques max. par message"
+              "manager_stuck_at": "Seuil : bloqué"
             },
             "data_description": {
-              "manager": "Un modèle de décision examine les longues réponses toutes les quelques actions d'outils et prévient l'IA quand elle est bloquée, se répète ou a terminé. Nécessite un fournisseur OpenRouter et utilise sa clé. Chaque vérification coûte environ 0,0001 $ et compte dans le plafond journalier. Une note dans le chat montre chaque vérification.",
-              "manager_model": "L'id d'un modèle de décision OpenRouter. Les valeurs par défaut ont été testées avec typesafe/jev-1.14.",
-              "manager_every": "Appels d'outils entre deux vérifications. Il vérifie aussi aussitôt quand l'IA répète un appel identique et quand une réponse va s'arrêter.",
-              "manager_stuck_at": "À quel point (de 0 à 1) le superviseur doit être sûr que l'IA est bloquée avant de lui demander de changer d'approche.",
-              "manager_drifting_at": "À quel point il doit être sûr que l'IA fait des choses que vous n'avez pas demandées. Élevé par défaut : lors des tests, ces réponses étaient souvent fausses.",
-              "manager_repeat_at": "À quel point il doit être sûr que l'IA répète des appels dont elle a déjà les résultats.",
-              "manager_done_at": "À quel point il doit être sûr que le travail est terminé avant de demander à l'IA de répondre.",
-              "manager_resume_at": "À quel point il doit être sûr qu'une réponse arrêtée doit continuer avant de la poursuivre pour vous. Élevé par défaut : lors des tests, il ne savait pas distinguer les arrêts qui en avaient besoin.",
-              "manager_max_continues": "Nombre maximal de fois où le superviseur poursuit seul un message. 0 désactive cette option ; le bouton Continuer fonctionne toujours."
+              "manager": "Un modèle de décision examine les longues réponses toutes les quelques actions d'outils, et aussitôt après 3 appels échoués d'affilée. Quand il est sûr que l'IA tourne en rond, il lui demande d'essayer autrement ou de vous dire ce qui la bloque. Nécessite un fournisseur OpenRouter et utilise sa clé. Chaque vérification coûte environ 0,0001 $ et compte dans le plafond journalier. Une note dans le chat montre chaque vérification.",
+              "manager_model": "L'id d'un modèle de décision OpenRouter. Le seuil par défaut a été testé avec typesafe/jev-1.14.",
+              "manager_every": "Appels d'outils entre deux vérifications.",
+              "manager_stuck_at": "À quel point (de 0 à 1) le superviseur doit être sûr que l'IA est bloquée avant d'intervenir."
             }
           }
         }

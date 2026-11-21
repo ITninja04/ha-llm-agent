@@ -212,23 +212,13 @@
               "manager": "主管",
               "manager_model": "主管模型",
               "manager_every": "检查间隔",
-              "manager_stuck_at": "阈值：卡住",
-              "manager_drifting_at": "阈值：偏题",
-              "manager_repeat_at": "阈值：重复",
-              "manager_done_at": "阈值：已完成",
-              "manager_resume_at": "阈值：自动继续",
-              "manager_max_continues": "每条消息最多自动继续次数"
+              "manager_stuck_at": "阈值：卡住"
             },
             "data_description": {
-              "manager": "一个决策模型每隔几次工具调用查看一次较长的回复，在 AI 卡住、重复或已经完成时提醒它。需要一个 OpenRouter 提供方并使用其密钥。每次检查约 0.0001 美元，计入每日上限。聊天中的备注会显示每次检查。",
-              "manager_model": "OpenRouter 上决策模型的 ID。默认值是用 typesafe/jev-1.14 测试得出的。",
-              "manager_every": "两次检查之间的工具调用次数。AI 重复完全相同的调用时、以及回复即将停止时，也会立即检查。",
-              "manager_stuck_at": "主管需要多确定（0 到 1）AI 卡住了，才会让它换一种做法。",
-              "manager_drifting_at": "需要多确定 AI 在做你没要求的事。默认较高：测试中这类判断大多是错的。",
-              "manager_repeat_at": "需要多确定 AI 在重复已有结果的调用。",
-              "manager_done_at": "需要多确定工作已完成，才会让 AI 作答。",
-              "manager_resume_at": "需要多确定停下的回复应该继续，才会替你继续。默认较高：测试中它分辨不出哪些停止需要继续。",
-              "manager_max_continues": "主管自行继续同一条消息的最多次数。0 表示关闭；“继续”按钮照常可用。"
+              "manager": "一个决策模型每隔几次工具调用查看一次较长的回复，连续 3 次调用失败时也会立即查看。当它确定 AI 卡在反复重试时，会让 AI 换一种做法，或告诉你是什么挡住了它。需要一个 OpenRouter 提供方并使用其密钥。每次检查约 0.0001 美元，计入每日上限。聊天中的备注会显示每次检查。",
+              "manager_model": "OpenRouter 上决策模型的 ID。默认阈值是用 typesafe/jev-1.14 测试得出的。",
+              "manager_every": "两次检查之间的工具调用次数。",
+              "manager_stuck_at": "主管需要多确定（0 到 1）AI 卡住了，才会介入。"
             }
           }
         }

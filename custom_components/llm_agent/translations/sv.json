@@ -212,23 +212,13 @@
               "manager": "Handledare",
               "manager_model": "Handledarens modell",
               "manager_every": "Kontrollera var",
-              "manager_stuck_at": "Tröskel: fastnat",
-              "manager_drifting_at": "Tröskel: utanför ämnet",
-              "manager_repeat_at": "Tröskel: upprepar sig",
-              "manager_done_at": "Tröskel: klar",
-              "manager_resume_at": "Tröskel: fortsätt själv",
-              "manager_max_continues": "Högst automatiska fortsättningar per meddelande"
+              "manager_stuck_at": "Tröskel: fastnat"
             },
             "data_description": {
-              "manager": "En beslutsmodell tittar på långa svar med några verktygsanrops mellanrum och ger AI:n en knuff när den har fastnat, upprepar sig eller är klar. Kräver en OpenRouter-leverantör och använder dess nyckel. Varje kontroll kostar ungefär 0,0001 $ och räknas in i dagstaket. En notering i chatten visar varje kontroll.",
-              "manager_model": "Id för en beslutsmodell hos OpenRouter. Standardvärdena testades med typesafe/jev-1.14.",
-              "manager_every": "Verktygsanrop mellan kontrollerna. Den kontrollerar också direkt när AI:n upprepar ett identiskt anrop och när ett svar är på väg att stanna.",
-              "manager_stuck_at": "Hur säker (0 till 1) handledaren måste vara på att AI:n har fastnat innan den ber den byta angreppssätt.",
-              "manager_drifting_at": "Hur säker den måste vara på att AI:n gör saker du inte bad om. Högt som standard: i testerna var de svaren oftast fel.",
-              "manager_repeat_at": "Hur säker den måste vara på att AI:n upprepar anrop den redan har resultaten av.",
-              "manager_done_at": "Hur säker den måste vara på att arbetet är klart innan den ber AI:n svara.",
-              "manager_resume_at": "Hur säker den måste vara på att ett stoppat svar ska fortsätta innan den fortsätter det åt dig. Högt som standard: i testerna kunde den inte avgöra vilka stopp som behövde det.",
-              "manager_max_continues": "Hur många gånger handledaren högst fortsätter ett meddelande på egen hand. 0 stänger av det; knappen Fortsätt fungerar ändå."
+              "manager": "En beslutsmodell tittar på långa svar med några verktygsanrops mellanrum, och direkt efter 3 misslyckade anrop i rad. När den är säker på att AI:n har fastnat i att försöka igen ber den AI:n pröva ett annat sätt eller berätta för dig vad som stoppar den. Kräver en OpenRouter-leverantör och använder dess nyckel. Varje kontroll kostar ungefär 0,0001 $ och räknas in i dagstaket. En notering i chatten visar varje kontroll.",
+              "manager_model": "Id för en beslutsmodell hos OpenRouter. Standardtröskeln testades med typesafe/jev-1.14.",
+              "manager_every": "Verktygsanrop mellan kontrollerna.",
+              "manager_stuck_at": "Hur säker (0 till 1) handledaren måste vara på att AI:n har fastnat innan den griper in."
             }
           }
         }

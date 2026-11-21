@@ -212,23 +212,13 @@
               "manager": "Supervisor",
               "manager_model": "Modelo do supervisor",
               "manager_every": "Verificar a cada",
-              "manager_stuck_at": "Limite: travado",
-              "manager_drifting_at": "Limite: fora do assunto",
-              "manager_repeat_at": "Limite: repetindo",
-              "manager_done_at": "Limite: concluído",
-              "manager_resume_at": "Limite: continuar sozinho",
-              "manager_max_continues": "Máximo de continuações automáticas por mensagem"
+              "manager_stuck_at": "Limite: travado"
             },
             "data_description": {
-              "manager": "Um modelo de decisão confere as respostas longas a cada poucas chamadas de ferramentas e avisa a IA quando ela está travada, se repetindo ou já terminou. Precisa de um provedor OpenRouter e usa a chave dele. Cada verificação custa cerca de US$ 0,0001 e conta para o limite diário. Uma nota no chat mostra cada verificação.",
-              "manager_model": "O id de um modelo de decisão do OpenRouter. Os valores padrão foram testados com typesafe/jev-1.14.",
-              "manager_every": "Chamadas de ferramentas entre verificações. Também verifica na hora quando a IA repete uma chamada idêntica e quando uma resposta está para parar.",
-              "manager_stuck_at": "O quanto (de 0 a 1) o supervisor precisa ter certeza de que a IA travou antes de pedir que mude de abordagem.",
-              "manager_drifting_at": "O quanto precisa ter certeza de que a IA está fazendo coisas que você não pediu. Alto por padrão: nos testes, essas respostas costumavam estar erradas.",
-              "manager_repeat_at": "O quanto precisa ter certeza de que a IA repete chamadas cujos resultados já tem.",
-              "manager_done_at": "O quanto precisa ter certeza de que o trabalho terminou antes de mandar a IA responder.",
-              "manager_resume_at": "O quanto precisa ter certeza de que uma resposta parada deve seguir antes de continuá-la por você. Alto por padrão: nos testes ele não soube dizer quais paradas precisavam disso.",
-              "manager_max_continues": "Quantas vezes no máximo o supervisor continua uma mensagem sozinho. 0 desativa; o botão Continuar continua funcionando."
+              "manager": "Um modelo de decisão confere as respostas longas a cada poucas chamadas de ferramentas, e na hora após 3 chamadas com falha seguidas. Quando tem certeza de que a IA está travada tentando de novo, pede que ela tente outro caminho ou diga a você o que a bloqueia. Precisa de um provedor OpenRouter e usa a chave dele. Cada verificação custa cerca de US$ 0,0001 e conta para o limite diário. Uma nota no chat mostra cada verificação.",
+              "manager_model": "O id de um modelo de decisão do OpenRouter. O limite padrão foi testado com typesafe/jev-1.14.",
+              "manager_every": "Chamadas de ferramentas entre verificações.",
+              "manager_stuck_at": "O quanto (de 0 a 1) o supervisor precisa ter certeza de que a IA travou antes de intervir."
             }
           }
         }

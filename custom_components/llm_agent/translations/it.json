@@ -212,23 +212,13 @@
               "manager": "Supervisore",
               "manager_model": "Modello del supervisore",
               "manager_every": "Controlla ogni",
-              "manager_stuck_at": "Soglia: bloccato",
-              "manager_drifting_at": "Soglia: fuori tema",
-              "manager_repeat_at": "Soglia: si ripete",
-              "manager_done_at": "Soglia: finito",
-              "manager_resume_at": "Soglia: continua da solo",
-              "manager_max_continues": "Continuazioni automatiche massime per messaggio"
+              "manager_stuck_at": "Soglia: bloccato"
             },
             "data_description": {
-              "manager": "Un modello decisionale controlla le risposte lunghe ogni poche chiamate agli strumenti e avvisa l'IA quando è bloccata, si ripete o ha finito. Richiede un provider OpenRouter e ne usa la chiave. Ogni controllo costa circa 0,0001 $ e conta nel limite giornaliero. Una nota nella chat mostra ogni controllo.",
-              "manager_model": "L'id di un modello decisionale di OpenRouter. I valori predefiniti sono stati provati con typesafe/jev-1.14.",
-              "manager_every": "Chiamate agli strumenti tra un controllo e l'altro. Controlla anche subito quando l'IA ripete una chiamata identica e quando una risposta sta per fermarsi.",
-              "manager_stuck_at": "Quanto (da 0 a 1) il supervisore deve essere sicuro che l'IA sia bloccata prima di chiederle di cambiare approccio.",
-              "manager_drifting_at": "Quanto deve essere sicuro che l'IA stia facendo cose che non hai chiesto. Alto di default: nei test queste risposte erano per lo più sbagliate.",
-              "manager_repeat_at": "Quanto deve essere sicuro che l'IA ripeta chiamate di cui ha già i risultati.",
-              "manager_done_at": "Quanto deve essere sicuro che il lavoro sia finito prima di dire all'IA di rispondere.",
-              "manager_resume_at": "Quanto deve essere sicuro che una risposta fermata debba proseguire prima di continuarla per te. Alto di default: nei test non sapeva distinguere quali interruzioni ne avevano bisogno.",
-              "manager_max_continues": "Quante volte al massimo il supervisore continua da solo un messaggio. 0 lo disattiva; il pulsante Continua funziona comunque."
+              "manager": "Un modello decisionale controlla le risposte lunghe ogni poche chiamate agli strumenti, e subito dopo 3 chiamate fallite di fila. Quando è sicuro che l'IA è bloccata a riprovare, le chiede di provare un'altra strada o di dirti cosa la blocca. Richiede un provider OpenRouter e ne usa la chiave. Ogni controllo costa circa 0,0001 $ e conta nel limite giornaliero. Una nota nella chat mostra ogni controllo.",
+              "manager_model": "L'id di un modello decisionale di OpenRouter. La soglia predefinita è stata provata con typesafe/jev-1.14.",
+              "manager_every": "Chiamate agli strumenti tra un controllo e l'altro.",
+              "manager_stuck_at": "Quanto (da 0 a 1) il supervisore deve essere sicuro che l'IA sia bloccata prima di intervenire."
             }
           }
         }
