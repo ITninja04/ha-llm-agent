@@ -641,6 +641,9 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   double the room, then stops with a message that says which setting to raise.
 - **0.10.4 (released):** a hidden developer preview of the Notes view written with Solid
   2.0, off unless an admin turns it on. Nothing changes for anyone else.
+- **0.10.5 (released):** a home note that cannot fit is refused before you are asked to
+  approve it, longer facts and history go to the knowledge base instead, and voice replies
+  get the same retry when a reply's whole length goes on thinking.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
