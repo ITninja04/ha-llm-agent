@@ -205,6 +205,31 @@
               "reviewer_model": "Identyfikator modelu, na przykład claude-haiku-5-5 lub lokalny model Ollama. Puste pole używa domyślnego modelu dostawcy. Recenzent widzi twoją prośbę i działanie, nigdy wyniki narzędzi.",
               "always_ask": "Te działania zawsze trafiają do ciebie, niezależnie od opinii recenzenta. Rozdziel przecinkami: domain.service (lock.*), identyfikatory encji, nazwy narzędzi (shell) lub tool:action (integrations:remove). * pasuje do wszystkiego."
             }
+          },
+          "manager": {
+            "name": "Nadzorca (zaawansowane)",
+            "data": {
+              "manager": "Nadzorca",
+              "manager_model": "Model nadzorcy",
+              "manager_every": "Sprawdzaj co",
+              "manager_stuck_at": "Próg: utknął",
+              "manager_drifting_at": "Próg: nie na temat",
+              "manager_repeat_at": "Próg: powtarza się",
+              "manager_done_at": "Próg: skończone",
+              "manager_resume_at": "Próg: kontynuuj samodzielnie",
+              "manager_max_continues": "Maks. automatycznych kontynuacji na wiadomość"
+            },
+            "data_description": {
+              "manager": "Model decyzyjny co kilka wywołań narzędzi sprawdza długie odpowiedzi i daje AI wskazówkę, gdy utknęła, powtarza się albo skończyła. Wymaga dostawcy OpenRouter i używa jego klucza. Każde sprawdzenie kosztuje około 0,0001 $ i wlicza się do dziennego limitu. Notatka w czacie pokazuje każde sprawdzenie.",
+              "manager_model": "Identyfikator modelu decyzyjnego w OpenRouter. Wartości domyślne testowano z typesafe/jev-1.14.",
+              "manager_every": "Liczba wywołań narzędzi między sprawdzeniami. Sprawdza też od razu, gdy AI powtarza identyczne wywołanie i gdy odpowiedź ma się zatrzymać.",
+              "manager_stuck_at": "Jak pewny (od 0 do 1) musi być nadzorca, że AI utknęła, zanim każe jej zmienić podejście.",
+              "manager_drifting_at": "Jak pewny musi być, że AI robi rzeczy, o które nie prosiłeś. Domyślnie wysoko: w testach te odpowiedzi były zwykle błędne.",
+              "manager_repeat_at": "Jak pewny musi być, że AI powtarza wywołania, których wyniki już ma.",
+              "manager_done_at": "Jak pewny musi być, że praca jest skończona, zanim każe AI odpowiedzieć.",
+              "manager_resume_at": "Jak pewny musi być, że zatrzymana odpowiedź powinna trwać dalej, zanim ją za ciebie kontynuuje. Domyślnie wysoko: w testach nie umiał rozpoznać, które zatrzymania tego wymagały.",
+              "manager_max_continues": "Ile razy najwyżej nadzorca sam kontynuuje jedną wiadomość. 0 to wyłącza; przycisk Kontynuuj nadal działa."
+            }
           }
         }
       },

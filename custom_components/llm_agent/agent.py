@@ -42,6 +42,15 @@ from .const import (
     CONF_EXTRA_PROMPT,
     CONF_KEEP_TURNS,
     CONF_LOG_PROMPTS,
+    CONF_MANAGER,
+    CONF_MANAGER_CONTINUES,
+    CONF_MANAGER_DONE,
+    CONF_MANAGER_DRIFTING,
+    CONF_MANAGER_EVERY,
+    CONF_MANAGER_MODEL,
+    CONF_MANAGER_REPEAT,
+    CONF_MANAGER_RESUME,
+    CONF_MANAGER_STUCK,
     CONF_MAX_CHATS,
     CONF_MAX_REPLY_TOKENS,
     CONF_MAX_STEPS,
@@ -56,6 +65,7 @@ from .const import (
     CONF_UNDO_KEEP,
     CONF_UNDO_MB,
     DEFAULT_ALWAYS_ASK,
+    DEFAULT_OPTIONS,
     MAX_TOOL_RESULT_CHARS,
     MODE_ASK_RISKY,
     MODE_AUTOPILOT,
@@ -66,6 +76,7 @@ from .const import (
     RANGES,
     setting,
 )
+from .manager import JevDecider, Thresholds, Watch, with_steers
 from .page import UNTRUSTED_NOTE as PAGE_UNTRUSTED_NOTE, label as page_label, render as render_page
 from .phone import MAX_TEXT as PHONE_MAX_TEXT, PhoneApprovals, phone_service
 from .providers import ProviderConfig, ProviderError, make_provider
@@ -520,6 +531,7 @@ class ChatRun:
         self.text_so_far = ""
         self.task: asyncio.Task[None] | None = None
         self.long_price: tuple[int, Price] | None = None
+        self._manager_provider: ProviderConfig | None = None
 
     def emit(self, event: dict[str, Any]) -> None:
         if event["type"] == "delta":
@@ -680,6 +692,9 @@ class ChatRun:
         # chat: deepseek-flash via OpenRouter stopped at 16,000 with an empty reply.
         budget = setting(options, CONF_MAX_REPLY_TOKENS)
         raised = False
+        watch = self._watch(text)
+        base_steps = max_steps  # what one auto-continue at the limit adds
+        check: asyncio.Task[Any] | None = None
         try:
             if images:
                 # Sent with this turn only: the finally block drops them (_drop_turn_only).
@@ -805,13 +820,54 @@ class ChatRun:
                     break
                 elif cut:
                     self._stopped("length")
+                said = "".join(text_parts)
+                if watch and not calls and steps and done.stop_reason != "refusal":
+                    at = "length" if cut else "empty" if not said.strip() else None
+                    if at and conv["messages"][-2]["role"] == "tool":
+                        record = await self._manage(watch, at, steps, max_steps, said)
+                        if record and record["action"] == "continue":
+                            # The empty reply goes, and the next request ends on the tool
+                            # result that now carries the steer, as if it had just come.
+                            conv["messages"].pop()
+                            self._attach(record, conv["messages"][-1])
+                            continue
+                        if record:
+                            self._attach(record, conv["messages"][-1])
                 if not calls:
                     if steps > max_steps and not conv.get("stopped"):
                         self._stopped("tool_limit")
                     break
+                record, check_at = None, None
+                if watch:
+                    pending = [(c.name, c.args) for c in calls]
+                    check_at = watch.due(steps, pending, max_steps)
+                    if check_at == "tool_limit":
+                        # Asked before any call is refused, so a continue lets these run
+                        # as if the limit had been higher, and the model never sees one.
+                        record = await self._manage(
+                            watch, check_at, steps, max_steps, said, pending
+                        )
+                        if record and record["action"] == "continue":
+                            max_steps += base_steps
+                    elif check_at:
+                        # Runs while the tools run: its answer is for the next step.
+                        check = asyncio.ensure_future(watch.ask(check_at, max_steps, pending))
                 steps += len(calls)
                 over = steps > max_steps
                 await self._run_calls(calls, tools, over)
+                if watch:
+                    watch.record(
+                        [(c.id, c.name, c.args) for c in calls],
+                        conv["messages"][-len(calls) :],
+                        said,
+                    )
+                    if check is not None and check_at:
+                        task, check = check, None
+                        record = await self._manage(
+                            watch, check_at, steps, max_steps, said, None, task
+                        )
+                    if record:
+                        self._attach(record, conv["messages"][-1])
                 agent.store.save(conv)
                 if over and steps > max_steps + 10:
                     self._stopped("tool_limit")
@@ -854,6 +910,8 @@ class ChatRun:
                 }
             )
         finally:
+            if check is not None:
+                check.cancel()  # stopped while a check was out: its answer has no step
             _close_open_calls(conv["messages"])
             if not sent:
                 # stopped before the model saw them (the spend cap): say so, don't pretend
@@ -878,6 +936,86 @@ class ChatRun:
         """Record why the turn ended early, so the panel can explain it and offer to continue."""
         self.conv["stopped"] = reason
         self.emit({"type": "notice", "text": text or STOP_TEXT[reason], "stop": reason})
+
+    def _watch(self, request: str) -> Watch | None:
+        """The Manager for this turn, or None when it is off, has no OpenRouter provider to
+        go through, or today's spend cap is reached (it costs money too)."""
+        agent, options = self.agent, self.agent.options
+        if not options.get(CONF_MANAGER):
+            return None
+        routers = [p for p in agent.providers() if p.type == "openrouter" and p.api_key]
+        chat = self.conv.get("provider_id")
+        pconf = next((p for p in routers if p.id == chat), routers[0] if routers else None)
+        if pconf is None:
+            _LOGGER.debug("Manager is on but no OpenRouter provider is set up, so it is skipped")
+            return None
+        cap = setting(options, CONF_DAILY_CAP)
+        if cap > 0 and agent.store.spent(_today()) >= cap:
+            return None
+        self._manager_provider = pconf
+        decider = JevDecider(
+            async_get_clientsession(self.hass),
+            pconf.base_url,
+            pconf.api_key or "",
+            options.get(CONF_MANAGER_MODEL) or DEFAULT_OPTIONS[CONF_MANAGER_MODEL],
+        )
+        thresholds = Thresholds(
+            stuck=setting(options, CONF_MANAGER_STUCK),
+            drifting=setting(options, CONF_MANAGER_DRIFTING),
+            repeat=setting(options, CONF_MANAGER_REPEAT),
+            done=setting(options, CONF_MANAGER_DONE),
+            resume=setting(options, CONF_MANAGER_RESUME),
+        )
+        return Watch(
+            decider,
+            thresholds,
+            setting(options, CONF_MANAGER_EVERY),
+            setting(options, CONF_MANAGER_CONTINUES),
+            request,
+        )
+
+    async def _manage(
+        self,
+        watch: Watch,
+        at: str,
+        calls: int,
+        limit: int,
+        said: str,
+        pending: list[tuple[str, Any]] | None = None,
+        task: Awaitable[Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """One Manager check: await its answer, count what it cost, show the note. None is
+        no decision, and the turn goes on as it would with the Manager off."""
+        try:
+            decision = await (task or watch.ask(at, limit, pending, said))
+        except Exception:
+            _LOGGER.debug("Manager check failed", exc_info=True)
+            return None
+        record = watch.judge(decision, at, calls)
+        if record is None:
+            return None
+        self._add_manager_usage(record)
+        self.emit({"type": "notice", "text": record["text"], "detail": record["detail"]})
+        return record
+
+    def _attach(self, record: dict[str, Any], msg: dict[str, Any]) -> None:
+        """Keep a Manager record on the message it followed, so a reload shows the note in
+        the same place and a capture log can read every decision of the turn."""
+        msg.setdefault("manager", []).append(record)
+
+    def _add_manager_usage(self, record: dict[str, Any]) -> None:
+        """The provider reports each check's cost itself, so no price table is involved. It
+        counts toward the daily cap and the chat's cost like any other call."""
+        pconf = self._manager_provider
+        cost = record.get("cost")
+        usage = Usage(input_tokens=int(record.get("input_tokens") or 0))
+        if cost is not None:
+            self.agent.store.add_spend(_today(), cost, self.user_id)
+        _count(self.agent.store, pconf, record["model"], "manager", usage, cost)
+        total = self.conv["usage"]
+        if cost is not None and total.get("cost") is not None:
+            total["cost"] = round(total["cost"] + cost, 6)
+        self.emit({"type": "usage", "usage": total})
 
     def _add_usage(
         self, usage: Usage, price: Price | None, pconf: ProviderConfig, model: str
@@ -1525,7 +1663,7 @@ def _provider_view(msg: dict[str, Any]) -> dict[str, Any]:
             "role": "tool",
             "tool_call_id": msg["tool_call_id"],
             "name": msg["name"],
-            "content": msg["content"],
+            "content": with_steers(msg["content"], msg.get("manager")),
             "is_error": msg.get("is_error", False),
             **({"images": msg["images"]} if msg.get("images") else {}),
         }

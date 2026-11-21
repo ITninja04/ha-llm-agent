@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from .manager import DEFAULT_MODEL as MANAGER_MODEL, Thresholds
+
+_T = Thresholds()
+
 DOMAIN = "llm_agent"
 NAME = "LLM Agent"
 
@@ -85,6 +89,18 @@ CONF_MEMBER_DAILY_CAP = "member_daily_cap"  # USD per member per day, 0 = no cap
 CONF_APPROVAL_PHONE = "approval_phone"  # notify action of the phone that approves
 CONF_FLOAT_BUTTON = "float_button"  # the chat button on every HA page
 
+# 0.12 Manager: a decision model checks long turns (manager.py). Off by default: it is
+# a second paid service, and a public install must not start spending on it unasked.
+CONF_MANAGER = "manager"
+CONF_MANAGER_MODEL = "manager_model"
+CONF_MANAGER_EVERY = "manager_every"  # tool calls between checks
+CONF_MANAGER_STUCK = "manager_stuck_at"
+CONF_MANAGER_DRIFTING = "manager_drifting_at"
+CONF_MANAGER_REPEAT = "manager_repeat_at"
+CONF_MANAGER_DONE = "manager_done_at"
+CONF_MANAGER_RESUME = "manager_resume_at"
+CONF_MANAGER_CONTINUES = "manager_max_continues"
+
 DEFAULT_OPTIONS = {
     CONF_TOOL_RULES: "",
     CONF_HOUSEHOLD: False,
@@ -124,6 +140,16 @@ DEFAULT_OPTIONS = {
     CONF_SEARCH_BACKEND: "free",
     CONF_SEARXNG_URL: "",
     CONF_SEARCH_KEY: "",
+    # Thresholds come from the offline replay. manager.Thresholds explains each one.
+    CONF_MANAGER: False,
+    CONF_MANAGER_MODEL: MANAGER_MODEL,
+    CONF_MANAGER_EVERY: 5,
+    CONF_MANAGER_STUCK: _T.stuck,
+    CONF_MANAGER_DRIFTING: _T.drifting,
+    CONF_MANAGER_REPEAT: _T.repeat,
+    CONF_MANAGER_DONE: _T.done,
+    CONF_MANAGER_RESUME: _T.resume,
+    CONF_MANAGER_CONTINUES: 2,
 }
 
 # (min, max) for every number setting, so a bad value can never break anything.
@@ -144,6 +170,13 @@ RANGES: dict[str, tuple[float, float]] = {
     CONF_AUDIT_MB: (1, 100),
     CONF_TIMEOUT: (30, 1800),
     CONF_RETRIES: (0, 6),
+    CONF_MANAGER_EVERY: (1, 50),
+    CONF_MANAGER_STUCK: (0, 1),
+    CONF_MANAGER_DRIFTING: (0, 1),
+    CONF_MANAGER_REPEAT: (0, 1),
+    CONF_MANAGER_DONE: (0, 1),
+    CONF_MANAGER_RESUME: (0, 1),
+    CONF_MANAGER_CONTINUES: (0, 5),
 }
 
 

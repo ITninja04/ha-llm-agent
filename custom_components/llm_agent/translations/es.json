@@ -205,6 +205,31 @@
               "reviewer_model": "Un ID de modelo, por ejemplo claude-haiku-5-5 o un modelo local de Ollama. Vacío usa el modelo predeterminado del proveedor. El revisor ve tu solicitud y la acción, nunca los resultados de herramientas.",
               "always_ask": "Estas acciones siempre se te consultan, diga lo que diga el revisor. Separadas por comas: domain.service (lock.*), ID de entidades, nombres de herramientas (shell) o tool:action (integrations:remove). * coincide con todo."
             }
+          },
+          "manager": {
+            "name": "Supervisor (avanzado)",
+            "data": {
+              "manager": "Supervisor",
+              "manager_model": "Modelo del supervisor",
+              "manager_every": "Comprobar cada",
+              "manager_stuck_at": "Umbral: atascado",
+              "manager_drifting_at": "Umbral: fuera de tema",
+              "manager_repeat_at": "Umbral: se repite",
+              "manager_done_at": "Umbral: terminado",
+              "manager_resume_at": "Umbral: continuar solo",
+              "manager_max_continues": "Máximo de continuaciones automáticas por mensaje"
+            },
+            "data_description": {
+              "manager": "Un modelo de decisión revisa las respuestas largas cada pocas llamadas a herramientas y avisa a la IA cuando está atascada, se repite o ya ha terminado. Necesita un proveedor OpenRouter y usa su clave. Cada revisión cuesta unos 0,0001 $ y cuenta para el límite diario. Una nota en el chat muestra cada revisión.",
+              "manager_model": "El id de un modelo de decisión de OpenRouter. Los valores por defecto se probaron con typesafe/jev-1.14.",
+              "manager_every": "Llamadas a herramientas entre revisiones. También revisa en cuanto la IA repite una llamada idéntica y cuando una respuesta está a punto de parar.",
+              "manager_stuck_at": "Lo seguro (de 0 a 1) que debe estar el supervisor de que la IA está atascada antes de pedirle que cambie de enfoque.",
+              "manager_drifting_at": "Lo seguro que debe estar de que la IA hace cosas que no pediste. Alto por defecto: en las pruebas, estas respuestas solían ser erróneas.",
+              "manager_repeat_at": "Lo seguro que debe estar de que la IA repite llamadas cuyos resultados ya tiene.",
+              "manager_done_at": "Lo seguro que debe estar de que el trabajo está terminado antes de pedir a la IA que responda.",
+              "manager_resume_at": "Lo seguro que debe estar de que una respuesta detenida debe seguir antes de continuarla por ti. Alto por defecto: en las pruebas no supo distinguir qué paradas lo necesitaban.",
+              "manager_max_continues": "Cuántas veces como máximo el supervisor continúa un mensaje por su cuenta. 0 lo desactiva; el botón Continuar sigue funcionando."
+            }
           }
         }
       },

@@ -205,6 +205,31 @@
               "reviewer_model": "Een model-ID, bijvoorbeeld claude-haiku-5-5 of een lokaal Ollama-model. Leeg gebruikt het standaardmodel van de provider. De beoordelaar ziet je verzoek en de actie, nooit tooluitvoer.",
               "always_ask": "Deze acties komen altijd bij jou terecht, ongeacht wat de beoordelaar zegt. Kommagescheiden: domain.service (lock.*), entiteit-ID's, toolnamen (shell) of tool:action (integrations:remove). * komt met alles overeen."
             }
+          },
+          "manager": {
+            "name": "Manager (geavanceerd)",
+            "data": {
+              "manager": "Manager",
+              "manager_model": "Managermodel",
+              "manager_every": "Controleer elke",
+              "manager_stuck_at": "Drempel: vastgelopen",
+              "manager_drifting_at": "Drempel: off-topic",
+              "manager_repeat_at": "Drempel: herhaalt zich",
+              "manager_done_at": "Drempel: klaar",
+              "manager_resume_at": "Drempel: zelf doorgaan",
+              "manager_max_continues": "Maximaal automatisch doorgaan per bericht"
+            },
+            "data_description": {
+              "manager": "Een beslismodel bekijkt lange antwoorden om de paar toolaanroepen en geeft de AI een seintje als die vastloopt, zich herhaalt of klaar is. Heeft een OpenRouter-provider nodig en gebruikt diens sleutel. Elke controle kost ongeveer $0,0001 en telt mee voor het daglimiet. Een notitie in de chat toont elke controle.",
+              "manager_model": "De id van een beslismodel op OpenRouter. De standaardwaarden zijn getest met typesafe/jev-1.14.",
+              "manager_every": "Toolaanroepen tussen twee controles. Er wordt ook meteen gecontroleerd als de AI een identieke aanroep herhaalt en als een antwoord op het punt staat te stoppen.",
+              "manager_stuck_at": "Hoe zeker (0 tot 1) de manager moet zijn dat de AI vastzit voordat die een andere aanpak voorstelt.",
+              "manager_drifting_at": "Hoe zeker hij moet zijn dat de AI dingen doet waar je niet om vroeg. Standaard hoog: bij het testen klopten deze antwoorden meestal niet.",
+              "manager_repeat_at": "Hoe zeker hij moet zijn dat de AI aanroepen herhaalt waarvan de resultaten er al zijn.",
+              "manager_done_at": "Hoe zeker hij moet zijn dat het werk klaar is voordat de AI moet antwoorden.",
+              "manager_resume_at": "Hoe zeker hij moet zijn dat een gestopt antwoord verder moet voordat hij het voor je voortzet. Standaard hoog: bij het testen kon hij niet zien welke stops dat nodig hadden.",
+              "manager_max_continues": "Hoe vaak de manager een bericht hoogstens zelf voortzet. 0 zet dit uit; de knop Doorgaan werkt nog steeds."
+            }
           }
         }
       },

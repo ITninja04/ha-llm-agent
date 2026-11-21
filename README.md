@@ -285,6 +285,25 @@ approves or denies each risky action in your place.
 - Its verdict shows on the tool card and goes in the audit log. Its tokens and cost are
   shown separately and count towards the daily spend cap.
 
+**Manager (off by default).** A decision model looks at long replies every 5 tool calls,
+at once when the AI repeats an identical call, and when a reply is about to stop at the
+tool call limit or with nothing written. It answers fixed questions with numbers (is it
+on task, is it repeating itself, is it working, drifting, stuck or done), never with text.
+- When it is sure enough the AI is stuck or repeating itself, one fixed sentence is added
+  to what the AI reads next, such as "You are retrying without getting closer. Try a
+  different approach, or stop and tell the owner what is blocking you." It can't run,
+  skip or approve anything.
+- At the tool call limit it can let the reply carry on, at most twice per message. With
+  the default threshold this does not happen: in testing on real chats it could not tell
+  which stops needed it, so the Continue button stays the way to go on.
+- Every check shows as a small Manager note in the chat. Open it for the numbers.
+- It needs an OpenRouter provider and uses its key. A check costs about $0.0001 and counts
+  towards the daily spend cap. If it fails or takes over 3 seconds, the reply carries on
+  as if it were off.
+- What it does not catch: an AI that wanders into something you did not ask for (reading
+  source code to answer a dashboard question). It only ever flagged that wrongly, so that
+  threshold is set where it does not fire.
+
 **MCP servers.** Add a server with HA's Model Context Protocol integration (it handles
 the address and sign-in), then turn on **Use tools from MCP servers**. Its tools show up
 as `mcp_<server>_<tool>`. Those servers are outside your home: their tools can do
@@ -423,6 +442,7 @@ default, a safe range and a one-line explanation. The less common groups start f
 | Approval rules | Allow, ask or deny rules that apply in every approval mode |
 | Household and phone | Household members' chat on or off, their daily limit, and the phone that approves |
 | Reviewer mode | The reviewer's provider and model (the chat's own by default), and the always-ask list |
+| Manager (advanced) | The Manager on or off, its model, how often it checks, how sure it must be before it steers or continues, and how many times it may continue one message |
 | Web research | Web pages on or off, fetching LAN addresses (off), web search: Free (HA forum, HA GitHub issues and Wikipedia, no key, the default), SearXNG (self-hosted, covers the whole web), Brave Search, or Off |
 | Debugging | Log full prompts and replies (the log then contains your conversations) |
 

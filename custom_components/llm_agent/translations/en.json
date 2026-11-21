@@ -205,6 +205,31 @@
               "reviewer_model": "A model id, for example claude-haiku-5-5 or a local Ollama model. Empty uses the provider's default model. The reviewer sees your request and the action, never tool output.",
               "always_ask": "These actions always come to you, whatever the reviewer says. Comma-separated: domain.service (lock.*), entity ids, tool names (shell) or tool:action (integrations:remove). * matches anything."
             }
+          },
+          "manager": {
+            "name": "Manager (advanced)",
+            "data": {
+              "manager": "Manager",
+              "manager_model": "Manager model",
+              "manager_every": "Check every",
+              "manager_stuck_at": "Stuck threshold",
+              "manager_drifting_at": "Off-task threshold",
+              "manager_repeat_at": "Repeating threshold",
+              "manager_done_at": "Finished threshold",
+              "manager_resume_at": "Auto-continue threshold",
+              "manager_max_continues": "Most auto-continues per message"
+            },
+            "data_description": {
+              "manager": "A decision model looks at long replies every few tool calls and nudges the AI when it is stuck, repeating itself or finished. Needs an OpenRouter provider and uses its key. Each check costs about $0.0001 and counts toward the daily cap. A note in the chat shows every check.",
+              "manager_model": "An OpenRouter decision model id. typesafe/jev-1.14 is the one the defaults were tested with.",
+              "manager_every": "Tool calls between checks. It also checks at once when the AI repeats an identical call, and when a reply is about to stop.",
+              "manager_stuck_at": "How sure (0 to 1) the manager must be that the AI is stuck before telling it to change approach.",
+              "manager_drifting_at": "How sure it must be that the AI is doing things you did not ask for. High by default: in testing, these answers were usually wrong.",
+              "manager_repeat_at": "How sure it must be that the AI is repeating calls it already has the results of.",
+              "manager_done_at": "How sure it must be that the work is finished before telling the AI to answer.",
+              "manager_resume_at": "How sure it must be that a stopped reply should carry on before continuing it for you. High by default: in testing it could not tell which stops needed it.",
+              "manager_max_continues": "Most times the manager continues one message on its own. 0 turns this off; the Continue button still works."
+            }
           }
         }
       },

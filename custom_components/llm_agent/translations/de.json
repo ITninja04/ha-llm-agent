@@ -205,6 +205,31 @@
               "reviewer_model": "Eine Modell-ID, etwa claude-haiku-5-5 oder ein lokales Ollama-Modell. Leer verwendet das Standardmodell des Anbieters. Der Prüfer sieht deine Anfrage und die Aktion, aber nie Werkzeugausgaben.",
               "always_ask": "Diese Aktionen kommen immer zu dir, unabhängig vom Urteil des Prüfers. Kommagetrennt: domain.service (lock.*), Entitäts-IDs, Werkzeugnamen (shell) oder tool:action (integrations:remove). * passt auf alles."
             }
+          },
+          "manager": {
+            "name": "Manager (erweitert)",
+            "data": {
+              "manager": "Manager",
+              "manager_model": "Manager-Modell",
+              "manager_every": "Prüfen alle",
+              "manager_stuck_at": "Schwelle: festgefahren",
+              "manager_drifting_at": "Schwelle: vom Thema ab",
+              "manager_repeat_at": "Schwelle: wiederholt sich",
+              "manager_done_at": "Schwelle: fertig",
+              "manager_resume_at": "Schwelle: automatisch fortsetzen",
+              "manager_max_continues": "Höchstens automatisch fortsetzen pro Nachricht"
+            },
+            "data_description": {
+              "manager": "Ein Entscheidungsmodell prüft lange Antworten alle paar Werkzeugaufrufe und gibt der KI einen Hinweis, wenn sie festgefahren ist, sich wiederholt oder fertig ist. Braucht einen OpenRouter-Anbieter und nutzt dessen Schlüssel. Jede Prüfung kostet etwa 0,0001 $ und zählt zum Tageslimit. Ein Hinweis im Chat zeigt jede Prüfung.",
+              "manager_model": "Die ID eines Entscheidungsmodells bei OpenRouter. Die Standardwerte wurden mit typesafe/jev-1.14 getestet.",
+              "manager_every": "Werkzeugaufrufe zwischen zwei Prüfungen. Geprüft wird auch sofort, wenn die KI einen identischen Aufruf wiederholt und wenn eine Antwort gleich endet.",
+              "manager_stuck_at": "Wie sicher (0 bis 1) der Manager sein muss, dass die KI festgefahren ist, bevor er ihr einen anderen Weg nahelegt.",
+              "manager_drifting_at": "Wie sicher er sein muss, dass die KI Dinge tut, um die du nicht gebeten hast. Standardmäßig hoch: im Test lagen diese Antworten meist falsch.",
+              "manager_repeat_at": "Wie sicher er sein muss, dass die KI Aufrufe wiederholt, deren Ergebnis sie schon hat.",
+              "manager_done_at": "Wie sicher er sein muss, dass die Arbeit fertig ist, bevor er die KI antworten lässt.",
+              "manager_resume_at": "Wie sicher er sein muss, dass eine angehaltene Antwort weitergehen sollte, bevor er sie für dich fortsetzt. Standardmäßig hoch: im Test konnte er nicht erkennen, wo das nötig war.",
+              "manager_max_continues": "Wie oft der Manager eine Nachricht höchstens selbst fortsetzt. 0 schaltet das ab; die Schaltfläche Fortsetzen funktioniert weiter."
+            }
           }
         }
       },

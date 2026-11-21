@@ -85,6 +85,15 @@ Prices can be overridden in options.
 4. Tool results go back to the model. The loop repeats until a final answer,
    with a step cap (default 25 tool calls per turn).
 5. Usage totals are stored for each conversation: tokens and a $ estimate.
+6. The Manager (`manager.py`, off by default) checks the turn with a decision model
+   (Jev via OpenRouter's `/systemone`): every N tool calls, on an exact repeat, and
+   before a stop (the tool limit, an empty reply, a length cut). A periodic check runs
+   alongside the tool calls, since its answer only matters for the step after them. A steer
+   is a fixed sentence stored on the last tool message (`manager` key) and appended to
+   that message only in `_provider_view`, so the stored output, the panel preview and
+   undo never contain it. At the limit it can raise the limit once per continue, before
+   any call is refused. A length cut is never continued by it, since that needs a new
+   user message the panel would not know about. No answer in 3 s is no decision.
 
 The panel loop owns its own state rather than HA's ChatLog. ChatLog runs tool
 calls automatically as they stream, which conflicts with pausing for approval.
