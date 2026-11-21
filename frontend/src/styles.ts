@@ -1470,8 +1470,20 @@ styles.replaceSync(`
     .model-pill select {
       max-width: 88px;
     }
+    /* the mode is worth reading on a phone; the model box gives way first */
+    .mode-pill select {
+      min-width: 84px;
+      max-width: 110px;
+    }
     .model-pill input.model {
       width: 120px;
+      min-width: 60px;
+    }
+    /* with one provider there is nothing to pick, and its name costs the room the
+       model needs */
+    .model-pill.single select,
+    .model-pill.single .sep {
+      display: none;
     }
   }
   .plan-run {

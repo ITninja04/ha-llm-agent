@@ -2167,7 +2167,10 @@ class LlmAgentPanel extends HTMLElement {
               </select>
             </label>{" "}
             <Show when={!this.member}>
-              <label class="model-pill" title={this.modelError || t("provider_and_model")}>
+              <label
+                class={`model-pill ${(this.info?.providers.length ?? 0) <= 1 ? "single" : ""}`}
+                title={this.modelError || t("provider_and_model")}
+              >
                 <ha-icon icon="mdi:creation-outline" />{" "}
                 <select
                   aria-label={t("provider")}

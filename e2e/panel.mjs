@@ -148,9 +148,10 @@ for (const c of toolbar) if (c.r > 391) fail(`${c.cls} runs past the phone's edg
 for (let i = 1; i < toolbar.length; i++)
   if (toolbar[i].l < toolbar[i - 1].r - 1 || Math.abs(toolbar[i].t - toolbar[0].t) > 16)
     fail(`toolbar items overlap or wrap on a phone: ${JSON.stringify(toolbar)}`);
-for (const sel of ["select[aria-label='Approval mode']", "input.model"]) {
+// wide enough to read: "Ask for risky" was cut to "A..." at 390 px before
+for (const [sel, min] of [["select[aria-label='Approval mode']", 80], ["input.model", 60]]) {
   const w = (await panel.locator(sel).boundingBox())?.width ?? 0;
-  if (w < 50) fail(`${sel} squeezed to ${w}px on a phone`);
+  if (w < min) fail(`${sel} squeezed to ${w}px on a phone (needs ${min})`);
 }
 await page.screenshot({ path: `${shots}/llm-agent-4-phone.png` });
 await panel.locator("input.model").click();
