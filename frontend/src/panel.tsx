@@ -1197,11 +1197,17 @@ class LlmAgentPanel extends HTMLElement {
   }
 
   /** Follow the newest message and add copy buttons to new code blocks, which Lit's
-   * updated() did after every render. Here it runs once the DOM has really changed: an
-   * effect would run before Solid applies the attributes of rows it just made, measure
-   * a card still closed, stop short of the bottom, and make the card's chevron animate
-   * open. The resize observer also catches the list growing when an icon or a picture
-   * loads, and the pane shrinking when the composer grows. */
+   * updated() did after every render.
+   *
+   * A mutation observer on the whole shadow root runs as a microtask right after any
+   * change to the panel's DOM, so in the same task as the change, as updated() did. An
+   * effect is too early: it runs before Solid applies the attributes of rows it just
+   * made, so it measured an approval card still closed, stopped 5 px short and made the
+   * card's chevron animate open. A resize observer alone is too late: when the composer
+   * grows, Chrome's scroll anchoring fires a scroll event before resize observers run,
+   * and that event turns stickToBottom off (measured in CI, 2026-11-21). The resize
+   * observer stays for what changes size with no DOM change of ours: an icon or a
+   * picture loading inside a row. */
   private watchMessages(el: HTMLElement): void {
     this.scroller = el;
     const follow = () => {
@@ -1209,14 +1215,15 @@ class LlmAgentPanel extends HTMLElement {
     };
     const sizes = new ResizeObserver(follow);
     sizes.observe(el);
-    new MutationObserver((records) => {
-      for (const r of records) {
-        for (const n of r.addedNodes) if (n instanceof Element && n.parentNode === el) sizes.observe(n);
-        for (const n of r.removedNodes) if (n instanceof Element) sizes.unobserve(n);
-      }
-      follow();
-      this.addCopyButtons();
-    }).observe(el, { childList: true, subtree: true, characterData: true, attributes: true });
+    queueMicrotask(() =>
+      new MutationObserver((records) => {
+        for (const r of records)
+          if (r.target === el) for (const gone of r.removedNodes) if (gone instanceof Element) sizes.unobserve(gone);
+        for (const row of el.children) sizes.observe(row);
+        follow();
+        this.addCopyButtons();
+      }).observe(this.shadowRoot!, { childList: true, subtree: true, characterData: true, attributes: true }),
+    );
   }
 
   private placeholder(): string {
