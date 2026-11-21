@@ -332,8 +332,9 @@ function Usage(props: Props<{ hass: Hass }>) {
       <For each={b() ?? []}>{(x) => <BalanceRow x={x} />}</For>
       <p class="tl">
         <span>{t("turn_log_about")}</span>{" "}
+        {/* text only: an icon's svg here would sit after the chart's bars */}
         <button class="small" onClick={() => void downloadLog()}>
-          <ha-icon icon="mdi:download" /> {t("turn_log_download")}
+          {t("turn_log_download")}
         </button>{" "}
         <Show when={logNote()}>
           <span>{logNote()}</span>
