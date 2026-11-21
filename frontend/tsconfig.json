@@ -9,7 +9,9 @@
     "useDefineForClassFields": false,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "noEmit": true
+    "noEmit": true,
+    "jsx": "preserve",
+    "jsxImportSource": "@solidjs/web"
   },
   "include": ["src"]
 }

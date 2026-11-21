@@ -10,6 +10,13 @@ NAME = "LLM Agent"
 PANEL_URL = "llm-agent"
 PANEL_ELEMENT = "llm-agent-panel"
 STATIC_URL = "/llm_agent_static"
+# The Solid 2.0 Notes preview, a sidebar page that exists only while the hidden
+# solid_preview option is on. Kept out of DEFAULT_OPTIONS on purpose: it has no field in
+# the settings form and no line in a settings export, so no one finds it by accident.
+# The admin-only WebSocket command llm_agent/solid_preview turns it on and off.
+CONF_SOLID_PREVIEW = "solid_preview"
+PREVIEW_URL = "llm-agent-solid"
+PREVIEW_ELEMENT = "llm-agent-solid-preview"
 # The small script HA loads on every page, which draws the floating chat button.
 FLOAT_LOADER = "llm-agent-float"
 
