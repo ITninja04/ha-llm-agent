@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+    # labeled and unlabeled too, so adding the new-dependency label reruns the guard
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 
 permissions:
@@ -40,6 +42,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # the size and dependency checks below compare with origin/main
+          fetch-depth: 0
+      - name: No new dependency without the new-dependency label
+        # Every package is code that runs in someone's Home Assistant, and the panel's
+        # dependencies end up in the bundle every user downloads. So adding, removing or
+        # changing one is a decision someone makes on purpose, marked by the label, not
+        # a habit that slips in with a feature. Compared as parsed JSON, so reformatting
+        # package.json or manifest.json does not trip it.
+        env:
+          LABELED: ${{ contains(github.event.pull_request.labels.*.name, 'new-dependency') }}
+        run: |
+          deps() { python3 -c 'import json, sys; d = json.load(sys.stdin); print(json.dumps({k: d.get(k) for k in sys.argv[1:]}, sort_keys=True, indent=1))' "$@"; }
+          changed=""
+          for spec in "frontend/package.json dependencies devDependencies" "custom_components/llm_agent/manifest.json requirements"; do
+            set -- $spec
+            file=$1
+            shift
+            was=$(git show "origin/main:$file" | deps "$@")
+            now=$(deps "$@" < "$file")
+            if [ "$was" != "$now" ]; then
+              echo "$file: $* differ from main:"
+              diff <(echo "$was") <(echo "$now") || true
+              changed=1
+            fi
+          done
+          if [ -n "$changed" ] && [ "$LABELED" != "true" ]; then
+            echo "Dependencies changed. If that is intended, add the new-dependency label to the PR."
+            exit 1
+          fi
+          if [ -n "$changed" ]; then echo "dependencies: changed, labeled new-dependency"; else echo "dependencies: unchanged from main"; fi
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -55,18 +88,18 @@ jobs:
         run: |
           git diff --exit-code -- custom_components/llm_agent/www
           test -z "$(git status --porcelain -- custom_components/llm_agent/www)" || { git status --short; exit 1; }
-      - name: Panel stays within its size budget (111 KiB gzipped)
+      - name: Panel grows by at most 8 KiB in one change
+        # Size matters here only when something big slips in: an accidentally bundled
+        # library adds 8 kB or more gzipped, while a feature adds one or two. So the
+        # check is how much this change grows the panel against main's committed copy,
+        # not an absolute budget that every feature has to raise. On main itself the
+        # two are the same file and the growth is 0.
         run: |
           size=$(gzip -9c custom_components/llm_agent/www/llm-agent-panel.js | wc -c)
-          echo "panel: $size bytes gzipped"
-          # The budget keeps 8 KiB of headroom over the measured panel on purpose: an
-          # accidentally bundled library adds 8 kB or more and fails this step, while
-          # normal feature growth fits. When feature growth leaves under 2 KiB of
-          # headroom, re-base it: the measured size plus 8 KiB, rounded up to the next
-          # KiB, with the measurement written here.
-          # Last re-based 2026-11-21: 104565 bytes measured (per-chat modes, model search,
-          # turn log download; main was 101979), + 8192 = 112757, rounded up to 113664.
-          test "$size" -le 113664
+          base=$(git show origin/main:custom_components/llm_agent/www/llm-agent-panel.js | gzip -9c | wc -c)
+          delta=$((size - base))
+          echo "panel: $size bytes gzipped, main: $base, growth: $delta (limit 8192)"
+          test "$delta" -le 8192
       - name: Floating chat loader stays within its size budget (6 kB gzipped)
         run: |
           size=$(gzip -9c custom_components/llm_agent/www/llm-agent-float.js | wc -c)
