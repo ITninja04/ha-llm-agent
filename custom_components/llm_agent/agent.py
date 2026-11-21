@@ -756,6 +756,7 @@ class ChatRun:
             "budget_reminder": False,
             "tokens": {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "reasoning": 0},
             "cost": 0.0,
+            "manager_cost": 0.0,
             "stop": None,
             "error": None,
             "latency_ms": None,
@@ -1140,6 +1141,12 @@ class ChatRun:
         total = self.conv["usage"]
         if cost is not None and total.get("cost") is not None:
             total["cost"] = round(total["cost"] + cost, 6)
+        # The turn record follows the chat total, so the two agree: in cost, and on its own
+        # in manager_cost for telling the checks apart from the chat model.
+        if cost is not None and "manager_cost" in self.record:
+            self.record["manager_cost"] = round(self.record["manager_cost"] + cost, 6)
+            if self.record.get("cost") is not None:
+                self.record["cost"] = round(self.record["cost"] + cost, 6)
         self.emit({"type": "usage", "usage": total})
 
     def _add_usage(
