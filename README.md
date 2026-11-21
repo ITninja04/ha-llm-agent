@@ -652,6 +652,9 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   same.
 - **0.10.9 (released):** the same rewrite for the Usage, Changes, integration settings
   and dashboard preview views; they look and work the same.
+- **0.11.0 (released):** the rest of the panel gets the same rewrite and the old
+  rendering library is gone. It looks and works the same; a change somewhere else in
+  the house no longer redraws the chat.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
