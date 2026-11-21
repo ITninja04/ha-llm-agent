@@ -11,7 +11,6 @@
   "dependencies": {
     "@solidjs/web": "^2.0.3",
     "dompurify": "^3.2.0",
-    "lit": "^3.3.0",
     "marked": "^18.1.1",
     "solid-js": "^2.0.3",
     "tiny-markdown-editor": "0.2.35"

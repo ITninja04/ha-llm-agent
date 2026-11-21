@@ -14,6 +14,28 @@ import { render, type JSX } from "@solidjs/web";
 import { createMemo, createSignal, type Accessor, type Setter } from "solid-js";
 import type { Hass } from "./types";
 
+// HA's own elements and the panel's views, used from JSX as custom elements. prop:x
+// sets a DOM property (HA hands hass to its elements that way), not an attribute.
+type Custom = JSX.HTMLAttributes<HTMLElement> & { icon?: string };
+declare module "@solidjs/web" {
+  namespace JSX {
+    interface ExplicitProperties {
+      hass: unknown;
+      narrow: boolean;
+      config: unknown;
+    }
+    interface IntrinsicElements {
+      "ha-icon": Custom;
+      "ha-menu-button": Custom;
+      "llm-agent-notes": Custom;
+      "llm-agent-usage": Custom;
+      "llm-agent-changes": Custom;
+      "llm-agent-settings": Custom;
+      "llm-dashboard-preview": Custom;
+    }
+  }
+}
+
 /** Each declared property of the element, as an accessor the view reads. */
 export type Props<P> = { readonly [K in keyof P]-?: Accessor<P[K] | undefined> };
 
@@ -113,4 +135,54 @@ export function hassPart<T>(hass: Accessor<Hass | undefined>, pick: (h: Hass) =>
     const h = hass();
     return h ? pick(h) : undefined;
   });
+}
+
+// ---- fields for a class-based element ----------------------------------------
+// The panel is a long imperative class (send, stream, approve, undo) that sets a field
+// and reads it back on the next line. A plain signal would break that: Solid stages a
+// write until the next microtask, so the read would see the old value. A field marked
+// @state() keeps its value in a plain slot, read and written at once, and a version
+// signal beside it: reading the field inside a view subscribes to the version, and
+// every write bumps it, so the view re-reads the slot after Solid flushes.
+
+interface Slot {
+  v: unknown;
+  ver: [Accessor<number>, Setter<number>];
+}
+const SLOTS = Symbol("slots");
+
+function slot(obj: object, key: string): Slot {
+  const all = ((obj as Record<symbol, Map<string, Slot>>)[SLOTS] ??= new Map());
+  let s = all.get(key);
+  if (!s) {
+    s = { v: undefined, ver: createSignal(0) };
+    all.set(key, s);
+  }
+  return s;
+}
+
+/** A field a view can read. Like Lit's @state, a write of the same value is no change. */
+export function state() {
+  return (proto: object, key: string): void => {
+    Object.defineProperty(proto, key, {
+      get(this: object) {
+        const s = slot(this, key);
+        s.ver[0]();
+        return s.v;
+      },
+      set(this: object, v: unknown) {
+        const s = slot(this, key);
+        if (s.v === v) return;
+        s.v = v;
+        s.ver[1]((n) => n + 1);
+      },
+      configurable: true,
+    });
+  };
+}
+
+/** Tell the views a @state() field changed in place (an object or array mutated), the
+ * job Lit's requestUpdate() did. */
+export function bump(obj: object, key: string): void {
+  slot(obj, key).ver[1]((n) => n + 1);
 }

@@ -252,6 +252,6 @@ function Notes(props: Props<{ hass: Hass }>) {
 
 define<{ hass: Hass }>("llm-agent-notes", {
   props: ["hass"],
-  styles: () => [styles.styleSheet!, css],
+  styles: () => [styles, css],
   view: (p) => <Notes {...p} />,
 });

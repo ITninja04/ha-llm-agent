@@ -308,6 +308,6 @@ function Usage(props: Props<{ hass: Hass }>) {
 
 define<{ hass: Hass }>("llm-agent-usage", {
   props: ["hass"],
-  styles: () => [styles.styleSheet!, css],
+  styles: () => [styles, css],
   view: (p) => <Usage {...p} />,
 });

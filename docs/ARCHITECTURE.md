@@ -28,7 +28,7 @@ custom_components/llm_agent/
   conversation.py      Assist conversation entity (voice)
   websocket.py         admin-only WS API for the panel
   www/agent-panel.js   built frontend (committed; HACS installs from the repo)
-frontend/              Lit + TypeScript source, Vite build
+frontend/              SolidJS 2.0 + TypeScript source, Vite build
 tests/                 pytest-homeassistant-custom-component, fake provider
 .github/workflows/     CI (GitHub-hosted runners only)
 LICENSE NOTICE README.md DISCLAIMER.md hacs.json
@@ -182,9 +182,15 @@ doing less:
 
 ## 8. Frontend
 
-Lit + TypeScript, built by Vite into one ES module (`www/agent-panel.js`, about
-60 KB target). Small dependencies only: `lit`, `marked` and `dompurify` for safe
-Markdown rendering, and `tiny-markdown-editor` (its `lib/` files only, which carry no
+SolidJS 2.0 + TypeScript, built by Vite into one minified ES module
+(`www/llm-agent-panel.js`, about 100 kB gzipped, capped in CI). Each view is a custom
+element (same tag names as when it was Lit) rendered by the small shell in
+`element.tsx`, which turns the properties HA sets into signals and gives a view only
+the parts of `hass` it reads, so a state change elsewhere in the house redraws nothing.
+The floating chat button and window (`float.ts`, `floatwindow.ts`) are plain DOM on
+purpose: the button loads on every HA page, and Solid in it would add its runtime to
+each one. Small dependencies only: `solid-js` and `@solidjs/web`, `marked` and
+`dompurify` for safe Markdown rendering, and `tiny-markdown-editor` (its `lib/` files only, which carry no
 polyfills) so the chat box formats Markdown as it is typed. `composer.ts` wraps it to
 read the caret inside Home Assistant's shadow roots, and falls back to a plain textarea
 where the browser cannot.

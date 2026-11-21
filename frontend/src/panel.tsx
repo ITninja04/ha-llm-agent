@@ -1,14 +1,6 @@
-import {
-  LitElement,
-  css,
-  html,
-  nothing,
-  type PropertyValues,
-  type TemplateResult,
-} from "lit";
-import { property, query, state } from "lit/decorators.js";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import { repeat } from "lit/directives/repeat.js";
+import { render, type JSX } from "@solidjs/web";
+import { For, Match, Show, Switch, createEffect, createMemo, flush, type Accessor } from "solid-js";
+import { hassPart, sheet, state } from "./element";
 import { has, type Key, loadLanguage, t } from "./i18n";
 import { renderMarkdown } from "./markdown";
 import { type ComposerBox, insideFence, makeBox } from "./composer";
@@ -55,7 +47,7 @@ const EMPTY_USAGE: Usage = {
 export { collectPageContext } from "./pagecontext";
 export type { PageContext } from "./pagecontext";
 
-class LlmAgentPanel extends LitElement {
+class LlmAgentPanel extends HTMLElement {
   /* The panel keeps itself clear of the phone's status bar and home indicator. It is
    * registered with handle_safe_area (custom_components/llm_agent/__init__.py), because
    * otherwise HA pads its own container by those insets (ha-panel-custom.ts in HA
@@ -64,9 +56,7 @@ class LlmAgentPanel extends LitElement {
    * container has no height of its own. The padding sits inside the 100dvh box
    * (border-box), and the floating window takes care of the insets itself, so it gets
    * none. Left and right follow HA, where the sidebar already covers its side. */
-  static styles = [
-    styles,
-    css`
+  static hostCss = sheet(`
       :host {
         box-sizing: border-box;
         padding: var(--safe-area-inset-top, 0px)
@@ -77,18 +67,53 @@ class LlmAgentPanel extends LitElement {
       :host([embedded]) {
         padding: 0;
       }
-    `,
-  ];
+    `);
 
-  @property({ attribute: false }) hass?: Hass;
-  @property({ type: Boolean }) narrow = false;
+  @state() private _hass?: Hass;
+  // no initializer: it would run before the constructor moves a value HA set early
+  @state() narrow?: boolean;
+
+  get hass(): Hass | undefined {
+    return this._hass;
+  }
+
+  /** HA sets this on every state change in the house. The first one starts the panel
+   * (Lit's updated() did this after the first render with hass). */
+  set hass(hass: Hass | undefined) {
+    this._hass = hass;
+    if (hass && !this.started && this.isConnected) {
+      this.started = true;
+      queueMicrotask(() => void this.init());
+    }
+  }
   /** The page the person is on, set by the floating chat. The full panel at /llm-agent
    * never sets it, so it shows no page chip. */
-  @property({ attribute: false }) pageContext?: PageContext;
+  @state() private _page?: PageContext;
+
+  get pageContext(): PageContext | undefined {
+    return this._page;
+  }
+
+  /** A new page turns the chip back on (Lit's willUpdate did this). */
+  set pageContext(now: PageContext | undefined) {
+    const old = this._page;
+    if (old?.path !== now?.path || old?.summary !== now?.summary) this.pageOff = false;
+    this._page = now;
+  }
   /** Drawn inside the floating chat window (float.ts) rather than as HA's panel: the
    * narrow layout at any width, since the window is phone sized, and no HA menu button,
    * which would open HA's sidebar from inside a window on top of it. */
-  @property({ type: Boolean, reflect: true }) embedded = false;
+  @state() private _embedded = false;
+
+  get embedded(): boolean {
+    return this._embedded;
+  }
+
+  /** Reflected as the embedded attribute, which the host styles above match. */
+  set embedded(on: boolean) {
+    this._embedded = on;
+    this.toggleAttribute("embedded", on);
+  }
 
   @state() private info?: Info;
   @state() private convs: ConvSummary[] = [];
@@ -138,10 +163,10 @@ class LlmAgentPanel extends LitElement {
   @state() private pageOff = false;
   private mentionStart = -1;
 
-  @query(".composer textarea") private source?: HTMLTextAreaElement;
+  private source?: HTMLTextAreaElement;
   /** The chat box: the Markdown editor, or the textarea when the editor cannot start. */
   private input?: ComposerBox;
-  @query(".messages") private scroller?: HTMLElement;
+  private scroller?: HTMLElement;
 
   private gen = 0;
   private listening?: HassConnection;
@@ -200,14 +225,6 @@ class LlmAgentPanel extends LitElement {
         : p.default_model;
   }
 
-  protected willUpdate(changed: PropertyValues): void {
-    if (changed.has("pageContext")) {
-      const old = changed.get("pageContext") as PageContext | undefined;
-      const now = this.pageContext;
-      if (old?.path !== now?.path || old?.summary !== now?.summary) this.pageOff = false;
-    }
-  }
-
   /** The page to send with a message: the chip's page with the latest selection, or
    * nothing when the chip is off or there is no page. */
   private pageToSend(): PageContext | undefined {
@@ -220,23 +237,34 @@ class LlmAgentPanel extends LitElement {
     return { ...page, details };
   }
 
-  protected updated(changed: PropertyValues): void {
-    if (changed.has("hass") && this.hass && !this.started) {
+  #rendered = false;
+
+  constructor() {
+    super();
+    // A property set before the element was defined sits on the instance and would hide
+    // the accessor; move it over, as Lit did for its properties.
+    for (const key of ["hass", "narrow", "pageContext", "embedded"] as const) {
+      if (Object.prototype.hasOwnProperty.call(this, key)) {
+        const v = (this as Record<string, unknown>)[key];
+        delete (this as Record<string, unknown>)[key];
+        (this as Record<string, unknown>)[key] = v;
+      }
+    }
+  }
+
+  connectedCallback(): void {
+    if (!this.#rendered) {
+      // Rendered once and kept, as Lit kept its shadow DOM, so a move in the page (the
+      // floating window keeps one panel for the life of the page) loses nothing.
+      this.#rendered = true;
+      const root = this.attachShadow({ mode: "open" });
+      root.adoptedStyleSheets = [styles, LlmAgentPanel.hostCss];
+      render(() => this.renderPanel(), root);
+    }
+    if (this.hass && !this.started) {
       this.started = true;
-      void this.init();
-    } else if (changed.has("hass") && this.hass) {
-      const old = (changed.get("hass") as Hass | undefined)?.locale?.language;
-      const now = this.hass.locale?.language;
-      if (old !== now)
-        void loadLanguage(now).then((c) => {
-          if (c) this.requestUpdate();
-        });
+      queueMicrotask(() => void this.init());
     }
-    this.attachBox();
-    if (this.stickToBottom && this.scroller) {
-      this.scroller.scrollTop = this.scroller.scrollHeight;
-    }
-    this.addCopyButtons();
   }
 
   /** The composer's textarea is rendered by the template; the box that formats it is
@@ -253,7 +281,7 @@ class LlmAgentPanel extends LitElement {
         onBlur: () =>
           // close the list unless focus came back (a pick by mouse refocuses the box)
           setTimeout(() => {
-            if ((this.renderRoot as ShadowRoot).activeElement !== this.input?.el)
+            if (this.shadowRoot!.activeElement !== this.input?.el)
               this.mentions = [];
           }, 150),
       });
@@ -296,18 +324,20 @@ class LlmAgentPanel extends LitElement {
   };
 
   disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this.listening?.removeEventListener?.("ready", this.onReady);
-    this.listening = undefined;
-    void this.detach();
-    this.started = false;
+    // A move (out and back in within the same task) is not a leave.
+    queueMicrotask(() => {
+      if (this.isConnected) return;
+      this.listening?.removeEventListener?.("ready", this.onReady);
+      this.listening = undefined;
+      void this.detach();
+      this.started = false;
+    });
   }
 
   private async init(): Promise<void> {
     this.listening = this.ws;
     this.ws.addEventListener?.("ready", this.onReady);
-    if (await loadLanguage(this.hass?.locale?.language))
-      this.requestUpdate();
+    await loadLanguage(this.hass?.locale?.language);
     try {
       this.info = await this.ws.sendMessagePromise<Info>({
         type: "llm_agent/info",
@@ -330,7 +360,7 @@ class LlmAgentPanel extends LitElement {
       }
     }
     if (!this.convId) {
-      await this.updateComplete;
+      flush(); // the composer exists from the first render; let it see the state above
       this.setText(loadDraft(this.draftKey, null));
     }
   }
@@ -374,7 +404,7 @@ class LlmAgentPanel extends LitElement {
    * where focusing opens the keyboard over the reply, and not away from another field
    * (an approval note) the person is typing in. */
   private focusComposer(): void {
-    const active = (this.renderRoot as ShadowRoot).activeElement;
+    const active = this.shadowRoot!.activeElement;
     if (matchMedia("(pointer: coarse)").matches) return;
     if (active && active !== this.input?.el && active.tagName !== "BUTTON") return;
     this.input?.focus();
@@ -470,11 +500,11 @@ class LlmAgentPanel extends LitElement {
     this.model = conv.model;
     this.items = toItems(conv.messages);
     if (conv.stopped && conv.stopped_text)
-      this.items.push({
+      this.items = [...this.items, {
         kind: "notice",
         text: conv.stopped_text,
         stop: conv.stopped,
-      });
+      }];
     this.running = false;
     this.stickToBottom = true;
     const info = await this.ws.sendMessagePromise<Info>({
@@ -512,8 +542,8 @@ class LlmAgentPanel extends LitElement {
     const shown = Object.fromEntries(
       Object.entries(args ?? {}).filter(([k]) => !(hasDiff && DIFF_ARGS.has(k))),
     );
-    if (!Object.keys(shown).length) return nothing;
-    return html`<pre class="args">${JSON.stringify(shown, null, 2)}</pre>`;
+    if (!Object.keys(shown).length) return null;
+    return <pre class="args">{JSON.stringify(shown, null, 2)}</pre>;
   }
 
   private async removeConv(id: string, ev: Event): Promise<void> {
@@ -678,7 +708,7 @@ class LlmAgentPanel extends LitElement {
         if (last?.kind === "assistant") {
           last.text += e.text;
         } else {
-          this.items.push({ kind: "assistant", text: e.text });
+          this.items = [...this.items, { kind: "assistant", text: e.text }];
         }
         this.scheduleRender();
         return;
@@ -758,7 +788,10 @@ class LlmAgentPanel extends LitElement {
         this.items = this.items.filter(
           (i) => !(i.kind === "assistant" && !i.text),
         );
-        void this.updateComplete.then(() => this.focusComposer());
+        queueMicrotask(() => {
+          flush();
+          this.focusComposer();
+        });
         void this.detach();
         void this.refreshList().then(() => {
           this.chatTitle =
@@ -774,7 +807,10 @@ class LlmAgentPanel extends LitElement {
     if (this.renderTimer !== undefined) return;
     this.renderTimer = window.setTimeout(() => {
       this.renderTimer = undefined;
-      this.requestUpdate();
+      // The reply grows in place (onEvent appends to its text); a new copy of the last
+      // item is what tells its row to draw the text again. Rows are kept by index.
+      const n = this.items.length;
+      if (n) this.items = [...this.items.slice(0, -1), { ...this.items[n - 1] }];
     }, 80);
   }
 
@@ -805,7 +841,7 @@ class LlmAgentPanel extends LitElement {
   private async answer(id: string, approved: boolean): Promise<void> {
     const note =
       (
-        this.renderRoot.querySelector(
+        this.shadowRoot!.querySelector(
           `#note-${CSS.escape(id)}`,
         ) as HTMLInputElement | null
       )?.value ?? "";
@@ -855,7 +891,7 @@ class LlmAgentPanel extends LitElement {
 
   // ---- input ---------------------------------------------------------------
 
-  private modelError = "";
+  @state() private modelError = "";
   private loadingModels = new Set<string>();
 
   private async loadModels(): Promise<void> {
@@ -1110,21 +1146,94 @@ class LlmAgentPanel extends LitElement {
   }
 
   // ---- render --------------------------------------------------------------
+  // The markup is the Lit template's, element for element. Where Lit had whitespace
+  // between two siblings the JSX has {" "}: inside a line of text or icons that space
+  // shows, and JSX would otherwise drop it.
 
-  protected render(): TemplateResult {
-    if (this.loadError) {
-      return html`<div class="empty">${t("load_error", { error: this.loadError })}</div>`;
-    }
-    if (this.info && !this.info.providers.length) {
-      return html`<div class="empty">${t("no_provider")}</div>`;
-    }
-    const listOpen = this.slim ? this.showList : this.prefs.listOpen;
-    const lastUser = this.convId ? this.lastUserIndex() : -1;
-    return html`
+  /** The parts of hass the panel draws from. HA replaces hass on every state change in
+   * the house; these change only when their part does (see element.tsx). Made in renderPanel(),
+   * which runs under Solid's owner. */
+  #user!: Accessor<Hass["user"] | undefined>;
+  #tips!: Accessor<{ text: string; icon: string }[]>;
+
+  /** The last item index that is the newest sent message, or -1 (no edit/retry offered). */
+  #lastUser!: Accessor<number>;
+
+  private renderPanel(): JSX.Element {
+    this.#user = hassPart(() => this.hass, (h) => h.user);
+    this.#tips = createMemo(() => welcomeTips(this.hass, this.member), {
+      // hass changes all the time, the tips almost never
+      equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+    });
+    this.#lastUser = createMemo(() => (this.convId ? this.lastUserIndex() : -1));
+    const lang = hassPart(() => this.hass, (h) => h.locale?.language);
+    // a language change in the profile: the words follow (t() is reactive)
+    let first = true;
+    createEffect(
+      () => lang(),
+      (now) => {
+        if (first) {
+          first = false; // init() loads the first language
+          return;
+        }
+        void loadLanguage(now);
+      },
+    );
+    // What Lit's updated() did after each render: keep the box's placeholder in step,
+    // follow the newest message, and add copy buttons to new code blocks.
+    createEffect(
+      () => this.placeholder(),
+      (text) => this.input?.setPlaceholder(text),
+    );
+    createEffect(
+      () => [this.items, this.running, this.editAt, this.photos, this.files, this.mentions, this.showChanges],
+      () => {
+        if (this.stickToBottom && this.scroller) this.scroller.scrollTop = this.scroller.scrollHeight;
+        this.addCopyButtons();
+      },
+    );
+    return (
+      <Show
+        when={!this.loadError}
+        fallback={<div class="empty">{t("load_error", { error: this.loadError })}</div>}
+      >
+        <Show when={!(this.info && !this.info.providers.length)} fallback={<div class="empty">{t("no_provider")}</div>}>
+          {this.renderLayout()}
+        </Show>
+      </Show>
+    );
+  }
+
+  private placeholder(): string {
+    return this.slim
+      ? t("composer_placeholder")
+      : `${t("composer_placeholder")} (${t(this.prefs.send === "ctrl" ? "keys_ctrl" : "keys_enter")})`;
+  }
+
+  private listOpen(): boolean {
+    return this.slim ? this.showList : this.prefs.listOpen;
+  }
+
+  private renderLayout(): JSX.Element {
+    const viewBtn = (view: "notes" | "changes" | "usage", title: Key, label: Key, icon: string) => (
+      <button
+        class="icon"
+        title={t(title)}
+        aria-label={t(label)}
+        aria-pressed={tf(this.showChanges && this.view === view)}
+        onClick={() => {
+          this.showChanges = !(this.showChanges && this.view === view);
+          this.view = view;
+        }}
+      >
+        <ha-icon icon={icon} />
+      </button>
+    );
+    return (
       <div
-        class="layout ${this.slim ? "narrow" : ""}"
-        @click=${this.closePrefsOutside}
-        @keydown=${(e: KeyboardEvent) => {
+        class={`layout ${this.slim ? "narrow" : ""}`}
+        onClick={(e) => this.closePrefsOutside(e)}
+        onKeyDown={(e: KeyboardEvent) => {
           if (e.key === "Escape") {
             // Esc stops a reply from anywhere in the panel, unless it closed a popover
             // or the @ list (those prevent the default) first. Using the key marks it
@@ -1138,163 +1247,101 @@ class LlmAgentPanel extends LitElement {
           }
         }}
       >
-        ${listOpen ? this.renderList() : nothing}
+        <Show when={this.listOpen()}>{this.renderList()}</Show>{" "}
         <main
-          class=${this.showChanges ? "changes" : ""}
-          @dragover=${this.onDragOver}
-          @dragleave=${this.onDragLeave}
-          @drop=${this.onDrop}
+          class={this.showChanges ? "changes" : ""}
+          onDragOver={(e) => this.onDragOver(e)}
+          onDragLeave={(e) => this.onDragLeave(e)}
+          onDrop={(e) => void this.onDrop(e)}
         >
           <header>
-            ${
-              this.embedded
-                ? nothing
-                : html`<ha-menu-button
-                    .hass=${this.hass}
-                    .narrow=${this.narrow}
-                  ></ha-menu-button>`
-            }
+            <Show when={!this.embedded}>
+              <ha-menu-button prop:hass={this.hass} prop:narrow={this.narrow} />
+            </Show>{" "}
             <button
               class="icon"
-              title=${listOpen ? t("hide_chats") : t("show_chats")}
-              aria-label=${t("conversations")}
-              aria-expanded=${listOpen}
-              @click=${() =>
-                this.slim
-                  ? (this.showList = !this.showList)
-                  : this.setPref("listOpen", !this.prefs.listOpen)}
+              title={this.listOpen() ? t("hide_chats") : t("show_chats")}
+              aria-label={t("conversations")}
+              aria-expanded={tf(this.listOpen())}
+              onClick={() =>
+                this.slim ? (this.showList = !this.showList) : this.setPref("listOpen", !this.prefs.listOpen)
+              }
             >
-              <ha-icon
-                icon=${this.slim ? "mdi:forum-outline" : "mdi:dock-left"}
-              ></ha-icon>
-            </button>
-            <div class="title">${this.showChanges ? t(this.view === "notes" ? "home_notes" : this.view) : chatName(this.chatTitle)}</div>
-            ${
-              this.items.length
-                ? html`<button
-                    class="icon"
-                    title=${t("export_title")}
-                    aria-label=${t("export")}
-                    @click=${this.exportChat}
-                  >
-                    <ha-icon icon="mdi:tray-arrow-down"></ha-icon>
-                  </button>`
-                : nothing
-            }
-            ${
-              listOpen
-                ? nothing
-                : html`<button
-                    class="icon"
-                    title=${t("new_chat")}
-                    aria-label=${t("new_chat")}
-                    @click=${this.newChat}
-                  >
-                    <ha-icon icon="mdi:square-edit-outline"></ha-icon>
-                  </button>`
-            }
-            ${
-              this.member
-                ? nothing
-                : html`<button
-                    class="icon"
-                    title=${t("home_notes")}
-                    aria-label=${t("home_notes")}
-                    aria-pressed=${this.showChanges && this.view === "notes"}
-                    @click=${() => {
-                      this.showChanges = !(this.showChanges && this.view === "notes");
-                      this.view = "notes";
-                    }}
-                  >
-                    <ha-icon icon="mdi:notebook-outline"></ha-icon>
-                  </button>`
-            }
-            ${
-              this.member
-                ? nothing
-                : html`<button
-                    class="icon"
-                    title=${t("changes_title")}
-                    aria-label=${t("changes")}
-                    aria-pressed=${this.showChanges && this.view === "changes"}
-                    @click=${() => {
-                      this.showChanges = !(this.showChanges && this.view === "changes");
-                      this.view = "changes";
-                    }}
-                  >
-                    <ha-icon icon="mdi:history"></ha-icon>
-                  </button>`
-            }
-            ${
-              this.member
-                ? nothing
-                : html`<button
-                    class="icon"
-                    title=${t("usage_view_title")}
-                    aria-label=${t("usage")}
-                    aria-pressed=${this.showChanges && this.view === "usage"}
-                    @click=${() => {
-                      this.showChanges = !(this.showChanges && this.view === "usage");
-                      this.view = "usage";
-                    }}
-                  >
-                    <ha-icon icon="mdi:chart-bar"></ha-icon>
-                  </button>`
-            }
+              <ha-icon icon={this.slim ? "mdi:forum-outline" : "mdi:dock-left"} />
+            </button>{" "}
+            <div class="title">
+              {this.showChanges ? t(this.view === "notes" ? "home_notes" : this.view) : chatName(this.chatTitle)}
+            </div>{" "}
+            <Show when={this.items.length}>
+              <button class="icon" title={t("export_title")} aria-label={t("export")} onClick={() => this.exportChat()}>
+                <ha-icon icon="mdi:tray-arrow-down" />
+              </button>
+            </Show>{" "}
+            <Show when={!this.listOpen()}>
+              <button class="icon" title={t("new_chat")} aria-label={t("new_chat")} onClick={() => this.newChat()}>
+                <ha-icon icon="mdi:square-edit-outline" />
+              </button>
+            </Show>{" "}
+            <Show when={!this.member}>{viewBtn("notes", "home_notes", "home_notes", "mdi:notebook-outline")}</Show>{" "}
+            <Show when={!this.member}>{viewBtn("changes", "changes_title", "changes", "mdi:history")}</Show>{" "}
+            <Show when={!this.member}>{viewBtn("usage", "usage_view_title", "usage", "mdi:chart-bar")}</Show>{" "}
             <button
               class="icon gear"
-              title=${t("panel_settings")}
-              aria-label=${t("panel_settings")}
-              aria-expanded=${this.showPrefs}
-              @click=${() => (this.showPrefs = !this.showPrefs)}
+              title={t("panel_settings")}
+              aria-label={t("panel_settings")}
+              aria-expanded={tf(this.showPrefs)}
+              onClick={() => (this.showPrefs = !this.showPrefs)}
             >
-              <ha-icon icon="mdi:cog-outline"></ha-icon>
-            </button>
-            ${this.showPrefs ? this.renderPrefs() : nothing}
-          </header>
-          ${
-            this.showChanges && this.view === "notes"
-              ? html`<llm-agent-notes .hass=${this.hass}></llm-agent-notes>`
-              : this.showChanges && this.view === "usage"
-              ? html`<llm-agent-usage .hass=${this.hass}></llm-agent-usage>`
-              : this.showChanges
-              ? html`<llm-agent-changes
-                  .hass=${this.hass}
-                  @open-chat=${(e: CustomEvent<string>) => void this.open(e.detail)}
-                ></llm-agent-changes>`
-              : nothing
-          }
-          <div class="sr-only" role="status" aria-live="polite">${this.announce}</div>
-          <div class="messages" role="log" aria-label=${t("conversation")} @scroll=${this.onScroll}>
-            ${this.items.length ? nothing : this.renderWelcome()}
-            ${repeat(
-              this.items,
-              (_i, idx) => idx,
-              (item, idx) =>
-                this.renderItem(
-                  item,
-                  idx === this.items.length - 1,
-                  idx === lastUser,
-                  item.kind !== "user" &&
-                    item.kind !== "notice" &&
-                    (idx === 0 || this.items[idx - 1].kind === "user"),
-                  idx,
-                ),
-            )}
-          </div>
-          ${this.renderComposer()}
-        </main>
-        ${
-          this.showSettings
-            ? html`<llm-agent-settings
-                .hass=${this.hass}
-                @close=${() => (this.showSettings = false)}
-                @reloaded=${this.reloaded}
-              ></llm-agent-settings>`
-            : nothing
-        }
+              <ha-icon icon="mdi:cog-outline" />
+            </button>{" "}
+            <Show when={this.showPrefs}>{this.renderPrefs()}</Show>
+          </header>{" "}
+          <Switch>
+            <Match when={this.showChanges && this.view === "notes"}>
+              <llm-agent-notes prop:hass={this.hass} />
+            </Match>
+            <Match when={this.showChanges && this.view === "usage"}>
+              <llm-agent-usage prop:hass={this.hass} />
+            </Match>
+            <Match when={this.showChanges}>
+              <llm-agent-changes
+                prop:hass={this.hass}
+                ref={(el: HTMLElement) =>
+                  el.addEventListener("open-chat", (e) => void this.open((e as CustomEvent<string>).detail))
+                }
+              />
+            </Match>
+          </Switch>{" "}
+          <div class="sr-only" role="status" aria-live="polite">
+            {this.announce}
+          </div>{" "}
+          <div
+            class="messages"
+            role="log"
+            aria-label={t("conversation")}
+            ref={(el) => (this.scroller = el)}
+            onScroll={() => this.onScroll()}
+          >
+            <Show when={!this.items.length}>{this.renderWelcome()}</Show>{" "}
+            {/* By index, as Lit's repeat() was: a row keeps its DOM (an open card, a
+                typed approval note) while its item is replaced by a newer copy. */}
+            <For each={this.items} keyed={false}>
+              {(item, idx) => this.renderItem(item, idx)}
+            </For>
+          </div>{" "}
+          {this.renderComposer()}
+        </main>{" "}
+        <Show when={this.showSettings}>
+          <llm-agent-settings
+            prop:hass={this.hass}
+            ref={(el: HTMLElement) => {
+              el.addEventListener("close", () => (this.showSettings = false));
+              el.addEventListener("reloaded", () => void this.reloaded());
+            }}
+          />
+        </Show>
       </div>
-    `;
+    );
   }
 
   private onSearch(ev: Event): void {
@@ -1323,79 +1370,73 @@ class LlmAgentPanel extends LitElement {
     URL.revokeObjectURL(url);
   }
 
-  private renderList(): TemplateResult {
-    const list = this.hits ?? this.convs;
-    return html`<nav>
-      <div class="nav-head">
-        <span class="brand"
-          ><span class="brand-mark"
-            ><ha-icon icon="mdi:robot-happy-outline"></ha-icon></span
-          >LLM Agent</span
-        >
-        <button
-          class="icon"
-          title=${t("new_chat")}
-          aria-label=${t("new_chat")}
-          @click=${this.newChat}
-        >
-          <ha-icon icon="mdi:square-edit-outline"></ha-icon>
-        </button>
-      </div>
-      <label class="search">
-        <ha-icon icon="mdi:magnify"></ha-icon>
-        <input
-          type="search"
-          placeholder=${t("search_chats")}
-          aria-label=${t("search_chats")}
-          .value=${this.query}
-          @input=${this.onSearch}
-        />
-      </label>
-      <div class="convs">
-        ${
-          this.hits && !this.hits.length
-            ? html`<div class="nav-empty">${t("no_matches")}</div>`
-            : nothing
-        }
-        ${!this.hits && !this.convs.length ? html`<div class="nav-empty">${t("no_chats")}</div>` : nothing}
-        ${groupByDay(list, !!this.hits).map(
-          ([label, convs]) => html`
-            ${label ? html`<div class="group">${t(label)}</div>` : nothing}
-            ${convs.map(
-              (c) =>
-                html`<div
-                  class="conv ${c.id === this.convId ? "active" : ""}"
-                  @click=${() => this.open(c.id)}
-                >
-                  <span class="conv-title"
-                    >${
-                      c.source === "action"
-                        ? html`<ha-icon
-                            class="auto"
-                            icon="mdi:robot-outline"
-                            title=${t("started_by_automation")}
-                          ></ha-icon>`
-                        : nothing
-                    }${chatName(c.title)}${
-                      c.snippet && c.snippet !== c.title
-                        ? html`<small class="snippet">${c.snippet}</small>`
-                        : nothing
-                    }</span
-                  >
-                  <button
-                    class="icon del"
-                    title=${t("delete")}
-                    aria-label=${t("delete_chat")}
-                    @click=${(e: Event) => this.removeConv(c.id, e)}
-                  >
-                    <ha-icon icon="mdi:trash-can-outline"></ha-icon>
-                  </button>
-                </div>`,
+  private renderList(): JSX.Element {
+    return (
+      <nav>
+        <div class="nav-head">
+          <span class="brand">
+            <span class="brand-mark">
+              <ha-icon icon="mdi:robot-happy-outline" />
+            </span>
+            LLM Agent
+          </span>{" "}
+          <button class="icon" title={t("new_chat")} aria-label={t("new_chat")} onClick={() => this.newChat()}>
+            <ha-icon icon="mdi:square-edit-outline" />
+          </button>
+        </div>{" "}
+        <label class="search">
+          <ha-icon icon="mdi:magnify" />{" "}
+          <input
+            type="search"
+            placeholder={t("search_chats")}
+            aria-label={t("search_chats")}
+            value={this.query}
+            onInput={(e) => this.onSearch(e)}
+          />
+        </label>{" "}
+        <div class="convs">
+          <Show when={this.hits && !this.hits.length}>
+            <div class="nav-empty">{t("no_matches")}</div>
+          </Show>{" "}
+          <Show when={!this.hits && !this.convs.length}>
+            <div class="nav-empty">{t("no_chats")}</div>
+          </Show>{" "}
+          <For each={groupByDay(this.hits ?? this.convs, !!this.hits)}>
+            {([label, convs]) => (
+              <>
+                {" "}
+                <Show when={label}>
+                  <div class="group">{t(label as Key)}</div>
+                </Show>{" "}
+                <For each={convs}>
+                  {(c) => (
+                    <div class={`conv ${c.id === this.convId ? "active" : ""}`} onClick={() => void this.open(c.id)}>
+                      <span class="conv-title">
+                        <Show when={c.source === "action"}>
+                          <ha-icon class="auto" icon="mdi:robot-outline" title={t("started_by_automation")} />
+                        </Show>
+                        {chatName(c.title)}
+                        <Show when={c.snippet && c.snippet !== c.title}>
+                          <small class="snippet">{c.snippet}</small>
+                        </Show>
+                      </span>{" "}
+                      <button
+                        class="icon del"
+                        title={t("delete")}
+                        aria-label={t("delete_chat")}
+                        onClick={(e) => void this.removeConv(c.id, e)}
+                      >
+                        <ha-icon icon="mdi:trash-can-outline" />
+                      </button>
+                    </div>
+                  )}
+                </For>{" "}
+              </>
             )}
-          `,
-        )}
-      </div>
-    </nav>`;
+          </For>
+        </div>
+      </nav>
+    );
   }
 
   /** Close the panel settings popover on a click anywhere outside it. */
@@ -1411,656 +1452,666 @@ class LlmAgentPanel extends LitElement {
     if (!inside) this.showPrefs = false;
   }
 
-  private renderPrefs(): TemplateResult {
-    const p = this.prefs;
-    const pick = <K extends keyof Prefs>(
-      key: K,
-      label: string,
-      options: [Prefs[K], string][],
-    ) =>
-      html`<label
-        >${label}
-        <select
-          @change=${(e: Event) =>
-            this.setPref(
-              key,
-              (e.target as HTMLSelectElement).value as Prefs[K],
-            )}
-        >
-          ${options.map(
-            ([value, text]) =>
-              html`<option value=${String(value)} ?selected=${p[key] === value}>
-                ${text}
-              </option>`,
-          )}
-        </select></label
-      >`;
-    const check = (key: "compact" | "toolsOpen" | "showUsage", label: string) =>
-      html`<label class="check"
-        ><input
+  private renderPrefs(): JSX.Element {
+    const pick = <K extends keyof Prefs>(key: K, label: string, options: [Prefs[K], string][]) => (
+      <label>
+        {label}{" "}
+        <select onChange={(e) => this.setPref(key, (e.target as HTMLSelectElement).value as Prefs[K])}>
+          {options.map(([value, text]) => (
+            <option value={String(value)} selected={this.prefs[key] === value}>
+              {text}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+    const check = (key: "compact" | "toolsOpen" | "showUsage", label: string) => (
+      <label class="check">
+        <input
           type="checkbox"
-          .checked=${p[key]}
-          @change=${(e: Event) => this.setPref(key, (e.target as HTMLInputElement).checked)}
-        />${label}</label
-      >`;
-    const mine = this.info?.my_default;
-    const mineName = mine
-      ? `${this.info?.providers.find((x) => x.id === mine.provider_id)?.name ?? "?"} · ${mine.model || t("model_provider_default")}`
-      : "";
-    return html`<div class="prefs" role="dialog" aria-label=${t("panel_settings")}>
-      ${pick("theme", t("theme"), [
-        ["auto", t("theme_auto")],
-        ["light", t("theme_light")],
-        ["dark", t("theme_dark")],
-      ])}
-      ${pick("size", t("text_size"), [
-        ["small", t("size_small")],
-        ["normal", t("size_normal")],
-        ["large", t("size_large")],
-      ])}
-      ${pick("send", t("send_with"), [
-        ["enter", "Enter"],
-        ["ctrl", "Ctrl+Enter"],
-      ])}
-      ${check("compact", t("compact_layout"))}
-      ${check("toolsOpen", t("expand_tools"))}
-      ${check("showUsage", t("show_usage"))}
-      ${
-        this.member
-          ? nothing
-          : html`<div class="mine">
-        <div>${t("my_default", { model: mine ? mineName : t("provider_default") })}</div>
-        <button class="small" @click=${() => this.setMyDefault()}>
-          ${t("use_current_model")}
-        </button>
-        ${
-          mine
-            ? html`<button
-                class="small ghost"
-                @click=${() => this.setMyDefault(true)}
-              >
-                ${t("clear")}
-              </button>`
-            : nothing
-        }
-      </div>`
-      }
-      ${
-        this.admin
-          ? html`<div class="mine">
-              <button
-                class="small"
-                @click=${() => {
-                  this.showPrefs = false;
-                  this.showSettings = true;
-                }}
-              >
-                ${t("integration_settings")}
+          checked={this.prefs[key]}
+          onChange={(e) => this.setPref(key, (e.target as HTMLInputElement).checked)}
+        />
+        {label}
+      </label>
+    );
+    const mine = () => this.info?.my_default;
+    const mineName = () => {
+      const m = mine();
+      return m
+        ? `${this.info?.providers.find((x) => x.id === m.provider_id)?.name ?? "?"} \u00b7 ${m.model || t("model_provider_default")}`
+        : "";
+    };
+    return (
+      <div class="prefs" role="dialog" aria-label={t("panel_settings")}>
+        {pick("theme", t("theme"), [
+          ["auto", t("theme_auto")],
+          ["light", t("theme_light")],
+          ["dark", t("theme_dark")],
+        ])}{" "}
+        {pick("size", t("text_size"), [
+          ["small", t("size_small")],
+          ["normal", t("size_normal")],
+          ["large", t("size_large")],
+        ])}{" "}
+        {pick("send", t("send_with"), [
+          ["enter", "Enter"],
+          ["ctrl", "Ctrl+Enter"],
+        ])}{" "}
+        {check("compact", t("compact_layout"))} {check("toolsOpen", t("expand_tools"))}{" "}
+        {check("showUsage", t("show_usage"))}{" "}
+        <Show when={!this.member}>
+          <div class="mine">
+            <div>{t("my_default", { model: mine() ? mineName() : t("provider_default") })}</div>{" "}
+            <button class="small" onClick={() => void this.setMyDefault()}>
+              {t("use_current_model")}
+            </button>{" "}
+            <Show when={mine()}>
+              <button class="small ghost" onClick={() => void this.setMyDefault(true)}>
+                {t("clear")}
               </button>
-              <button class="small ghost" @click=${openInHa}>${t("open_in_ha")}</button>
-            </div>`
-          : nothing
-      }
-      <div class="hint">${t("prefs_hint")}</div>
-    </div>`;
-  }
-
-  private renderWelcome(): TemplateResult {
-    const tips = welcomeTips(this.hass, this.member);
-    const name = this.hass?.user?.name?.split(" ")[0];
-    return html`<div class="welcome">
-      <div class="logo"><ha-icon icon="mdi:robot-happy-outline"></ha-icon></div>
-      <h2>${name ? t("greeting_name", { greeting: greeting(), name }) : greeting()}</h2>
-      ${
-        this.member
-          ? html`<p>${t("welcome_member")}</p>`
-          : html`<p>${t("welcome_admin")}</p>
-              <span class="mode-chip"
-                ><ha-icon icon="mdi:shield-check-outline"></ha-icon
-                >${modeName(this.info?.approval_mode)}</span
-              >`
-      }
-      <div class="tips">
-        ${tips.map(
-          (tip) =>
-            html`<button
-              class="tip"
-              @click=${() => {
-                this.setText(tip.text);
-                this.input!.focus();
+            </Show>
+          </div>
+        </Show>{" "}
+        <Show when={this.admin}>
+          <div class="mine">
+            <button
+              class="small"
+              onClick={() => {
+                this.showPrefs = false;
+                this.showSettings = true;
               }}
             >
-              <ha-icon icon=${tip.icon}></ha-icon>
-              <span>${tip.text}</span>
-            </button>`,
-        )}
+              {t("integration_settings")}
+            </button>{" "}
+            <button class="small ghost" onClick={openInHa}>
+              {t("open_in_ha")}
+            </button>
+          </div>
+        </Show>{" "}
+        <div class="hint">{t("prefs_hint")}</div>
       </div>
-    </div>`;
+    );
   }
 
-  private renderItem(
-    item: Item,
-    last: boolean,
-    lastUser = false,
-    replyStart = false,
-    idx = -1,
-  ): TemplateResult | typeof nothing {
-    const avatar = replyStart
-      ? html`<div class="avatar" aria-hidden="true">
-          <ha-icon icon="mdi:robot-happy-outline"></ha-icon>
-        </div>`
-      : nothing;
-    switch (item.kind) {
-      case "user":
-        return html`<div class="row user ${idx === this.editAt ? "edited" : ""}">
-          ${
-            this.convId && !this.running
-              ? html`<div class="msg-actions">
-                  <button
-                    class="icon"
-                    title=${t("edit")}
-                    aria-label=${t("edit")}
-                    @click=${() => this.edit(idx)}
-                  >
-                    <ha-icon icon="mdi:pencil-outline"></ha-icon>
-                  </button>
-                  ${
-                    lastUser
-                      ? html`<button
-                          class="icon"
-                          title=${t("retry")}
-                          aria-label=${t("retry")}
-                          @click=${() => this.send(item.text)}
-                        >
-                          <ha-icon icon="mdi:refresh"></ha-icon>
-                        </button>`
-                      : nothing
-                  }
-                </div>`
-              : nothing
+  private renderWelcome(): JSX.Element {
+    const name = () => this.#user()?.name?.split(" ")[0];
+    return (
+      <div class="welcome">
+        <div class="logo">
+          <ha-icon icon="mdi:robot-happy-outline" />
+        </div>{" "}
+        <h2>{name() ? t("greeting_name", { greeting: greeting(), name: name()! }) : greeting()}</h2>{" "}
+        <Show
+          when={this.member}
+          fallback={
+            <>
+              <p>{t("welcome_admin")}</p>{" "}
+              <span class="mode-chip">
+                <ha-icon icon="mdi:shield-check-outline" />
+                {modeName(this.info?.approval_mode)}
+              </span>
+            </>
           }
-          <div class="msg user md">
-            ${this.renderPhotos(item)}${unsafeHTML(withChips(renderMarkdown(item.text), this.hass))}
-          </div>
-          ${
-            item.page
-              ? html`<div class="page-note">
-                  <ha-icon icon="mdi:file-eye-outline"></ha-icon>${t("page_sent", { page: item.page })}
-                </div>`
-              : nothing
-          }
-        </div>`;
-      case "assistant":
-        if (!item.text) {
-          return last && this.running
-            ? html`<div class="row reply">
-                ${avatar}
-                <div class="msg assistant typing">
-                  <span></span><span></span><span></span>
-                </div>
-              </div>`
-            : nothing;
-        }
-        return html`<div class="row reply">
-          ${avatar}
-          <div class="msg assistant md">
-            ${unsafeHTML(renderMarkdown(item.text, !(last && this.running)))}
-          </div>
-          ${
-            last && this.running
-              ? nothing
-              : html`<div class="msg-actions acts">
-                  <button
-                    class="icon"
-                    title=${t("copy")}
-                    aria-label=${t("copy")}
-                    @click=${(e: Event) =>
-                      this.copy(item.text, e.currentTarget as HTMLElement)}
-                  >
-                    <ha-icon icon="mdi:content-copy"></ha-icon>
-                  </button>
-                </div>`
-          }
-        </div>`;
-      case "notice":
-        return html`<div class="notice ${item.error ? "error" : ""}">
-          ${item.text}
-          ${
-            last && !this.running && item.stop && CONTINUABLE.has(item.stop)
-              ? html`<button
-                  class="small"
-                  @click=${() => this.continueTurn(item.stop === "spend_cap")}
+        >
+          <p>{t("welcome_member")}</p>
+        </Show>{" "}
+        <div class="tips">
+          <For each={this.#tips()}>
+            {(tip) => (
+              <>
+                {" "}
+                <button
+                  class="tip"
+                  onClick={() => {
+                    this.setText(tip.text);
+                    this.input!.focus();
+                  }}
                 >
-                  ${item.stop === "spend_cap" ? t("continue_anyway") : t("continue")}
-                </button>`
-              : nothing
-          }
-        </div>`;
-      case "tool":
-        return html`<div class="row reply">
-          ${avatar}${this.renderTool(item)}
-        </div>`;
-    }
+                  <ha-icon icon={tip.icon} /> <span>{tip.text}</span>
+                </button>{" "}
+              </>
+            )}
+          </For>
+        </div>
+      </div>
+    );
   }
 
-  private renderPreview(item: Extract<Item, { kind: "tool" }>): TemplateResult {
-    const config = item.args?.config;
-    if (!config || typeof config !== "object") return html``;
-    const open = this.previews.has(item.id);
-    return html`<div class="preview">
-      <button
-        class="ghost small"
-        @click=${() => {
-          const next = new Set(this.previews);
-          if (open) next.delete(item.id);
-          else next.add(item.id);
-          this.previews = next;
-        }}
-      >
-        <ha-icon icon=${open ? "mdi:eye-off-outline" : "mdi:eye-outline"}></ha-icon>
-        ${open ? t("hide_preview") : t("preview_dashboard")}
-      </button>
-      ${
-        open
-          ? html`<llm-dashboard-preview .hass=${this.hass} .config=${config}></llm-dashboard-preview>`
-          : nothing
-      }
-    </div>`;
+  /** One row of the chat. `item` is the row's current item: a row stays while the item
+   * at its index is replaced (a streamed reply, a tool that finished). */
+  private renderItem(item: Accessor<Item>, idx: number): JSX.Element {
+    const last = () => idx === this.items.length - 1;
+    const replyStart = () => {
+      const k = item().kind;
+      return k !== "user" && k !== "notice" && (idx === 0 || this.items[idx - 1]?.kind === "user");
+    };
+    const avatar = () => (
+      <Show when={replyStart()}>
+        <div class="avatar" aria-hidden="true">
+          <ha-icon icon="mdi:robot-happy-outline" />
+        </div>
+      </Show>
+    );
+    const user = () => item() as Extract<Item, { kind: "user" }>;
+    const said = () => item() as Extract<Item, { kind: "assistant" }>;
+    const notice = () => item() as Extract<Item, { kind: "notice" }>;
+    const tool = () => item() as Extract<Item, { kind: "tool" }>;
+    // Markdown is rendered when the text changes; the @ chips are filled in from hass,
+    // and the DOM is only touched when the chips' names change.
+    const userMd = createMemo(() => (item().kind === "user" ? renderMarkdown(user().text) : ""));
+    const userHtml = createMemo(() => withChips(userMd(), this.hass));
+    return (
+      <Switch>
+        <Match when={item().kind === "user"}>
+          <div class={`row user ${idx === this.editAt ? "edited" : ""}`}>
+            <Show when={this.convId && !this.running}>
+              <div class="msg-actions">
+                <button class="icon" title={t("edit")} aria-label={t("edit")} onClick={() => this.edit(idx)}>
+                  <ha-icon icon="mdi:pencil-outline" />
+                </button>{" "}
+                <Show when={idx === this.#lastUser()}>
+                  <button
+                    class="icon"
+                    title={t("retry")}
+                    aria-label={t("retry")}
+                    onClick={() => void this.send(user().text)}
+                  >
+                    <ha-icon icon="mdi:refresh" />
+                  </button>
+                </Show>
+              </div>
+            </Show>{" "}
+            <div class="msg user md">
+              {this.renderPhotos(user)}
+              {nodes(userHtml())}
+            </div>{" "}
+            <Show when={user().page}>
+              <div class="page-note">
+                <ha-icon icon="mdi:file-eye-outline" />
+                {t("page_sent", { page: user().page! })}
+              </div>
+            </Show>
+          </div>
+        </Match>
+        <Match when={item().kind === "assistant" && !said().text && last() && this.running}>
+          <div class="row reply">
+            {avatar()}{" "}
+            <div class="msg assistant typing">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+        </Match>
+        <Match when={item().kind === "assistant" && said().text}>
+          <div class="row reply">
+            {avatar()}{" "}
+            <div class="msg assistant md" innerHTML={renderMarkdown(said().text, !(last() && this.running))} />{" "}
+            <Show when={!(last() && this.running)}>
+              <div class="msg-actions acts">
+                <button
+                  class="icon"
+                  title={t("copy")}
+                  aria-label={t("copy")}
+                  onClick={(e) => void this.copy(said().text, e.currentTarget as HTMLElement)}
+                >
+                  <ha-icon icon="mdi:content-copy" />
+                </button>
+              </div>
+            </Show>
+          </div>
+        </Match>
+        <Match when={item().kind === "notice"}>
+          <div class={`notice ${notice().error ? "error" : ""}`}>
+            {notice().text}{" "}
+            <Show when={last() && !this.running && notice().stop && CONTINUABLE.has(notice().stop!)}>
+              <button class="small" onClick={() => this.continueTurn(notice().stop === "spend_cap")}>
+                {notice().stop === "spend_cap" ? t("continue_anyway") : t("continue")}
+              </button>
+            </Show>
+          </div>
+        </Match>
+        <Match when={item().kind === "tool"}>
+          <div class="row reply">
+            {avatar()}
+            {this.renderTool(tool)}
+          </div>
+        </Match>
+      </Switch>
+    );
+  }
+
+  private renderPreview(item: Accessor<Extract<Item, { kind: "tool" }>>): JSX.Element {
+    const config = () => {
+      const c = item().args?.config;
+      return c && typeof c === "object" ? c : undefined;
+    };
+    const open = () => this.previews.has(item().id);
+    return (
+      <Show when={config()}>
+        <div class="preview">
+          <button
+            class="ghost small"
+            onClick={() => {
+              const next = new Set(this.previews);
+              if (open()) next.delete(item().id);
+              else next.add(item().id);
+              this.previews = next;
+            }}
+          >
+            <ha-icon icon={open() ? "mdi:eye-off-outline" : "mdi:eye-outline"} />{" "}
+            {open() ? t("hide_preview") : t("preview_dashboard")}
+          </button>{" "}
+          <Show when={open()}>
+            <llm-dashboard-preview prop:hass={this.hass} prop:config={config()} />
+          </Show>
+        </div>
+      </Show>
+    );
   }
 
   /** When each notes card appeared; its Save button waits a moment so it isn't clicked by habit. */
   private noteCardSince = new Map<string, number>();
+  /** Bumped when a notes card's wait is over, so its Save button is drawn again. */
+  @state() private noteTick = 0;
 
   /** A suggested change to the home notes: its own look and words, unlike an action approval. */
-  private renderNoteSuggestion(item: Extract<Item, { kind: "tool" }>): TemplateResult {
-    const lines = (item.approval?.diff ?? "").replace(/\n+$/, "").split("\n");
-    const added = lines.filter((l) => l.startsWith("+") && !l.startsWith("+++")).map((l) => l.slice(1));
-    const removed = lines.filter((l) => l.startsWith("-") && !l.startsWith("---")).map((l) => l.slice(1));
-    let since = this.noteCardSince.get(item.id);
-    if (since === undefined) {
-      since = Date.now();
-      this.noteCardSince.set(item.id, since);
-      setTimeout(() => this.requestUpdate(), NOTE_ARM_MS + 50);
-    }
-    const armed = Date.now() - since >= NOTE_ARM_MS;
-    return html`<div class="note-suggestion" role="group" aria-label=${t("suggested_note")}>
-      <div class="note-head">
-        <ha-icon icon="mdi:notebook-edit-outline"></ha-icon>
-        <div>
-          <strong>${t("note_question")}</strong>
-          <small>${t("note_explain")}</small>
+  private renderNoteSuggestion(item: Accessor<Extract<Item, { kind: "tool" }>>): JSX.Element {
+    const lines = () => (item().approval?.diff ?? "").replace(/\n+$/, "").split("\n");
+    const added = () =>
+      lines()
+        .filter((l) => l.startsWith("+") && !l.startsWith("+++"))
+        .map((l) => l.slice(1))
+        .filter((l) => l.trim());
+    const removed = () =>
+      lines()
+        .filter((l) => l.startsWith("-") && !l.startsWith("---"))
+        .map((l) => l.slice(1))
+        .filter((l) => l.trim());
+    const armed = () => {
+      void this.noteTick;
+      const id = item().id;
+      let since = this.noteCardSince.get(id);
+      if (since === undefined) {
+        since = Date.now();
+        this.noteCardSince.set(id, since);
+        setTimeout(() => this.noteTick++, NOTE_ARM_MS + 50);
+      }
+      return Date.now() - since >= NOTE_ARM_MS;
+    };
+    return (
+      <div class="note-suggestion" role="group" aria-label={t("suggested_note")}>
+        <div class="note-head">
+          <ha-icon icon="mdi:notebook-edit-outline" />{" "}
+          <div>
+            <strong>{t("note_question")}</strong> <small>{t("note_explain")}</small>
+          </div>
+        </div>{" "}
+        <Show when={added().length}>
+          <ul class="note-lines add">
+            {" "}
+            <For each={added()}>{(l) => <li>{l}</li>}</For>{" "}
+          </ul>
+        </Show>{" "}
+        <Show when={removed().length}>
+          <div class="note-label">{t("forget")}</div>{" "}
+          <ul class="note-lines del">
+            {" "}
+            <For each={removed()}>{(l) => <li>{l}</li>}</For>{" "}
+          </ul>
+        </Show>{" "}
+        <div class="note-actions">
+          <button class="ghost" onClick={() => void this.answer(item().id, false)}>
+            {t("note_no")}
+          </button>{" "}
+          <button
+            class="note-save"
+            disabled={!armed()}
+            title={armed() ? t("note_save_title") : t("read_it_first")}
+            onClick={() => void this.answer(item().id, true)}
+          >
+            {t("save_to_notes")}
+          </button>
         </div>
       </div>
-      ${added.filter((l) => l.trim()).length
-        ? html`<ul class="note-lines add">
-            ${added.filter((l) => l.trim()).map((l) => html`<li>${l}</li>`)}
-          </ul>`
-        : nothing}
-      ${removed.filter((l) => l.trim()).length
-        ? html`<div class="note-label">${t("forget")}</div>
-            <ul class="note-lines del">
-              ${removed.filter((l) => l.trim()).map((l) => html`<li>${l}</li>`)}
-            </ul>`
-        : nothing}
-      <div class="note-actions">
-        <button class="ghost" @click=${() => this.answer(item.id, false)}>
-          ${t("note_no")}
-        </button>
-        <button
-          class="note-save"
-          ?disabled=${!armed}
-          title=${armed ? t("note_save_title") : t("read_it_first")}
-          @click=${() => this.answer(item.id, true)}
-        >
-          ${t("save_to_notes")}
-        </button>
-      </div>
-    </div>`;
+    );
   }
 
-  private renderTool(item: Extract<Item, { kind: "tool" }>): TemplateResult {
-    const approval = item.approval;
-    if (approval && !approval.phoneOnly && item.name === "change_home_note") return this.renderNoteSuggestion(item);
-    const status = {
-      running: html`<span class="spinner" aria-label=${t("running")}></span>`,
-      ok: html`<ha-icon
-        class="st ok"
-        icon="mdi:check-circle"
-        aria-label=${t("done")}
-      ></ha-icon>`,
-      error: html`<ha-icon
-        class="st error"
-        icon="mdi:alert-circle"
-        aria-label=${t("failed")}
-      ></ha-icon>`,
-      waiting: html`<span class="tag wait">${t("waiting_for_you")}</span>`,
-    }[item.status];
-    return html`<div
-      class="tool ${item.status} ${approval?.risky ? "risky" : ""}"
-    >
-      ${
-        approval
-          ? html`<div class="approval-head">
-              <ha-icon
-                icon=${approval.risky ? "mdi:shield-alert-outline" : "mdi:hand-back-right-outline"}
-              ></ha-icon>
-              <span
-                >${t("needs_approval")}${approval.reason ? html`<span class="why"> · ${approval.reason}</span>` : nothing}</span
-              >
-            </div>`
-          : nothing
+  private renderTool(item: Accessor<Extract<Item, { kind: "tool" }>>): JSX.Element {
+    const approval = () => item().approval;
+    const status = () => {
+      switch (item().status) {
+        case "running":
+          return <span class="spinner" aria-label={t("running")} />;
+        case "ok":
+          return <ha-icon class="st ok" icon="mdi:check-circle" aria-label={t("done")} />;
+        case "error":
+          return <ha-icon class="st error" icon="mdi:alert-circle" aria-label={t("failed")} />;
+        case "waiting":
+          return <span class="tag wait">{t("waiting_for_you")}</span>;
       }
-      <details ?open=${!!approval || this.prefs.toolsOpen}>
-        <summary>
-          <span class="tool-icon"
-            ><ha-icon icon=${toolIcon(item.name)}></ha-icon
-          ></span>
-          <span class="tool-name">${toolLabel(item.name)}</span>
-          <span class="tool-summary"
-            >${approval?.summary ?? item.summary ?? argsLine(item.args)}</span
-          >
-          ${item.undone ? html`<span class="tag">${t("undone")}</span>` : nothing}
-          ${reviewTag(item.review, item.reviewing)}
-          ${status}
-          ${
-            item.snapshotId && !item.undone && item.status === "ok" && !this.member
-              ? html`<button
+    };
+    return (
+      <Show
+        when={!(approval() && !approval()!.phoneOnly && item().name === "change_home_note")}
+        fallback={this.renderNoteSuggestion(item)}
+      >
+        <div class={`tool ${item().status} ${approval()?.risky ? "risky" : ""}`}>
+          <Show when={approval()}>
+            {(a) => (
+              <div class="approval-head">
+                <ha-icon icon={a().risky ? "mdi:shield-alert-outline" : "mdi:hand-back-right-outline"} />{" "}
+                <span>
+                  {t("needs_approval")}
+                  <Show when={a().reason}>
+                    <span class="why"> {"\u00b7"} {a().reason}</span>
+                  </Show>
+                </span>
+              </div>
+            )}
+          </Show>{" "}
+          <details open={!!approval() || this.prefs.toolsOpen}>
+            <summary>
+              <span class="tool-icon">
+                <ha-icon icon={toolIcon(item().name)} />
+              </span>{" "}
+              <span class="tool-name">{toolLabel(item().name)}</span>{" "}
+              <span class="tool-summary">{approval()?.summary ?? item().summary ?? argsLine(item().args)}</span>{" "}
+              <Show when={item().undone}>
+                <span class="tag">{t("undone")}</span>
+              </Show>{" "}
+              {reviewTag(item().review, item().reviewing)} {status()}{" "}
+              <Show when={item().snapshotId && !item().undone && item().status === "ok" && !this.member}>
+                <button
                   class="ghost small undo"
-                  title=${t("undo_title")}
-                  @click=${(e: Event) => {
+                  title={t("undo_title")}
+                  onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    void this.undo(item);
+                    void this.undo(item());
                   }}
                 >
-                  ${t("undo")}
-                </button>`
-              : nothing
-          }
-          <ha-icon class="chev" icon="mdi:chevron-down"></ha-icon>
-        </summary>
-        ${
-          item.review
-            ? html`<div class="review-note ${item.review.decision}">
-                <ha-icon icon="mdi:shield-check-outline"></ha-icon>
-                <span
-                  ><b>${item.review.model ? t("reviewer_model", { model: item.review.model }) : t("reviewer")}:</b>
-                  ${item.review.reason || t(REVIEW_WORDS[item.review.decision])}</span
-                >
-              </div>`
-            : nothing
-        }
-        ${approval?.diff ? html`<pre class="diff">${diffLines(approval.diff)}</pre>` : nothing}
-        ${approval && item.name === "save_dashboard" ? this.renderPreview(item) : nothing}
-        ${this.renderArgs(item.args, Boolean(approval?.diff))}
-        ${item.preview && !approval ? html`<pre class="result">${item.preview}</pre>` : nothing}
-      </details>
-        ${
-          item.image
-            ? html`<img class="snapshot" src=${item.image} alt=${t("camera_snapshot")} />`
-            : nothing
-        }
-      ${
-        approval?.phoneOnly
-          ? html`<div class="approval phone-wait">
-              <ha-icon icon="mdi:cellphone-message"></ha-icon>
-              ${t("phone_wait")}
-            </div>`
-          : approval
-          ? html`<div class="approval">
-              <input
-                id="note-${item.id}"
-                placeholder=${t("approval_note")}
-                aria-label=${t("approval_note")}
-              />
-              <button
-                class="ghost danger-text"
-                @click=${() => this.answer(item.id, false)}
-              >
-                ${t("deny")}
-              </button>
-              <button
-                class="primary"
-                @click=${() => this.answer(item.id, true)}
-              >
-                ${t("approve")}
-              </button>
-            </div>`
-          : nothing
-      }
-    </div>`;
+                  {t("undo")}
+                </button>
+              </Show>{" "}
+              <ha-icon class="chev" icon="mdi:chevron-down" />
+            </summary>{" "}
+            <Show when={item().review}>
+              {(r) => (
+                <div class={`review-note ${r().decision}`}>
+                  <ha-icon icon="mdi:shield-check-outline" />{" "}
+                  <span>
+                    <b>{r().model ? t("reviewer_model", { model: r().model }) : t("reviewer")}:</b>{" "}
+                    {r().reason || t(REVIEW_WORDS[r().decision])}
+                  </span>
+                </div>
+              )}
+            </Show>{" "}
+            <Show when={approval()?.diff}>
+              <pre class="diff">{diffLines(approval()!.diff!)}</pre>
+            </Show>{" "}
+            <Show when={approval() && item().name === "save_dashboard"}>{this.renderPreview(item)}</Show>{" "}
+            {this.renderArgs(item().args, Boolean(approval()?.diff))}{" "}
+            <Show when={item().preview && !approval()}>
+              <pre class="result">{item().preview}</pre>
+            </Show>
+          </details>{" "}
+          <Show when={item().image}>
+            <img class="snapshot" src={item().image} alt={t("camera_snapshot")} />
+          </Show>{" "}
+          <Show
+            when={approval()?.phoneOnly}
+            fallback={
+              <Show when={approval()}>
+                <div class="approval">
+                  <input id={`note-${item().id}`} placeholder={t("approval_note")} aria-label={t("approval_note")} />{" "}
+                  <button class="ghost danger-text" onClick={() => void this.answer(item().id, false)}>
+                    {t("deny")}
+                  </button>{" "}
+                  <button class="primary" onClick={() => void this.answer(item().id, true)}>
+                    {t("approve")}
+                  </button>
+                </div>
+              </Show>
+            }
+          >
+            <div class="approval phone-wait">
+              <ha-icon icon="mdi:cellphone-message" /> {t("phone_wait")}
+            </div>
+          </Show>
+        </div>
+      </Show>
+    );
   }
 
   /** Photos and files on a sent message. The bubble keeps whitespace, so this adds none. */
-  private renderPhotos(item: Item): TemplateResult | typeof nothing {
-    if (item.kind !== "user") return nothing;
-    const files = item.files?.length
-      ? html`<div class="files">${item.files.map((f) => this.renderFile(f))}</div>`
-      : nothing;
-    if (item.images?.length)
-      return html`<div class="photos">${item.images.map((p) => html`<img src=${p.url} alt=${t("your_photo")} />`)}</div>${files}`;
-    if (item.photos)
-      return html`<div class="photo-note"><ha-icon icon="mdi:image-outline"></ha-icon>${photoCount(item.photos)} ${t("not_kept")}</div>${files}`;
-    return files;
+  private renderPhotos(item: Accessor<Extract<Item, { kind: "user" }>>): JSX.Element {
+    const files = () => (
+      <Show when={item().files?.length}>
+        <div class="files">
+          <For each={item().files}>{(f) => this.renderFile(f)}</For>
+        </div>
+      </Show>
+    );
+    return (
+      <Switch fallback={files()}>
+        <Match when={item().images?.length}>
+          <div class="photos">
+            <For each={item().images}>{(p) => <img src={p.url} alt={t("your_photo")} />}</For>
+          </div>
+          {files()}
+        </Match>
+        <Match when={item().photos}>
+          <div class="photo-note">
+            <ha-icon icon="mdi:image-outline" />
+            {photoCount(item().photos!)} {t("not_kept")}
+          </div>
+          {files()}
+        </Match>
+      </Switch>
+    );
   }
 
   /** A file chip: kind, name and size, with a remove button while it is a draft. */
-  private renderFile(f: AttachedFile, remove?: () => void): TemplateResult {
-    return html`<span class="file" title=${f.name}>
-      <ha-icon icon=${FILE_ICONS[f.kind]}></ha-icon>
-      <span class="file-name">${f.name}</span>
-      <span class="file-meta">${fileLabel(f)}, ${fmtBytes(f.size)}</span>
-      ${
-        remove
-          ? html`<button
-              class="icon"
-              title=${t("remove_file")}
-              aria-label=${`${t("remove_file")}: ${f.name}`}
-              @click=${remove}
-            >
-              <ha-icon icon="mdi:close"></ha-icon>
-            </button>`
-          : nothing
-      }
-    </span>`;
+  private renderFile(f: AttachedFile, remove?: () => void): JSX.Element {
+    return (
+      <span class="file" title={f.name}>
+        <ha-icon icon={FILE_ICONS[f.kind]} /> <span class="file-name">{f.name}</span>{" "}
+        <span class="file-meta">
+          {fileLabel(f)}, {fmtBytes(f.size)}
+        </span>{" "}
+        {remove ? (
+          <button class="icon" title={t("remove_file")} aria-label={`${t("remove_file")}: ${f.name}`} onClick={remove}>
+            <ha-icon icon="mdi:close" />
+          </button>
+        ) : null}
+      </span>
+    );
   }
 
-  private renderComposer(): TemplateResult {
-    const p = this.provider;
+  private renderComposer(): JSX.Element {
     const listId = "models";
-    const page = this.pageContext;
-    return html`<footer>
-      ${
-        page
-          ? html`<button
-              class="page-chip ${this.pageOff ? "off" : ""}"
-              aria-pressed=${!this.pageOff}
-              title=${`${page.path}\n${t(this.pageOff ? "page_chip_off" : "page_chip_on")}`}
-              @click=${() => (this.pageOff = !this.pageOff)}
+    const usage = () => this.usage;
+    return (
+      <footer>
+        <Show when={this.pageContext}>
+          {(page) => (
+            <button
+              class={`page-chip ${this.pageOff ? "off" : ""}`}
+              aria-pressed={tf(!this.pageOff)}
+              title={`${page().path}\n${t(this.pageOff ? "page_chip_off" : "page_chip_on")}`}
+              onClick={() => (this.pageOff = !this.pageOff)}
             >
-              <ha-icon icon=${this.pageOff ? "mdi:file-remove-outline" : "mdi:file-eye-outline"}></ha-icon>
-              <span>${t("page_chip", { page: page.summary })}</span>
-            </button>`
-          : nothing
-      }
-      <div class="composer ${this.dragging ? "dragging" : ""}">
-        <textarea
-          rows="1"
-          placeholder=${
-            this.slim
-              ? t("composer_placeholder")
-              : `${t("composer_placeholder")} (${t(this.prefs.send === "ctrl" ? "keys_ctrl" : "keys_enter")})`
-          }
-        ></textarea>
-        ${
-          this.mentions.length
-            ? html`<ul class="mentions" role="listbox">
-                ${this.mentions.map(
-                  (m, i) =>
-                    html`<li
-                      role="option"
-                      aria-selected=${i === this.mentionIndex}
-                      class=${i === this.mentionIndex ? "active" : ""}
-                      @mousedown=${(e: Event) => {
-                        e.preventDefault();
-                        this.pickMention(m);
-                      }}
-                    >
-                      <span class="kind">${m.kind}</span>
-                      <span class="label">${m.label}</span>
-                      <span class="detail">${m.detail}</span>
-                    </li>`,
-                )}
-              </ul>`
-            : nothing
-        }
-        ${
-          this.photos.length
-            ? html`<div class="attached">
-                ${this.photos.map(
-                  (p, i) =>
-                    html`<span class="thumb">
-                      <img src=${p.url} alt=${t("photo_to_send")} />
-                      <button
-                        class="icon"
-                        title=${t("remove_photo")}
-                        aria-label=${t("remove_photo")}
-                        @click=${() =>
-                          (this.photos = this.photos.filter((_, j) => j !== i))}
-                      >
-                        <ha-icon icon="mdi:close"></ha-icon>
-                      </button>
-                    </span>`,
-                )}
-              </div>`
-            : nothing
-        }
-        ${
-          this.files.length
-            ? html`<div class="attached files">
-                ${this.files.map((f, i) =>
-                  this.renderFile(f, () => {
-                    this.files = this.files.filter((_, j) => j !== i);
-                  }),
-                )}
-              </div>`
-            : nothing
-        }
-        <div class="toolbar">
-          <label
-            class="attach icon"
-            title=${t("attach_title")}
-            ?hidden=${this.photos.length >= MAX_PHOTOS && this.files.length >= MAX_FILES}
-          >
-            <ha-icon icon="mdi:paperclip"></ha-icon>
-            <!-- No accept filter: HA files often have no extension (.storage/*,
-                 home-assistant.log.1), and the type is decided from the bytes. -->
-            <input
-              type="file"
-              multiple
-              aria-label=${t("attach")}
-              ?disabled=${this.running}
-              @change=${this.onPick}
-            />
-          </label>
-          ${
-            this.member
-              ? nothing
-              : html`<label
-            class="model-pill"
-            title=${this.modelError || t("provider_and_model")}
-          >
-            <ha-icon icon="mdi:creation-outline"></ha-icon>
-            <select
-              aria-label=${t("provider")}
-              @change=${this.pickProvider}
-              .value=${this.providerId}
-              ?disabled=${this.running}
-            >
-              ${this.info?.providers.map(
-                (prov) =>
-                  html`<option
-                    value=${prov.id}
-                    ?selected=${prov.id === this.providerId}
+              <ha-icon icon={this.pageOff ? "mdi:file-remove-outline" : "mdi:file-eye-outline"} />{" "}
+              <span>{t("page_chip", { page: page().summary })}</span>
+            </button>
+          )}
+        </Show>{" "}
+        <div class={`composer ${this.dragging ? "dragging" : ""}`}>
+          <textarea
+            rows="1"
+            placeholder={this.placeholder()}
+            ref={(ta) => {
+              this.source = ta;
+              // the box is made once the textarea is in the shadow root (see attachBox)
+              queueMicrotask(() => this.attachBox());
+            }}
+          />{" "}
+          <Show when={this.mentions.length}>
+            <ul class="mentions" role="listbox">
+              {" "}
+              <For each={this.mentions}>
+                {(m, i) => (
+                  <li
+                    role="option"
+                    aria-selected={tf(i() === this.mentionIndex)}
+                    class={i() === this.mentionIndex ? "active" : ""}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      this.pickMention(m);
+                    }}
                   >
-                    ${prov.name}
-                  </option>`,
-              )}
-            </select>
-            <span class="sep">/</span>
-            <input
-              class="model"
-              aria-label=${t("model")}
-              list=${listId}
-              .value=${this.model}
-              ?disabled=${this.running}
-              @change=${(e: Event) => (this.model = (e.target as HTMLInputElement).value.trim())}
-              @focus=${this.loadModels}
-            />
-            <datalist id=${listId}>
-              ${(this.fetched[this.providerId] ?? p?.models)?.map(
-                (m) => html`<option value=${m.id}>${m.label}</option>`,
-              )}
-            </datalist>
-          </label>`
-          }
-          <span class="spacer"></span>
-          ${
-            this.running
-              ? html`<button
-                  class="send stop"
-                  title=${t("stop")}
-                  aria-label=${t("stop")}
-                  @click=${this.stop}
+                    <span class="kind">{m.kind}</span> <span class="label">{m.label}</span>{" "}
+                    <span class="detail">{m.detail}</span>
+                  </li>
+                )}
+              </For>{" "}
+            </ul>
+          </Show>{" "}
+          <Show when={this.photos.length}>
+            <div class="attached">
+              {" "}
+              <For each={this.photos}>
+                {(p, i) => (
+                  <span class="thumb">
+                    <img src={p.url} alt={t("photo_to_send")} />{" "}
+                    <button
+                      class="icon"
+                      title={t("remove_photo")}
+                      aria-label={t("remove_photo")}
+                      onClick={() => (this.photos = this.photos.filter((_, j) => j !== i()))}
+                    >
+                      <ha-icon icon="mdi:close" />
+                    </button>
+                  </span>
+                )}
+              </For>{" "}
+            </div>
+          </Show>{" "}
+          <Show when={this.files.length}>
+            <div class="attached files">
+              {" "}
+              <For each={this.files}>
+                {(f, i) =>
+                  this.renderFile(f, () => {
+                    this.files = this.files.filter((_, j) => j !== i());
+                  })
+                }
+              </For>{" "}
+            </div>
+          </Show>{" "}
+          <div class="toolbar">
+            <label
+              class="attach icon"
+              title={t("attach_title")}
+              hidden={this.photos.length >= MAX_PHOTOS && this.files.length >= MAX_FILES}
+            >
+              <ha-icon icon="mdi:paperclip" />{" "}
+              {/* No accept filter: HA files often have no extension (.storage/*,
+                  home-assistant.log.1), and the type is decided from the bytes. */}
+              <input
+                type="file"
+                multiple
+                aria-label={t("attach")}
+                disabled={this.running}
+                onChange={(e) => void this.onPick(e)}
+              />
+            </label>{" "}
+            <Show when={!this.member}>
+              <label class="model-pill" title={this.modelError || t("provider_and_model")}>
+                <ha-icon icon="mdi:creation-outline" />{" "}
+                <select
+                  aria-label={t("provider")}
+                  onChange={(e) => this.pickProvider(e)}
+                  value={this.providerId}
+                  disabled={this.running}
                 >
-                  <ha-icon icon="mdi:stop"></ha-icon>
-                </button>`
-              : html`<button
+                  {" "}
+                  <For each={this.info?.providers}>
+                    {(prov) => (
+                      <option value={prov.id} selected={prov.id === this.providerId}>
+                        {prov.name}
+                      </option>
+                    )}
+                  </For>{" "}
+                </select>{" "}
+                <span class="sep">/</span>{" "}
+                <input
+                  class="model"
+                  aria-label={t("model")}
+                  list={listId}
+                  value={this.model}
+                  disabled={this.running}
+                  onChange={(e) => (this.model = (e.target as HTMLInputElement).value.trim())}
+                  onFocus={() => void this.loadModels()}
+                />{" "}
+                <datalist id={listId}>
+                  {" "}
+                  <For each={this.fetched[this.providerId] ?? this.provider?.models}>
+                    {(m) => <option value={m.id}>{m.label}</option>}
+                  </For>{" "}
+                </datalist>
+              </label>
+            </Show>{" "}
+            <span class="spacer" />{" "}
+            <Show
+              when={this.running}
+              fallback={
+                <button
                   class="send"
-                  title=${t("send")}
-                  aria-label=${t("send")}
-                  ?disabled=${!this.hasText && !this.photos.length && !this.files.length}
-                  @click=${() => this.send()}
+                  title={t("send")}
+                  aria-label={t("send")}
+                  disabled={!this.hasText && !this.photos.length && !this.files.length}
+                  onClick={() => void this.send()}
                 >
-                  <ha-icon icon="mdi:arrow-up"></ha-icon>
-                </button>`
-          }
-        </div>
-      </div>
-      <div class="meta">
-        ${
-          this.editAt >= 0
-            ? html`<span class="editing"
-                >${t(this.editAt === this.lastUserIndex() ? "editing_last" : "editing_earlier")}
-                <button class="small ghost" @click=${this.cancelEdit}>
-                  ${t("cancel")}
-                </button></span
-              >`
-            : nothing
-        }
-        <span
-          class="usage"
-          ?hidden=${!this.prefs.showUsage}
-          title=${t("usage_title")}
-        >
-          ${t("usage_line", {
-            input: fmtTokens(this.usage.input + this.usage.cache_read + this.usage.cache_write),
-            output: fmtTokens(this.usage.output),
-          })}
-          ${this.usage.cache_read ? ` · ${t("usage_cached", { count: fmtTokens(this.usage.cache_read) })}` : nothing}
-          ·
-          ${this.usage.cost == null ? t("cost_na") : `~$${this.usage.cost.toFixed(this.usage.cost < 1 ? 4 : 2)}`}
-          ${
-            this.usage.review
-              ? ` · ${t("reviewer_usage", {
-                  tokens: fmtTokens(this.usage.review.input + this.usage.review.output),
-                  cost: this.usage.review.cost == null ? t("cost_na") : `~$${this.usage.review.cost.toFixed(4)}`,
+                  <ha-icon icon="mdi:arrow-up" />
+                </button>
+              }
+            >
+              <button class="send stop" title={t("stop")} aria-label={t("stop")} onClick={() => void this.stop()}>
+                <ha-icon icon="mdi:stop" />
+              </button>
+            </Show>
+          </div>
+        </div>{" "}
+        <div class="meta">
+          <Show when={this.editAt >= 0}>
+            <span class="editing">
+              {t(this.editAt === this.lastUserIndex() ? "editing_last" : "editing_earlier")}{" "}
+              <button class="small ghost" onClick={() => this.cancelEdit()}>
+                {t("cancel")}
+              </button>
+            </span>
+          </Show>{" "}
+          <span class="usage" hidden={!this.prefs.showUsage} title={t("usage_title")}>
+            {t("usage_line", {
+              input: fmtTokens(usage().input + usage().cache_read + usage().cache_write),
+              output: fmtTokens(usage().output),
+            })}{" "}
+            {usage().cache_read ? ` \u00b7 ${t("usage_cached", { count: fmtTokens(usage().cache_read) })}` : null}{" "}
+            {"\u00b7"}{" "}
+            {usage().cost == null ? t("cost_na") : `~$${usage().cost!.toFixed(usage().cost! < 1 ? 4 : 2)}`}{" "}
+            {usage().review
+              ? ` \u00b7 ${t("reviewer_usage", {
+                  tokens: fmtTokens(usage().review!.input + usage().review!.output),
+                  cost: usage().review!.cost == null ? t("cost_na") : `~$${usage().review!.cost!.toFixed(4)}`,
                 })}`
-              : nothing
-          }
-        </span>
-      </div>
-    </footer>`;
+              : null}
+          </span>
+        </div>
+      </footer>
+    );
   }
 }
 
@@ -2351,15 +2402,17 @@ const REVIEW_WORDS = {
 function reviewTag(
   review: ReviewVerdict | undefined,
   reviewing: boolean | undefined,
-): TemplateResult | typeof nothing {
-  if (reviewing && !review) return html`<span class="tag wait">${t("reviewing")}</span>`;
-  if (!review) return nothing;
-  return html`<span class="tag review ${review.decision}" title=${review.reason}
-    >${t(REVIEW_WORDS[review.decision] ?? "reviewer")}</span
-  >`;
+): JSX.Element {
+  if (reviewing && !review) return <span class="tag wait">{t("reviewing")}</span>;
+  if (!review) return null;
+  return (
+    <span class={`tag review ${review.decision}`} title={review.reason}>
+      {t(REVIEW_WORDS[review.decision] ?? "reviewer")}
+    </span>
+  );
 }
 
-function diffLines(diff: string): TemplateResult[] {
+function diffLines(diff: string): JSX.Element[] {
   return diff
     .replace(/\n+$/, "")
     .split("\n")
@@ -2372,7 +2425,7 @@ function diffLines(diff: string): TemplateResult[] {
             : line.startsWith("@@")
               ? "hunk"
               : "";
-      return html`<span class=${cls}>${line || " "}</span>`;
+      return <span class={cls}>{line || " "}</span>;
     });
 }
 
@@ -2496,6 +2549,19 @@ function errText(err: unknown): string {
 
 if (!customElements.get("llm-agent-panel")) {
   customElements.define("llm-agent-panel", LlmAgentPanel);
+}
+
+/** An ARIA true/false attribute: a boolean false would remove it instead. */
+function tf(on: boolean): "true" | "false" {
+  return on ? "true" : "false";
+}
+
+/** An HTML string as nodes, for markup that must sit directly in its parent (the
+ * bubble's CSS styles its first and last child), the job Lit's unsafeHTML did. */
+function nodes(html: string): Node[] {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html;
+  return [...tpl.content.childNodes];
 }
 
 const MAX_PHOTOS = 3;
