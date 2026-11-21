@@ -69,6 +69,7 @@ async def test_gemini_streams_text_calls_usage_and_keeps_signatures() -> None:
     assert call.id.startswith("gem_")
     usage = next(e for e in out if isinstance(e, Usage))
     assert (usage.input_tokens, usage.cache_read_tokens, usage.output_tokens) == (60, 40, 25)
+    assert usage.reasoning_tokens == 5
     done = out[-1]
     assert isinstance(done, Done) and done.stop_reason == "tool_use"
     raw = done.raw["gemini"]

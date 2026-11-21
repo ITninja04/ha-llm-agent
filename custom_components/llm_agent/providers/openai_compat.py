@@ -199,6 +199,10 @@ class OpenAICompatProvider(Provider):
                         usage.input_tokens = max(0, (u.get("prompt_tokens", 0) or 0) - cached)
                         usage.output_tokens = u.get("completion_tokens", 0) or 0
                         usage.cache_read_tokens = cached
+                        # OpenRouter and OpenAI count reasoning inside completion_tokens
+                        # and inside the max_tokens budget.
+                        thought = (u.get("completion_tokens_details") or {}).get("reasoning_tokens")
+                        usage.reasoning_tokens = thought if isinstance(thought, int) else 0
                     for choice in payload.get("choices") or []:
                         delta = choice.get("delta") or {}
                         if text := delta.get("content"):
