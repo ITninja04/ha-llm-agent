@@ -72,6 +72,11 @@ class Usage:
     output_tokens: int = 0
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
+    # The part of output_tokens the model spent thinking, where the provider reports it
+    # (OpenAI-compatible, Gemini, ChatGPT; Anthropic does not split it out). Already
+    # counted in output_tokens. It is what tells "the reply budget went on thinking"
+    # apart from "the answer was long" when a reply stops at the length limit.
+    reasoning_tokens: int = 0
 
 
 @dataclass(slots=True)

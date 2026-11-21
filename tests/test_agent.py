@@ -229,6 +229,44 @@ async def test_cut_off_reply_is_reported_and_cleared_by_the_next_message(hass) -
     assert "stopped" not in conv
 
 
+async def test_reply_spent_on_thinking_retries_once_with_double_budget(hass) -> None:
+    # The live failure: a reasoning model spent the whole budget thinking, so the reply
+    # was empty with stop=length and Continue could only repeat it at the same budget.
+    thought = [Usage(100, 16000, reasoning_tokens=16000), Done("length")]
+    provider = ScriptedProvider([thought, reply_text("The answer.")])
+    agent = Agent(hass, entry_options())
+    await agent.store.async_load()
+    conv = await agent.store.create("p1", "m", "ctx")
+    events: list[dict[str, Any]] = []
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        run = ChatRun(agent, conv, None)
+        run.listeners.add(events.append)
+        await run.run("design my whole house")
+    assert [c["max_tokens"] for c in provider.calls] == [16000, 32000]
+    assert "stopped" not in conv
+    # the empty reply is not left in the history the next request sees
+    assert [m["role"] for m in conv["messages"]] == ["user", "assistant"]
+    assert conv["messages"][-1]["content"] == "The answer."
+    assert any("Trying once more with 32,000" in e.get("text", "") for e in events)
+
+
+async def test_reply_spent_on_thinking_twice_stops_without_continue(hass) -> None:
+    thought = [Usage(100, 16000, reasoning_tokens=16000), Done("length")]
+    provider = ScriptedProvider([list(thought), list(thought)])
+    agent = Agent(hass, entry_options())
+    await agent.store.async_load()
+    conv = await agent.store.create("p1", "m", "ctx")
+    events: list[dict[str, Any]] = []
+    with patch("custom_components.llm_agent.agent.make_provider", return_value=provider):
+        run = ChatRun(agent, conv, None)
+        run.listeners.add(events.append)
+        await run.run("design my whole house")
+    assert len(provider.calls) == 2  # one retry, never a loop
+    assert conv["stopped"] == "thinking_limit"
+    stop = next(e for e in events if e.get("stop"))
+    assert stop["stop"] == "thinking_limit" and "Maximum reply length" in stop["text"]
+
+
 def test_rewind_drops_last_turn_and_reports_actions() -> None:
     from custom_components.llm_agent.agent import rewind_last_turn
 

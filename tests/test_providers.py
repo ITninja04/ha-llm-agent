@@ -64,6 +64,7 @@ async def test_openai_stream_text_tool_and_usage() -> None:
                 "prompt_tokens": 100,
                 "completion_tokens": 20,
                 "prompt_tokens_details": {"cached_tokens": 40},
+                "completion_tokens_details": {"reasoning_tokens": 12},
             },
         },
         "[DONE]",
@@ -76,6 +77,7 @@ async def test_openai_stream_text_tool_and_usage() -> None:
     assert text == "Hello"
     assert calls[0].id == "c1" and calls[0].args == {"ids": ["light.a"]}
     assert (usage.input_tokens, usage.cache_read_tokens, usage.output_tokens) == (60, 40, 20)
+    assert usage.reasoning_tokens == 12  # inside output_tokens, not added to it
     assert isinstance(events[-1], Done)
     body = session.requests[0]["json"]
     assert body["stream"] is True and body["tools"][0]["function"]["name"] == "get_entities"

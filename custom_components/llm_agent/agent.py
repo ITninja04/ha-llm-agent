@@ -62,6 +62,7 @@ from .const import (
     MODE_READ_ONLY,
     MODE_REVIEWER,
     MODE_YOLO,
+    RANGES,
     setting,
 )
 from .page import UNTRUSTED_NOTE as PAGE_UNTRUSTED_NOTE, label as page_label, render as render_page
@@ -338,6 +339,10 @@ MODEL_LIST_TTL = 3600
 STOP_TEXT = {
     "refusal": "The model declined this request.",
     "length": "The reply was cut off at the length limit.",
+    # Not continuable: continuing at the same limit spends it on thinking again.
+    "thinking_limit": "The model used its whole reply length on thinking and wrote no "
+    "answer. Raise Maximum reply length under the integration's Cost and limits "
+    "settings, then send your message again.",
     "tool_limit": "Stopped: the tool call limit for one message was reached.",
     "cancelled": "Stopped by you.",
     "spend_cap": "Stopped: today's estimated spend reached your daily cap.",
@@ -643,6 +648,13 @@ class ChatRun:
         sent = False  # whether the model has been called this turn
         streaming = False
         usage, text_parts, calls = Usage(), [], []
+        # The reply budget covers thinking as well as the answer on reasoning models
+        # (OpenRouter, OpenAI, Gemini). One that thinks past it returns nothing at all, and
+        # Continue would only think again at the same budget, so that case gets one retry
+        # with double the budget before the turn stops. Measured 2026-11-20 on a live
+        # chat: deepseek-flash via OpenRouter stopped at 16,000 with an empty reply.
+        budget = setting(options, CONF_MAX_REPLY_TOKENS)
+        raised = False
         try:
             if images:
                 # Sent with this turn only: the finally block drops them (_drop_turn_only).
@@ -695,7 +707,7 @@ class ChatRun:
                     system=system,
                     messages=[_provider_view(m) for m in conv["messages"]],
                     tools=specs,
-                    max_tokens=setting(options, CONF_MAX_REPLY_TOKENS),
+                    max_tokens=budget,
                 ):
                     if isinstance(event, TextDelta):
                         text_parts.append(event.text)
@@ -732,9 +744,41 @@ class ChatRun:
                     usage.cache_read_tokens,
                     usage.cache_write_tokens,
                 )
+                cut = done.stop_reason in ("max_tokens", "length") and not calls
+                if cut:
+                    # Warning, not debug: without it a cut-off leaves no trace in the HA
+                    # log, and the numbers say whether to raise the setting.
+                    _LOGGER.warning(
+                        "Reply from %s/%s stopped at the length limit of %d tokens: "
+                        "out=%d, of which thinking=%d, visible characters=%d, conversation %s",
+                        pconf.type,
+                        model,
+                        budget,
+                        usage.output_tokens,
+                        usage.reasoning_tokens,
+                        len("".join(text_parts)),
+                        conv["id"],
+                    )
                 if done.stop_reason == "refusal":
                     self._stopped("refusal")
-                elif done.stop_reason in ("max_tokens", "length") and not calls:
+                elif cut and not "".join(text_parts).strip():
+                    ceiling = int(RANGES[CONF_MAX_REPLY_TOKENS][1])
+                    if not raised and budget < ceiling:
+                        # Drop the empty reply so the retry starts from the same history.
+                        conv["messages"].pop()
+                        raised, old = True, budget
+                        budget = min(budget * 2, ceiling)
+                        self.emit(
+                            {
+                                "type": "notice",
+                                "text": f"The model used all {old:,} reply tokens thinking "
+                                f"and wrote nothing. Trying once more with {budget:,}.",
+                            }
+                        )
+                        continue
+                    self._stopped("thinking_limit")
+                    break
+                elif cut:
                     self._stopped("length")
                 if not calls:
                     if steps > max_steps and not conv.get("stopped"):

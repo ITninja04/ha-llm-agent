@@ -56,7 +56,7 @@ const ERR = (err: unknown) => (err as { message?: string }).message ?? String(er
 class LlmAgentUsage extends LitElement {
   static styles = [
     styles,
-    css`:host{flex:1;min-height:0;height:auto;overflow-y:auto;background:none;container-type:inline-size}
+    css`:host{flex:1;min-height:0;height:auto;overflow-y:auto;overscroll-behavior:contain;background:none;container-type:inline-size}
 .bar,.tot,p{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 20px;margin:0;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
 .bar button.small[aria-selected=true]:not(.ghost):not(.primary):not(.danger){background:var(--accent);color:var(--on-accent)}
 .bal a{color:var(--accent)}

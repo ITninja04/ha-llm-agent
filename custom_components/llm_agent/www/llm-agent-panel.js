@@ -5510,6 +5510,7 @@ var Qi = s`
   }
   .convs {
     overflow-y: auto;
+    overscroll-behavior: contain;
     flex: 1;
     margin: 0 -4px;
     padding: 0 4px;
@@ -5671,6 +5672,7 @@ var Qi = s`
   .messages {
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 24px max(20px, calc((100% - 780px) / 2));
     display: flex;
     flex-direction: column;
@@ -6379,6 +6381,7 @@ var Qi = s`
     box-shadow: var(--shadow-lg);
     max-height: 280px;
     overflow-y: auto;
+    overscroll-behavior: contain;
     z-index: 5;
   }
   ul.mentions li {
@@ -6436,6 +6439,7 @@ var Qi = s`
     max-height: 50vh;
     max-height: 50dvh;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
   /* The Markdown editor that takes the textarea's place (composer.ts). It keeps the
      textarea's type, padding and cap so swapping one for the other moves nothing. Its
@@ -6454,6 +6458,7 @@ var Qi = s`
     max-height: 50vh;
     max-height: 50dvh;
     overflow-y: auto;
+    overscroll-behavior: contain;
     overflow-wrap: anywhere;
     cursor: text;
   }
@@ -6899,7 +6904,7 @@ var Qi = s`
 		}, this.gen = 0;
 	}
 	static {
-		this.styles = [Qi, s`:host{flex:1;min-height:0;height:auto;overflow-y:auto;background:none;container-type:inline-size}
+		this.styles = [Qi, s`:host{flex:1;min-height:0;height:auto;overflow-y:auto;overscroll-behavior:contain;background:none;container-type:inline-size}
 .bar{display:flex;flex-wrap:wrap;gap:8px;padding:12px 20px}
 .bar>*{font:inherit;font-size:13px;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
 .bar>[type=search]{flex:1;min-width:140px}
@@ -7048,7 +7053,7 @@ var ia = class extends A {
 		};
 	}
 	static {
-		this.styles = [Qi, s`:host{flex:1;min-height:0;height:auto;overflow-y:auto;background:none}
+		this.styles = [Qi, s`:host{flex:1;min-height:0;height:auto;overflow-y:auto;overscroll-behavior:contain;background:none}
 .bar,.row,p{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 20px;margin:0;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
 .bar button.small[aria-selected=true]:not(.ghost):not(.primary):not(.danger){background:var(--accent);color:var(--on-accent)}
 .bar span{flex:1;text-align:end}
@@ -7165,7 +7170,7 @@ var aa = (e) => e.message ?? String(e), oa = class extends A {
 		}, this.gen = 0;
 	}
 	static {
-		this.styles = [Qi, s`:host{flex:1;min-height:0;height:auto;overflow-y:auto;background:none;container-type:inline-size}
+		this.styles = [Qi, s`:host{flex:1;min-height:0;height:auto;overflow-y:auto;overscroll-behavior:contain;background:none;container-type:inline-size}
 .bar,.tot,p{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 20px;margin:0;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
 .bar button.small[aria-selected=true]:not(.ghost):not(.primary):not(.danger){background:var(--accent);color:var(--on-accent)}
 .bal a{color:var(--accent)}
@@ -7294,7 +7299,7 @@ var fa = (e) => e.type === "string" ? "text" : Object.keys(e.selector ?? {})[0],
 		this.styles = [Qi, s`:host{position:absolute;inset:0;height:auto;z-index:20;display:flex;flex-direction:column;background:var(--bg);color:var(--text)}
 .top{display:flex;align-items:center;gap:4px;height:60px;flex:none;padding:0 12px;border-bottom:1px solid var(--line)}
 .top b{flex:1;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.body{flex:1;overflow-y:auto;padding:20px max(16px,calc((100% - 680px)/2)) 32px}
+.body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:20px max(16px,calc((100% - 680px)/2)) 32px}
 .body>*+*{margin-top:14px}
 .d,.note{color:var(--muted);font-size:13px;line-height:1.5}.d p{margin:4px 0}.d :is(a,strong){color:var(--text)}
 .menu{display:grid;gap:8px}.menu button{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;color:var(--text);background:var(--surface);border-color:var(--line);border-radius:12px;text-align:start}.menu button:hover{background:var(--hover)}

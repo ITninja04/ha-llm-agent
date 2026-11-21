@@ -118,6 +118,7 @@ def _usage(meta: dict[str, Any]) -> Usage:
         input_tokens=max(0, _count(meta, "promptTokenCount") - cached),
         output_tokens=out,
         cache_read_tokens=cached,
+        reasoning_tokens=_count(meta, "thoughtsTokenCount"),
     )
 
 
