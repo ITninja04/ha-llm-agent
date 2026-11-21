@@ -648,8 +648,10 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   no longer scrolls away and the chat box is no longer cut off at the bottom.
 - **0.10.7 (released):** the hidden Notes (Solid) preview page is gone; the panel
   itself is moving to Solid one view at a time.
-- **0.10.8 (released):** the Notes view is rebuilt on a lighter rendering library;
-  it looks and works the same.
+- **0.10.8 (released):** the Notes view's code is rewritten; it looks and works the
+  same.
+- **0.10.9 (released):** the same rewrite for the Usage, Changes, integration settings
+  and dashboard preview views; they look and work the same.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
