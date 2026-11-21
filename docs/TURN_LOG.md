@@ -66,7 +66,7 @@ every record of version 1 unless marked optional.
 | `model_ms` | int | Milliseconds spent streaming model replies, summed. |
 | `latency_ms` | int | Milliseconds from turn start to its end, including waits for approval. |
 | `tool_calls` | list | One entry per tool call, in the order the model asked for them; see below. |
-| `repeats` | int | Calls answered from an identical earlier read in the same turn instead of being run. |
+| `repeats` | int | Reads that ran again with the same tool and arguments in the same turn and came back with exactly the same result as the last time. The model got a one-line note instead of the result. |
 | `budget_reminder` | bool | The 80 percent budget reminder was added to a tool result. |
 | `tokens` | object | `input`, `output`, `cache_read`, `cache_write`, `reasoning`: summed over the turn's model calls. `input` excludes cached tokens, as the providers report it. |
 | `cost` | float or null | Estimated USD for the turn, from the same prices as the daily cap. Null when any call in the turn had no known price; a partial sum would read as the whole cost. Reviewer calls are not included. |
@@ -85,7 +85,7 @@ every record of version 1 unless marked optional.
 | `ms` | int | Milliseconds from the call starting to its result, including any approval wait. Reads in one step run concurrently, so their times overlap. |
 | `result_chars` | int | Length of the result as sent to the model (results are capped at 16000). |
 | `decision` | str or null | For a change: `auto`, `approved`, `denied`, `reviewer_approved`, `reviewer_denied`. Null for reads. |
-| `repeat` | bool | Answered from an identical earlier read in this turn; the tool did not run. |
+| `repeat` | bool | This read repeated an earlier identical call in the turn and returned the same result, so the model was sent the one-line note. The tool did run; `result_chars` is the note's length. |
 
 ### Example
 

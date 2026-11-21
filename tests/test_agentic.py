@@ -231,7 +231,7 @@ async def test_the_model_is_told_its_budget_and_reminded_at_80_percent(
 # ---- Repeated calls -------------------------------------------------------------
 
 
-async def test_a_repeated_read_returns_the_first_result_without_running(
+async def test_an_unchanged_repeated_read_runs_and_returns_a_short_note(
     hass: HomeAssistant,
 ) -> None:
     hass.states.async_set("sensor.t", "20")
@@ -256,27 +256,39 @@ async def test_a_repeated_read_returns_the_first_result_without_running(
     with patch.object(GetEntities, "run", counting):
         agent, conv, _ = await _turn(hass, provider)
     first, second = _tools(conv)
-    assert calls == 1
-    assert second["content"] == REPEAT_NOTE + first["content"]
+    assert calls == 2  # run both times: only an identical result is shortened
+    assert "sensor.t" in first["content"]
+    assert second["content"] == REPEAT_NOTE
+    assert provider.calls[2]["messages"][-1]["content"] == REPEAT_NOTE  # what the model saw
     record = agent.store.turns.records[-1]
     assert record["repeats"] == 1
     assert [c["repeat"] for c in record["tool_calls"]] == [False, True]
 
 
-async def test_a_read_after_a_change_runs_again(hass: HomeAssistant) -> None:
-    async_mock_service(hass, "light", "turn_on")
-    hass.states.async_set("light.kitchen", "off")
-    look = {"entity_ids": ["light.kitchen"]}
+async def test_a_repeated_read_whose_result_changed_returns_the_new_result(
+    hass: HomeAssistant,
+) -> None:
+    """A garage door polled while it opens: the second read must say so, never the
+    first read's "opening" again."""
+    hass.states.async_set("cover.garage", "opening")
+    look = {"entity_ids": ["cover.garage"]}
     provider = ScriptedProvider(
         [
             reply_tool("c1", "get_entities", look),
-            _light_on("c2"),
-            reply_tool("c3", "get_entities", look),
-            reply_text("On."),
+            reply_tool("c2", "get_entities", look),
+            reply_text("Open."),
         ]
     )
-    _, conv, _ = await _turn(hass, provider, approval_mode="autopilot")
-    assert not _tools(conv)[2]["content"].startswith("[You already made")
+
+    def door_finishes(run: ChatRun, event: dict[str, Any]) -> None:
+        if event["type"] == "tool_result" and event["call_id"] == "c1":
+            hass.states.async_set("cover.garage", "open")
+
+    agent, conv, _ = await _turn(hass, provider, on_event=door_finishes)
+    first, second = _tools(conv)
+    assert '"opening"' in first["content"]
+    assert '"open"' in second["content"] and REPEAT_NOTE not in second["content"]
+    assert agent.store.turns.records[-1]["repeats"] == 0
 
 
 async def test_a_repeated_action_is_never_deduplicated(hass: HomeAssistant) -> None:

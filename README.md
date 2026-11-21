@@ -266,8 +266,9 @@ Household members see Manual, Ask for risky, Read only and Planning; their chats
 skip an approval. Automations that call `llm_agent.ask` always use the mode from Settings.
 
 The AI is told its tool call budget and reminded when 80 percent of it is used. If it
-repeats a lookup it already made in the same message (same tool, same arguments), it gets
-the earlier answer back instead of running it again; actions are never deduplicated.
+repeats a lookup it already made in the same message (same tool, same arguments), the
+lookup runs again; when the answer has not changed it gets a one-line note saying so
+instead of the whole text. Actions are never touched.
 
 Risky actions include:
 

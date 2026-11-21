@@ -375,14 +375,8 @@ DIFF_ARGS = {"config", "content", "old", "new", "text", "body"}
 # Ozzie's install (2026-11-21) 11 of 106 tool-using turns ran past the 50 call limit, most
 # ending at 51 to 53: cut off mid-task by a limit the model was never told about.
 BUDGET_REMINDER_AT = 0.8
-# Reads whose answer changes from one call to the next even with the same arguments, so
-# a repeat is run again rather than answered from the earlier result.
-ALWAYS_RERUN = frozenset({"camera_snapshot"})
-REPEAT_NOTE = (
-    "[You already made this exact call earlier in this message, so it was not run again. "
-    "Its earlier result follows. Use it, or change the arguments if you need something "
-    "different.]\n"
-)
+# What a repeated read returns when its result is the same as last time.
+REPEAT_NOTE = "Same result as your earlier identical call in this message; it has not changed."
 PLANNING_PROMPT = (
     "Planning mode is on: research with tools that only read, change nothing, and reply "
     "with a numbered plan of the changes you would make. Name the tool and the exact "
@@ -588,8 +582,8 @@ class ChatRun:
         self.text_so_far = ""
         self.task: asyncio.Task[None] | None = None
         self.long_price: tuple[int, Price] | None = None
-        # Results of reads already run this turn, by tool and arguments: an identical
-        # call is answered from here. Emptied by any change, which may make them stale.
+        # The last result of each read run this turn, by tool and arguments, to tell
+        # whether a repeat of it came back unchanged
         self._reads: dict[str, str] = {}
         # This turn's entry in the turn log (turnlog.py), filled in as the turn runs
         self.record: dict[str, Any] = {}
@@ -1229,17 +1223,14 @@ class ChatRun:
             return result(f"Invalid arguments: {err}", True)
         except Exception as err:  # noqa: BLE001
             return result(f"Could not check this call: {err}", True)
-        # The same read twice in one turn (same tool, same arguments) is answered from the
-        # first result: models loop on a lookup they already made, and each repeat costs a
-        # step of the budget and the tokens of its result. Never for a change, which a
-        # person may mean to run twice, and the cache empties after any change runs.
+        # A read repeated in one turn (same tool, same arguments) still runs: what it reads
+        # can change without any write of ours (a garage door still opening, a log tail,
+        # history up to now), so an answer from the first result could be stale forever.
+        # When the result comes back identical, the model gets a one-line note instead of
+        # the whole text again, which saves the tokens and tells it it is looping.
         repeat_key = None
-        if risk.level is Level.READ and call.name not in ALWAYS_RERUN and not tool.untrusted:
+        if risk.level is Level.READ:
             repeat_key = call.name + json.dumps(call.args, sort_keys=True, default=str)
-            if (earlier := self._reads.get(repeat_key)) is not None:
-                return result(
-                    REPEAT_NOTE + earlier, summary="Repeated call, earlier result", repeat=True
-                )
         # The prompt asks for the reference page before acting on an integration it
         # covers, and models skipped it and called from memory. So the call is refused
         # until the page was read in this chat. Only where read_reference is offered: the
@@ -1469,8 +1460,6 @@ class ChatRun:
         if tool.untrusted:
             # Set before running: even an error message can carry text from the web.
             self.conv["untrusted"] = True
-        if changes:
-            self._reads.clear()  # what was read before may no longer be true
         try:
             out = await tool.run(ctx, call.args)
         except ToolError as err:
@@ -1512,8 +1501,12 @@ class ChatRun:
             review=_review_meta(verdict),
             images=out.images or None,
         )
-        if repeat_key is not None and not out.images:
-            self._reads[repeat_key] = msg["content"]
+        if repeat_key is not None and not out.images:  # a picture is never "the same"
+            if self._reads.get(repeat_key) == msg["content"]:
+                msg["content"] = REPEAT_NOTE
+                msg["repeat"] = True
+            else:
+                self._reads[repeat_key] = msg["content"]
         return msg
 
     def _hidden(self) -> Callable[[str], bool] | None:
