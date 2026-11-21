@@ -29,6 +29,7 @@ from .const import (
     NOTES_COUNT_MAX,
     NOTES_MAX,
 )
+from .turnlog import TurnLog
 
 VERSION = 1
 SAVE_DELAY = 2
@@ -79,6 +80,7 @@ class ConversationStore:
         # Home notes and knowledge base: facts about this home the household keeps
         self.home = HomeNotes(hass, self._delay_save)
         self.usage = UsageLog(hass, self._delay_save)
+        self.turns = TurnLog(hass, self._delay_save)
         self.cache_size = CACHE_SIZE
         self.max_chats = MAX_CONVERSATIONS
 
@@ -93,6 +95,7 @@ class ConversationStore:
         if await self.home.async_load(data.get("notes")):
             self._save_index()
         await self.usage.async_load()
+        await self.turns.async_load()
 
     def user_default(self, user_id: str) -> dict[str, str] | None:
         return self._prefs.get(user_id)

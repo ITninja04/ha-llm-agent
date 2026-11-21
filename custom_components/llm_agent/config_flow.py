@@ -73,6 +73,9 @@ from .const import (
     CONF_SEARXNG_URL,
     CONF_TIMEOUT,
     CONF_TOOL_RULES,
+    CONF_TURN_LOG,
+    CONF_TURN_LOG_DAYS,
+    CONF_TURN_LOG_MB,
     CONF_UNDO_DAYS,
     CONF_UNDO_KEEP,
     CONF_UNDO_MB,
@@ -165,7 +168,7 @@ SECTIONS: dict[str, tuple[bool, list[str]]] = {
             CONF_SEARCH_KEY,
         ],
     ),
-    "debugging": (True, [CONF_LOG_PROMPTS]),
+    "debugging": (True, [CONF_LOG_PROMPTS, CONF_TURN_LOG, CONF_TURN_LOG_DAYS, CONF_TURN_LOG_MB]),
 }
 
 _UNITS = {
@@ -177,6 +180,8 @@ _UNITS = {
     CONF_UNDO_MB: (1, "MB"),
     CONF_UNDO_DAYS: (1, "days"),
     CONF_AUDIT_MB: (1, "MB"),
+    CONF_TURN_LOG_DAYS: (1, "days"),
+    CONF_TURN_LOG_MB: (1, "MB"),
     CONF_TIMEOUT: (10, "s"),
 }
 

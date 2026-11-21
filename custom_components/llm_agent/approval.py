@@ -15,9 +15,11 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    MODE_ACCEPT_EDITS,
     MODE_ASK_ALL,
     MODE_ASK_RISKY,
     MODE_AUTOPILOT,
+    MODE_PLANNING,
     MODE_READ_ONLY,
     MODE_REVIEWER,
     MODE_YOLO,
@@ -48,11 +50,53 @@ class Risk:
         return cls(Level.RISKY, reason)
 
 
-def needs_approval(mode: str, risk: Risk) -> bool:
+# Tools that change the home's setup rather than the physical world: what Accept edits
+# lets through without asking. A list of names, not a property each tool declares, so a
+# tool added later asks in that mode until someone decides it belongs here. call_service
+# is never on it, because the same tool turns on a lamp and opens a lock.
+SETUP_TOOLS = frozenset(
+    {
+        "save_config_item",
+        "delete_config_item",
+        "save_dashboard",
+        "delete_dashboard",
+        "update_registry",
+        "change_home_note",
+        "change_knowledge",
+    }
+)
+# ha_websocket commands that create or edit a helper or rename things in a registry.
+# Anything else it can send (a service call, a script sequence, a system setting) is not
+# setup. Deleting is left out on purpose: those commands are RISKY and ask anyway.
+_SETUP_WS = re.compile(
+    r"^(input_boolean|input_number|input_text|input_select|input_datetime|input_button"
+    r"|counter|timer|schedule)/(create|update)$"
+    r"|^config/(entity|area|device|floor|label)_registry/(create|update)$"
+)
+
+
+def is_setup(tool_name: str, args: dict[str, Any]) -> bool:
+    """True when the call edits setup (automations, scripts, scenes, dashboards,
+    helpers, names, notes) and acts on no device by itself."""
+    if tool_name in SETUP_TOOLS:
+        return True
+    if tool_name == "ha_websocket":
+        return bool(_SETUP_WS.match(str(args.get("command", ""))))
+    return False
+
+
+def needs_approval(mode: str, risk: Risk, setup: bool = False) -> bool:
+    """Whether a call waits for a person (or the reviewer) in this mode. `setup` is
+    is_setup() for the call; only Accept edits looks at it."""
     if risk.level is Level.READ:
         return False
-    if mode in (MODE_ASK_ALL, MODE_READ_ONLY):  # read-only refuses before asking
+    # read-only and planning refuse every change before asking
+    if mode in (MODE_ASK_ALL, MODE_READ_ONLY, MODE_PLANNING):
         return True
+    if mode == MODE_ACCEPT_EDITS:
+        # The risk levels still count: deleting an automation, replacing the main
+        # dashboard or saving an automation that would open a lock is RISKY and asks.
+        return not (setup and risk.level is Level.WRITE)
     if mode in (MODE_AUTOPILOT, MODE_YOLO):
         return False
     # MODE_ASK_RISKY and anything unknown fall back to the safe default. In reviewer

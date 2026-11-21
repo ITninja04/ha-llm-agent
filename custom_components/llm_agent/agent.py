@@ -22,6 +22,7 @@ from .approval import (
     Level,
     Rule,
     always_asks,
+    is_setup,
     match_rule,
     needs_approval,
     parse_patterns,
@@ -33,6 +34,7 @@ from .balance import Balances
 from .chatgpt_auth import get_auth
 from .const import (
     APPROVAL_TIMEOUT,
+    CHAT_MODES,
     CONF_ALWAYS_ASK,
     CONF_APPROVAL_MODE,
     CONF_AUDIT_MB,
@@ -52,13 +54,18 @@ from .const import (
     CONF_REVIEWER_PROVIDER,
     CONF_TIMEOUT,
     CONF_TOOL_RULES,
+    CONF_TURN_LOG,
+    CONF_TURN_LOG_DAYS,
+    CONF_TURN_LOG_MB,
     CONF_UNDO_DAYS,
     CONF_UNDO_KEEP,
     CONF_UNDO_MB,
     DEFAULT_ALWAYS_ASK,
     MAX_TOOL_RESULT_CHARS,
+    MEMBER_DOWNGRADED,
+    MODE_ACCEPT_EDITS,
     MODE_ASK_RISKY,
-    MODE_AUTOPILOT,
+    MODE_PLANNING,
     MODE_READ_ONLY,
     MODE_REVIEWER,
     MODE_YOLO,
@@ -87,12 +94,15 @@ from .tools import LEAN_TOOLS, Tool, ToolContext, ToolError, build_tools, uses_l
 from .tools.household import member_tools
 from .tools.mcp import async_mcp_tools
 from .tools.reference import async_index, missing_text, page_name
+from .turnlog import MAX_DECISIONS, MAX_ERROR_CHARS, RECORD_VERSION, prompt_hash, short_args
 
 _LOGGER = logging.getLogger(__name__)
 # Full prompts and replies, only when "Log prompts and replies" is on.
 _PROMPT_LOGGER = logging.getLogger(f"{__name__}.prompts")
 
 Emit = Callable[[dict[str, Any]], None]
+# Receives every checkpoint of a turn (see ChatRun._checkpoint). May be async.
+CheckpointHook = Callable[["ChatRun", dict[str, Any]], Awaitable[None] | None]
 
 # The admin prompt. Its section 1 rules are backed by code: a call that skips a required
 # reference page is refused before it runs (see reference_pages in tools/reference.py), so
@@ -361,6 +371,48 @@ STOP_TEXT = {
 # Arguments a preview's diff already shows in full.
 DIFF_ARGS = {"config", "content", "old", "new", "text", "body"}
 
+# The share of the tool budget after which the model is reminded how much is left. On
+# Ozzie's install (2026-11-21) 11 of 106 tool-using turns ran past the 50 call limit, most
+# ending at 51 to 53: cut off mid-task by a limit the model was never told about.
+BUDGET_REMINDER_AT = 0.8
+# Reads whose answer changes from one call to the next even with the same arguments, so
+# a repeat is run again rather than answered from the earlier result.
+ALWAYS_RERUN = frozenset({"camera_snapshot"})
+REPEAT_NOTE = (
+    "[You already made this exact call earlier in this message, so it was not run again. "
+    "Its earlier result follows. Use it, or change the arguments if you need something "
+    "different.]\n"
+)
+PLANNING_PROMPT = (
+    "Planning mode is on: research with tools that only read, change nothing, and reply "
+    "with a numbered plan of the changes you would make. Name the tool and the exact "
+    "target (entity id, automation id, dashboard) in each step, and say what you will check "
+    "afterwards. The user can run the plan with one click: it then comes back to you as a "
+    "message in a mode that can act."
+)
+
+
+def set_chat_mode(conv: dict[str, Any], mode: str) -> None:
+    """Switch a chat's mode. Going into planning remembers the mode before it, which Run
+    plan goes back to (None when the chat had none of its own: the panel then uses Auto)."""
+    if mode == MODE_PLANNING and conv.get("mode") != MODE_PLANNING:
+        conv["mode_before_plan"] = conv.get("mode")
+    conv["mode"] = mode
+
+
+def chat_mode(
+    options: dict[str, Any], conv: dict[str, Any], member: bool = False, unattended: bool = False
+) -> str:
+    """The approval mode a turn runs in: the chat's own mode when it has one, else the
+    Settings mode. Unattended runs always use the Settings mode, since nobody picked a
+    mode for them, and a member's chat never runs in a mode that skips approvals."""
+    mode = options.get(CONF_APPROVAL_MODE) or MODE_ASK_RISKY
+    if not unattended and conv.get("mode") in CHAT_MODES:
+        mode = conv["mode"]
+    if member and mode in MEMBER_DOWNGRADED:
+        mode = MODE_ASK_RISKY
+    return mode
+
 
 class Agent:
     """Shared agent state for one config entry."""
@@ -378,7 +430,15 @@ class Agent:
         # provider id -> prices the provider published with its model list
         self.live_prices: dict[str, dict[str, Price]] = {}
         self.balances = Balances(lambda: async_get_clientsession(hass))
+        self.checkpoint_hooks: list[CheckpointHook] = []
         self._apply_limits()
+
+    def add_checkpoint_hook(self, hook: CheckpointHook) -> Callable[[], None]:
+        """Call `hook(run, checkpoint)` at every checkpoint of every turn. Returns the
+        function that removes it. A hook that raises is logged and skipped; it can not
+        stop a turn. It may add a line to the turn's record with run.decide()."""
+        self.checkpoint_hooks.append(hook)
+        return lambda: self.checkpoint_hooks.remove(hook) if hook in self.checkpoint_hooks else None
 
     def _apply_limits(self) -> None:
         """Push storage settings down to the stores, and the prompt log switch to its logger."""
@@ -389,6 +449,11 @@ class Agent:
         self.snapshots.keep = setting(opts, CONF_UNDO_KEEP)
         self.snapshots.max_age_days = setting(opts, CONF_UNDO_DAYS)
         self.snapshots.audit_max_bytes = setting(opts, CONF_AUDIT_MB) * 1024 * 1024
+        turns = self.store.turns
+        turns.enabled = bool(opts.get(CONF_TURN_LOG, True))
+        turns.max_days = setting(opts, CONF_TURN_LOG_DAYS)
+        turns.max_bytes = setting(opts, CONF_TURN_LOG_MB) * 1024 * 1024
+        turns.trim()
         # HA logs at warning by default; the prompt log is only useful if it shows up.
         _PROMPT_LOGGER.setLevel(logging.INFO if opts.get(CONF_LOG_PROMPTS) else logging.NOTSET)
 
@@ -404,7 +469,7 @@ class Agent:
         pconf = self.provider_config(provider_id)
         cached = self._model_cache.get(pconf.id)
         if cached and time.monotonic() - cached[0] < MODEL_LIST_TTL:
-            return merge_models(pconf.type, cached[1]), None
+            return merge_models(pconf.type, cached[1], self.live_prices.get(pconf.id)), None
         if pconf.type == "chatgpt":
             return merge_models(pconf.type, None), None  # the plan's models; no list to fetch
         url, headers = models_request(pconf.type, pconf.base_url, pconf.api_key)
@@ -421,9 +486,12 @@ class Agent:
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
             _LOGGER.debug("Model list from %s failed: %s", pconf.name, err)
             fallback = cached[1] if cached else None
-            return merge_models(pconf.type, fallback), f"Couldn't fetch models ({err})"
+            return (
+                merge_models(pconf.type, fallback, self.live_prices.get(pconf.id)),
+                f"Couldn't fetch models ({err})",
+            )
         self._model_cache[pconf.id] = (time.monotonic(), ids)
-        return merge_models(pconf.type, ids), None
+        return merge_models(pconf.type, ids, self.live_prices.get(pconf.id)), None
 
     async def count_task(self, pconf: ProviderConfig, model: str, usage: Usage | None) -> None:
         """Record an AI Task call in the usage record, priced like a chat call.
@@ -520,6 +588,37 @@ class ChatRun:
         self.text_so_far = ""
         self.task: asyncio.Task[None] | None = None
         self.long_price: tuple[int, Price] | None = None
+        # Results of reads already run this turn, by tool and arguments: an identical
+        # call is answered from here. Emptied by any change, which may make them stale.
+        self._reads: dict[str, str] = {}
+        # This turn's entry in the turn log (turnlog.py), filled in as the turn runs
+        self.record: dict[str, Any] = {}
+
+    @property
+    def mode(self) -> str:
+        return chat_mode(self.agent.options, self.conv, self.member, self.unattended)
+
+    def decide(self, text: str) -> None:
+        """Add a line to this turn's record in the turn log, for whatever decided
+        something about the turn (a checkpoint hook, say). The log keeps the first 50."""
+        decisions = self.record.setdefault("decisions", [])
+        if len(decisions) < MAX_DECISIONS:
+            decisions.append(str(text)[:MAX_ERROR_CHARS])
+
+    async def _checkpoint(self, kind: str, **data: Any) -> None:
+        """Hand a checkpoint to the hooks: "model" after each model reply, "tools" after
+        each batch of tool calls, "end" when the turn is over."""
+        hooks = self.agent.checkpoint_hooks
+        if not hooks:
+            return
+        point = {"kind": kind, "conversation_id": self.conv["id"], "mode": self.mode, **data}
+        for hook in list(hooks):
+            try:
+                out = hook(self, point)
+                if asyncio.iscoroutine(out):
+                    await out
+            except Exception:
+                _LOGGER.exception("Checkpoint hook %s failed", hook)
 
     def emit(self, event: dict[str, Any]) -> None:
         if event["type"] == "delta":
@@ -616,13 +715,53 @@ class ChatRun:
             f"\n\nThe user's Home Assistant language is {lang}. Reply in the language the "
             f"user writes in; when that is unclear, use {lang}."
         )
-        if options.get(CONF_APPROVAL_MODE) == MODE_READ_ONLY:
+        mode = self.mode
+        if mode == MODE_READ_ONLY:
             system += (
                 "\n\nRead-only mode is on: you can look, read and explain, but every "
                 "change is refused. Say what you would change instead of trying it."
             )
+        elif mode == MODE_PLANNING:
+            system += "\n\n" + PLANNING_PROMPT
+        max_steps = setting(options, CONF_MAX_STEPS)
+        system += (
+            f"\n\nTool budget: at most {max_steps} tool calls for this message. Plan before "
+            "acting, batch independent reads into one step, and do not repeat a call whose "
+            "result you already have."
+        )
         if extra := options.get(CONF_EXTRA_PROMPT):
             system += "\n\nUser instructions:\n" + extra
+        started_at, wall = time.time(), time.monotonic()
+        self.record = {
+            "v": RECORD_VERSION,
+            "ts": round(started_at, 3),
+            "conversation_id": conv["id"],
+            "who": "unattended" if self.unattended else "member" if self.member else "admin",
+            "provider": pconf.type,
+            "provider_id": pconf.id,
+            "model": model,
+            "mode": mode,
+            # the fixed prompt (which changes only with a release) and everything sent
+            # as the system text this turn (notes, knowledge index, home summary too)
+            "prompt_version": prompt_hash(MEMBER_PROMPT if self.member else SYSTEM_PROMPT),
+            "system_hash": prompt_hash(system),
+            "system_chars": len(system),
+            "message_chars": len(text),
+            "max_steps": max_steps,
+            "model_calls": 0,
+            "model_ms": 0,
+            "tool_calls": [],
+            "repeats": 0,
+            "budget_reminder": False,
+            "tokens": {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "reasoning": 0},
+            "cost": 0.0,
+            "stop": None,
+            "error": None,
+            "latency_ms": None,
+            "decisions": [],
+        }
+        self._reads = {}
+        last_stop: str | None = None
         compact_at = setting(options, CONF_COMPACT_AT)
         if compact_at and pconf.context_window:
             # leave room for the system prompt, tools and the reply in a small window
@@ -658,7 +797,6 @@ class ChatRun:
         conv.pop("stopped", None)
         if conv["title"] == "New chat":
             conv["title"] = chat_title(text)
-        max_steps = int(options.get(CONF_MAX_STEPS, 25))
         steps = 0
         overrides = options.get(CONF_PRICE_OVERRIDES) or {}
         if pconf.type == "openrouter" and pconf.id not in agent.live_prices:
@@ -758,6 +896,18 @@ class ChatRun:
                 self.text_so_far = ""
                 streaming = False
                 self._add_usage(usage, price, pconf, model)
+                self.record["model_calls"] += 1
+                self.record["model_ms"] += round((time.monotonic() - started) * 1000)
+                self.record["tokens"]["reasoning"] += usage.reasoning_tokens
+                last_stop = done.stop_reason
+                await self._checkpoint(
+                    "model",
+                    steps=steps,
+                    max_steps=max_steps,
+                    stop_reason=done.stop_reason,
+                    calls=[c.name for c in calls],
+                    text_chars=len("".join(text_parts)),
+                )
                 _LOGGER.debug(
                     "Response in %.1fs: stop=%s, %d tool calls, tokens in=%d out=%d "
                     "cache_read=%d cache_write=%d",
@@ -812,6 +962,20 @@ class ChatRun:
                 steps += len(calls)
                 over = steps > max_steps
                 await self._run_calls(calls, tools, over)
+                if (
+                    not over
+                    and not self.record["budget_reminder"]
+                    and steps >= max_steps * BUDGET_REMINDER_AT
+                ):
+                    # In the tool result, where the model looks next; the system prompt
+                    # only gave the total.
+                    self.record["budget_reminder"] = True
+                    conv["messages"][-1]["content"] += (
+                        f"\n\n[Tool budget: {steps} of {max_steps} tool calls used for this "
+                        "message. Finish with what you have; batch any reads you still need "
+                        "into one step.]"
+                    )
+                await self._checkpoint("tools", steps=steps, max_steps=max_steps)
                 agent.store.save(conv)
                 if over and steps > max_steps + 10:
                     self._stopped("tool_limit")
@@ -842,9 +1006,11 @@ class ChatRun:
             message = scrub(
                 str(err), [getattr(getattr(provider, "config", None), "api_key", "") or ""]
             )
+            self.record["error"] = message[:MAX_ERROR_CHARS]
             _LOGGER.warning("Provider error in conversation %s: %s", conv["id"], message)
             self.emit({"type": "error", "message": message})
         except Exception as err:
+            self.record["error"] = f"{type(err).__name__}: {err}"[:MAX_ERROR_CHARS]
             _LOGGER.exception("Unexpected error in conversation %s", conv["id"])
             self.emit(
                 {
@@ -864,7 +1030,15 @@ class ChatRun:
                     user["content"] += " (files were attached but not sent; attach them again)"
             _drop_turn_only(conv["messages"])
             agent.store.save(conv)
+            self.record["stop"] = conv.get("stopped") or (
+                "error" if self.record["error"] else last_stop
+            )
+            self.record["latency_ms"] = round((time.monotonic() - wall) * 1000)
+            self.record["steps"] = steps
+            agent.store.turns.add(self.record)
             self.emit({"type": "done", "usage": conv["usage"]})
+            # after "done": a hook that is slow must not hold the panel's spinner
+            await self._checkpoint("end", steps=steps, max_steps=max_steps, record=self.record)
 
     def _keep_partial(self, text_parts: list[str], model: str) -> None:
         """Save the text the person already saw, so a reload or Continue keeps it. Tool
@@ -897,6 +1071,17 @@ class ChatRun:
             usage.cache_read_tokens,
             usage.cache_write_tokens,
         )
+        if tokens := self.record.get("tokens"):
+            tokens["input"] += usage.input_tokens
+            tokens["output"] += usage.output_tokens
+            tokens["cache_read"] += usage.cache_read_tokens
+            tokens["cache_write"] += usage.cache_write_tokens
+            # None once any call in the turn had no known price: a partial sum would
+            # read as the whole cost
+            if cost is None:
+                self.record["cost"] = None
+            elif self.record.get("cost") is not None:
+                self.record["cost"] = round(self.record["cost"] + cost, 6)
         if cost is not None:
             self.agent.store.add_spend(_today(), cost, self.user_id)
         _count(self.agent.store, pconf, model, "chat", usage, cost)
@@ -919,10 +1104,18 @@ class ChatRun:
         # Consecutive read-only calls run concurrently; anything else runs in order.
         batch: list[ToolCall] = []
         results: dict[str, dict[str, Any]] = {}
+        took: dict[str, int] = {}
+
+        async def timed(call: ToolCall) -> dict[str, Any]:
+            begun = time.monotonic()
+            try:
+                return await self._execute(ctx, call, tools, over)
+            finally:
+                took[call.id] = round((time.monotonic() - begun) * 1000)
 
         async def flush() -> None:
             if batch:
-                outs = await asyncio.gather(*(self._execute(ctx, c, tools, over) for c in batch))
+                outs = await asyncio.gather(*(timed(c) for c in batch))
                 for call, out in zip(batch, outs, strict=True):
                     results[call.id] = out
                 batch.clear()
@@ -939,10 +1132,26 @@ class ChatRun:
                 batch.append(call)
                 continue
             await flush()
-            results[call.id] = await self._execute(ctx, call, tools, over)
+            results[call.id] = await timed(call)
         await flush()
         for call in calls:
-            self.conv["messages"].append(results[call.id])
+            msg = results[call.id]
+            self.conv["messages"].append(msg)
+            if self.record:
+                self.record["tool_calls"].append(
+                    {
+                        "name": call.name,
+                        "args": short_args(call.args),
+                        "ok": not msg.get("is_error"),
+                        "error": msg["content"][:MAX_ERROR_CHARS] if msg.get("is_error") else None,
+                        "ms": took.get(call.id, 0),
+                        "result_chars": len(msg.get("content") or ""),
+                        "decision": msg.get("decision"),
+                        "repeat": bool(msg.get("repeat")),
+                    }
+                )
+                if msg.get("repeat"):
+                    self.record["repeats"] += 1
 
     async def _execute(
         self, ctx: ToolContext, call: ToolCall, tools: dict[str, Tool], over: bool
@@ -1020,6 +1229,17 @@ class ChatRun:
             return result(f"Invalid arguments: {err}", True)
         except Exception as err:  # noqa: BLE001
             return result(f"Could not check this call: {err}", True)
+        # The same read twice in one turn (same tool, same arguments) is answered from the
+        # first result: models loop on a lookup they already made, and each repeat costs a
+        # step of the budget and the tokens of its result. Never for a change, which a
+        # person may mean to run twice, and the cache empties after any change runs.
+        repeat_key = None
+        if risk.level is Level.READ and call.name not in ALWAYS_RERUN and not tool.untrusted:
+            repeat_key = call.name + json.dumps(call.args, sort_keys=True, default=str)
+            if (earlier := self._reads.get(repeat_key)) is not None:
+                return result(
+                    REPEAT_NOTE + earlier, summary="Repeated call, earlier result", repeat=True
+                )
         # The prompt asks for the reference page before acting on an integration it
         # covers, and models skipped it and called from memory. So the call is refused
         # until the page was read in this chat. Only where read_reference is offered: the
@@ -1038,9 +1258,7 @@ class ChatRun:
 
         decision = "auto"
         options = self.agent.options
-        mode = options.get(CONF_APPROVAL_MODE, "ask_risky")
-        if self.member and mode in (MODE_AUTOPILOT, MODE_REVIEWER, MODE_YOLO):
-            mode = MODE_ASK_RISKY  # a member's chat never skips an approval
+        mode = self.mode  # a member's chat never gets a mode that skips approvals
         rule: Rule | None = None
         if rules := parse_rules(options.get(CONF_TOOL_RULES))[0]:
             try:
@@ -1058,6 +1276,15 @@ class ChatRun:
                 decision="denied",
             )
         changes = risk.level is not Level.READ
+        if mode == MODE_PLANNING and changes:
+            await self._audit(call, risk, "denied", False, "planning mode", None)
+            return result(
+                "Planning mode is on, so nothing is changed yet. Put this step in your "
+                "numbered plan instead; the user runs the plan when it is ready.",
+                True,
+                summary="Planning: not run",
+                decision="denied",
+            )
         if mode == MODE_READ_ONLY and changes:
             await self._audit(call, risk, "denied", False, "read-only mode", None)
             return result(
@@ -1103,8 +1330,13 @@ class ChatRun:
             and not rule_allow
             and changes
         )
-        if reviewing:
-            # The always-ask list wins over the reviewer for every change, risky or not.
+        # The always-ask list wins over the reviewer for every change, risky or not, and
+        # over Accept edits skipping the question for setup changes.
+        if reviewing or (
+            mode == MODE_ACCEPT_EDITS
+            and changes
+            and not (tainted or person or rule_ask or rule_allow)
+        ):
             try:
                 forced = always_asks(
                     parse_patterns(options.get(CONF_ALWAYS_ASK, DEFAULT_ALWAYS_ASK)),
@@ -1119,7 +1351,7 @@ class ChatRun:
             or person
             or bool(forced)
             or rule_ask
-            or (not rule_allow and needs_approval(mode, risk))
+            or (not rule_allow and needs_approval(mode, risk, is_setup(call.name, call.args)))
         )
         # A member may approve their own everyday changes; risky ones need an admin.
         admin_only = self.member and ask and risk.level is Level.RISKY
@@ -1237,6 +1469,8 @@ class ChatRun:
         if tool.untrusted:
             # Set before running: even an error message can carry text from the web.
             self.conv["untrusted"] = True
+        if changes:
+            self._reads.clear()  # what was read before may no longer be true
         try:
             out = await tool.run(ctx, call.args)
         except ToolError as err:
@@ -1270,7 +1504,7 @@ class ChatRun:
                 snapshot_id=out.snapshot_id,
                 rule=rule.pattern if rule_allow and decision == "auto" and rule else None,
             )
-        return result(
+        msg = result(
             out.data,
             summary=out.summary,
             snapshot_id=out.snapshot_id,
@@ -1278,6 +1512,9 @@ class ChatRun:
             review=_review_meta(verdict),
             images=out.images or None,
         )
+        if repeat_key is not None and not out.images:
+            self._reads[repeat_key] = msg["content"]
+        return msg
 
     def _hidden(self) -> Callable[[str], bool] | None:
         """For a member's chat: entities a deny rule names, which its tools then hide."""

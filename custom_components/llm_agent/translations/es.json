@@ -163,10 +163,16 @@
           "debugging": {
             "name": "Depuración",
             "data": {
-              "log_prompts": "Registrar instrucciones y respuestas"
+              "log_prompts": "Registrar instrucciones y respuestas",
+              "turn_log": "Registro de turnos",
+              "turn_log_days": "Conservar el registro de turnos",
+              "turn_log_mb": "Tamaño del registro de turnos"
             },
             "data_description": {
-              "log_prompts": "Escribe cada instrucción, respuesta y llamada a herramientas en el registro de Home Assistant. Déjalo desactivado salvo que estés notificando un problema: el registro contendrá tus conversaciones."
+              "log_prompts": "Escribe cada instrucción, respuesta y llamada a herramientas en el registro de Home Assistant. Déjalo desactivado salvo que estés notificando un problema: el registro contendrá tus conversaciones.",
+              "turn_log": "Guarda un registro por turno de chat (herramientas usadas, recuentos, tokens, coste, tiempo) para ajustar el prompt, aparte de los chats, así que borrar un chat no lo elimina. Se queda en Home Assistant; los administradores pueden descargarlo desde la vista de uso.",
+              "turn_log_days": "Los registros más antiguos se borran.",
+              "turn_log_mb": "Los registros más antiguos se borran a partir de este tamaño."
             }
           },
           "rules": {

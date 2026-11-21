@@ -68,6 +68,18 @@ APPROVAL_MODES = [
     MODE_YOLO,
     MODE_READ_ONLY,
 ]
+# Two more modes a chat can be switched to from the composer. They are not offered as the
+# Settings default: a new chat starts in the Settings mode, and these are picked per chat.
+# Accept edits runs changes to the home's setup (automations, scripts, scenes, dashboards,
+# helpers, entity names) without asking and asks for everything that acts on devices,
+# files or the shell (approval.SETUP_TOOLS says which is which).
+MODE_ACCEPT_EDITS = "accept_edits"
+# Planning looks only and answers with a numbered plan; the panel then offers Run plan,
+# which switches the chat back to the mode it had before and sends the plan.
+MODE_PLANNING = "planning"
+CHAT_MODES = [*APPROVAL_MODES, MODE_ACCEPT_EDITS, MODE_PLANNING]
+# A household member's chat never skips an approval, so these act as Ask for risky there.
+MEMBER_DOWNGRADED = {MODE_AUTOPILOT, MODE_REVIEWER, MODE_YOLO, MODE_ACCEPT_EDITS}
 # 0.2.1 reviewer approval mode
 CONF_REVIEWER_PROVIDER = "reviewer_provider"  # provider id, or SAME_PROVIDER
 SAME_PROVIDER = "chat"
@@ -84,6 +96,11 @@ CONF_HOUSEHOLD = "household_chat"  # non-admin users get a limited chat
 CONF_MEMBER_DAILY_CAP = "member_daily_cap"  # USD per member per day, 0 = no cap
 CONF_APPROVAL_PHONE = "approval_phone"  # notify action of the phone that approves
 CONF_FLOAT_BUTTON = "float_button"  # the chat button on every HA page
+# The turn log: one record per chat turn for tuning the prompt, kept apart from the chats
+# so deleting a chat does not lose it. Stays in .storage; nothing is sent anywhere.
+CONF_TURN_LOG = "turn_log"
+CONF_TURN_LOG_DAYS = "turn_log_days"
+CONF_TURN_LOG_MB = "turn_log_mb"
 
 DEFAULT_OPTIONS = {
     CONF_TOOL_RULES: "",
@@ -91,6 +108,9 @@ DEFAULT_OPTIONS = {
     CONF_MEMBER_DAILY_CAP: 0.5,
     CONF_APPROVAL_PHONE: "",
     CONF_FLOAT_BUTTON: True,
+    CONF_TURN_LOG: True,
+    CONF_TURN_LOG_DAYS: 30,
+    CONF_TURN_LOG_MB: 20,
     CONF_APPROVAL_MODE: MODE_ASK_RISKY,
     CONF_REVIEWER_PROVIDER: SAME_PROVIDER,
     CONF_REVIEWER_MODEL: "",
@@ -144,6 +164,8 @@ RANGES: dict[str, tuple[float, float]] = {
     CONF_AUDIT_MB: (1, 100),
     CONF_TIMEOUT: (30, 1800),
     CONF_RETRIES: (0, 6),
+    CONF_TURN_LOG_DAYS: (1, 365),
+    CONF_TURN_LOG_MB: (1, 200),
 }
 
 

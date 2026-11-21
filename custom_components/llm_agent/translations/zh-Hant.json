@@ -163,10 +163,16 @@
           "debugging": {
             "name": "偵錯",
             "data": {
-              "log_prompts": "記錄提示詞與回覆"
+              "log_prompts": "記錄提示詞與回覆",
+              "turn_log": "輪次日誌",
+              "turn_log_days": "輪次日誌保留時間",
+              "turn_log_mb": "輪次日誌大小"
             },
             "data_description": {
-              "log_prompts": "將每則提示詞、回覆和工具呼叫寫入 Home Assistant 日誌。除非正在回報問題，否則請保持關閉：開啟後日誌會包含你的對話。"
+              "log_prompts": "將每則提示詞、回覆和工具呼叫寫入 Home Assistant 日誌。除非正在回報問題，否則請保持關閉：開啟後日誌會包含你的對話。",
+              "turn_log": "為每輪對話保存一筆記錄（使用的工具、次數、權杖、費用、耗時），用於調整提示詞，與聊天分開保存，刪除聊天不會刪除它。它保留在 Home Assistant 中；管理員可以在用量檢視中下載。",
+              "turn_log_days": "更早的記錄會被刪除。",
+              "turn_log_mb": "超過此大小時刪除最早的記錄。"
             }
           },
           "rules": {

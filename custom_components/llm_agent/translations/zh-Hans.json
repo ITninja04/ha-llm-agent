@@ -163,10 +163,16 @@
           "debugging": {
             "name": "调试",
             "data": {
-              "log_prompts": "记录提示词和回复"
+              "log_prompts": "记录提示词和回复",
+              "turn_log": "轮次日志",
+              "turn_log_days": "轮次日志保留时间",
+              "turn_log_mb": "轮次日志大小"
             },
             "data_description": {
-              "log_prompts": "将每条提示词、回复和工具调用写入 Home Assistant 日志。除非正在报告问题，否则请保持关闭：开启后日志会包含你的对话。"
+              "log_prompts": "将每条提示词、回复和工具调用写入 Home Assistant 日志。除非正在报告问题，否则请保持关闭：开启后日志会包含你的对话。",
+              "turn_log": "为每轮对话保存一条记录（使用的工具、次数、令牌、费用、耗时），用于调整提示词，与聊天分开保存，删除聊天不会删除它。它保留在 Home Assistant 中；管理员可以在用量视图中下载。",
+              "turn_log_days": "更早的记录会被删除。",
+              "turn_log_mb": "超过此大小时删除最早的记录。"
             }
           },
           "rules": {

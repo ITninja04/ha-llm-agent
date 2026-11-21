@@ -243,13 +243,31 @@ All settings are under **Settings → Devices & services → LLM Agent → Confi
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| Approval mode | Ask before risky actions | `Ask before every change`, `Ask before risky actions`, `Reviewer` (a second AI model decides risky actions), `Autopilot` (never asks), `YOLO` (never asks, even after reading web content), or `Read only` (it looks and explains, but never changes anything). |
+| Approval mode | Ask before risky actions | `Ask before every change`, `Ask before risky actions`, `Reviewer` (a second AI model decides risky actions), `Autopilot` (never asks), `YOLO` (never asks, even after reading web content), or `Read only` (it looks and explains, but never changes anything). New chats start in this mode; each chat can switch with the picker next to the model. |
 | Back up before risky actions | On | Takes a full HA backup before HACS installs and integration removal. |
 | Protect sensitive data | On | Blocks reading `secrets.yaml`, auth and credential storage, databases, and files outside `/config`. Also blocks commands that issue tokens. |
 | Refuse restart when configuration is invalid | On | Restarts only after a passing config check. |
 | Allow shell commands | **Off** | Lets the AI run commands in the HA container. Asks you to confirm when you turn it on. |
 | Use tools from MCP servers | **Off** | Offers the tools of servers added with HA's own [Model Context Protocol](https://www.home-assistant.io/integrations/mcp/) integration. See below. |
 | Tool calls per message | 25 | Stops runaway loops. |
+
+Each chat has its own mode, picked in the chat box next to the model. Besides the six above
+it offers two more:
+
+- **Accept edits** changes the home's setup without asking: automations, scripts, scenes,
+  dashboards, helpers, area and entity names. Anything that acts on a device, and files
+  and the shell, still asks. Deleting, replacing your main dashboard, or saving an
+  automation that would unlock a door counts as risky and asks too. Your approval rules
+  and the always-ask list still win, and home notes and knowledge always come to a person.
+- **Planning** only looks. The AI answers with a numbered plan, and **Run plan** switches
+  the chat back to the mode it had before (Auto if none) and sends the plan to carry out.
+
+Household members see Manual, Ask for risky, Read only and Planning; their chats never
+skip an approval. Automations that call `llm_agent.ask` always use the mode from Settings.
+
+The AI is told its tool call budget and reminded when 80 percent of it is used. If it
+repeats a lookup it already made in the same message (same tool, same arguments), it gets
+the earlier answer back instead of running it again; actions are never deduplicated.
 
 Risky actions include:
 
@@ -424,7 +442,7 @@ default, a safe range and a one-line explanation. The less common groups start f
 | Household and phone | Household members' chat on or off, their daily limit, and the phone that approves |
 | Reviewer mode | The reviewer's provider and model (the chat's own by default), and the always-ask list |
 | Web research | Web pages on or off, fetching LAN addresses (off), web search: Free (HA forum, HA GitHub issues and Wikipedia, no key, the default), SearXNG (self-hosted, covers the whole web), Brave Search, or Off |
-| Debugging | Log full prompts and replies (the log then contains your conversations) |
+| Debugging | Log full prompts and replies (the log then contains your conversations); the turn log, one record per chat turn for tuning the prompt, kept 30 days or 20 MB by default and downloadable from the Usage view (format in [docs/TURN_LOG.md](docs/TURN_LOG.md)) |
 
 For a local model with a small context, set **Context window** when you add the provider
 (Ollama uses 4,096 tokens unless you raise it). Compaction then starts early enough to keep
