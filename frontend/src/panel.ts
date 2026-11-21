@@ -1,5 +1,6 @@
 import {
   LitElement,
+  css,
   html,
   nothing,
   type PropertyValues,
@@ -55,7 +56,29 @@ export { collectPageContext } from "./pagecontext";
 export type { PageContext } from "./pagecontext";
 
 class LlmAgentPanel extends LitElement {
-  static styles = styles;
+  /* The panel keeps itself clear of the phone's status bar and home indicator. It is
+   * registered with handle_safe_area (custom_components/llm_agent/__init__.py), because
+   * otherwise HA pads its own container by those insets (ha-panel-custom.ts in HA
+   * frontend 20261028.6, lines 182-183) around a host that is already 100dvh tall, and
+   * the page grows by both insets and scrolls. height: 100% is no way out: that
+   * container has no height of its own. The padding sits inside the 100dvh box
+   * (border-box), and the floating window takes care of the insets itself, so it gets
+   * none. Left and right follow HA, where the sidebar already covers its side. */
+  static styles = [
+    styles,
+    css`
+      :host {
+        box-sizing: border-box;
+        padding: var(--safe-area-inset-top, 0px)
+          var(--safe-area-content-inset-right, var(--safe-area-inset-right, 0px))
+          var(--safe-area-inset-bottom, 0px)
+          var(--safe-area-content-inset-left, var(--safe-area-inset-left, 0px));
+      }
+      :host([embedded]) {
+        padding: 0;
+      }
+    `,
+  ];
 
   @property({ attribute: false }) hass?: Hass;
   @property({ type: Boolean }) narrow = false;

@@ -614,6 +614,46 @@ if (!(await inGerman()))
   fail(`panel not in German: placeholder is "${await placeholder()}"`);
 await german.close();
 
+// On an iPhone the panel fits the screen with the safe-area insets set. HA reads them
+// from --app-safe-area-inset-* on <html> (src/resources/theme/main.globals.ts), which is
+// how the companion app hands them over. Before 0.10.6 HA's container added both insets
+// around a full-height panel, so the page was taller than the screen: the header
+// scrolled away or the composer was cut off at the bottom.
+const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
+phone.on("pageerror", (e) => errors.push(String(e)));
+await phone.addInitScript((t) => {
+  localStorage.setItem("hassTokens", JSON.stringify(t));
+  document.addEventListener("DOMContentLoaded", () => {
+    document.documentElement.style.setProperty("--app-safe-area-inset-top", "59px");
+    document.documentElement.style.setProperty("--app-safe-area-inset-bottom", "34px");
+  });
+}, tokens);
+await phone.goto(`${ha}/llm-agent`);
+const phonePanel = phone.locator("llm-agent-panel");
+await phonePanel.locator(".composer").waitFor({ timeout: 60000 });
+await phone.waitForTimeout(500);
+const fit = await phone.evaluate(() => {
+  const host = document
+    .querySelector("home-assistant")
+    .shadowRoot.querySelector("home-assistant-main")
+    .shadowRoot.querySelector("ha-panel-custom llm-agent-panel");
+  const root = host.shadowRoot;
+  const box = (sel) => root.querySelector(sel).getBoundingClientRect();
+  return {
+    inset: getComputedStyle(document.documentElement).getPropertyValue("--safe-area-inset-top").trim(),
+    scroll: document.scrollingElement.scrollHeight,
+    view: innerHeight,
+    header: box("header").top,
+    composer: box(".composer").bottom,
+  };
+});
+if (fit.inset !== "59px") fail(`safe-area inset not applied the way HA does: ${JSON.stringify(fit)}`);
+if (fit.scroll > fit.view) fail(`panel taller than the phone screen: ${JSON.stringify(fit)}`);
+if (fit.header < 59) fail(`header under the status bar: ${JSON.stringify(fit)}`);
+if (fit.composer > fit.view - 34) fail(`composer under the home indicator: ${JSON.stringify(fit)}`);
+await phone.screenshot({ path: `${shots}/llm-agent-phone.png` });
+await phone.close();
+
 if (errors.length) fail(`page errors: ${errors.join("; ")}`);
 await browser.close();
 console.log("E2E PASS");

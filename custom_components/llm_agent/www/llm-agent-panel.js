@@ -5340,7 +5340,7 @@ var Qi = s`
     font-size: 15px;
     -webkit-font-smoothing: antialiased;
   }
-  /* inside the floating window, which sets the size */
+  /* inside the floating window, which sets the size and keeps clear of the safe areas */
   :host([embedded]) {
     height: 100%;
   }
@@ -7930,7 +7930,18 @@ var uo = /* @__PURE__ */ new Set([
 		}, this.modelError = "", this.loadingModels = /* @__PURE__ */ new Set(), this.noteCardSince = /* @__PURE__ */ new Map();
 	}
 	static {
-		this.styles = Qi;
+		this.styles = [Qi, s`
+      :host {
+        box-sizing: border-box;
+        padding: var(--safe-area-inset-top, 0px)
+          var(--safe-area-content-inset-right, var(--safe-area-inset-right, 0px))
+          var(--safe-area-inset-bottom, 0px)
+          var(--safe-area-content-inset-left, var(--safe-area-inset-left, 0px));
+      }
+      :host([embedded]) {
+        padding: 0;
+      }
+    `];
 	}
 	get slim() {
 		return this.narrow || this.embedded;
