@@ -3,8 +3,10 @@
 // load an address chosen by the proposal or run code (add-on cards, templates, pictures,
 // markdown, maps, web pages, style overrides) is listed as not shown, so a proposal
 // can't make the browser fetch or run anything before it is approved.
-import { LitElement, css, html, nothing, type PropertyValues } from "lit";
-import { property, state } from "lit/decorators.js";
+// The cards are Home Assistant's own elements and draw entity state, so unlike the
+// panel's views this one hands them the whole hass on every change, as HA does.
+import { For, Show, createEffect, createSignal } from "solid-js";
+import { define, sheet, type Props } from "./element";
 import { t } from "./i18n";
 
 type Card = Record<string, unknown>;
@@ -122,82 +124,7 @@ export function previewable(card: Card, depth = 0): boolean {
   return safeValue(card);
 }
 
-class DashboardPreview extends LitElement {
-  @property({ attribute: false }) hass?: unknown;
-  @property({ attribute: false }) config?: { views?: View[] };
-  @state() private view = 0;
-  @state() private error = "";
-  private cards: (HTMLElement & { hass?: unknown })[] = [];
-  private skipped = 0;
-
-  private get views(): View[] {
-    return Array.isArray(this.config?.views) ? this.config!.views : [];
-  }
-
-  protected async willUpdate(changed: PropertyValues): Promise<void> {
-    if (changed.has("config") || changed.has("view")) await this.build();
-    for (const card of this.cards) card.hass = this.hass;
-  }
-
-  private async build(): Promise<void> {
-    this.cards = [];
-    this.skipped = 0;
-    const view = this.views[this.view];
-    if (!view) return;
-    try {
-      const helpers = await cardHelpers();
-      if (!helpers) throw new Error("card helpers aren't available");
-      for (const config of viewCards(view).slice(0, 40)) {
-        if (!previewable(config)) {
-          this.skipped++;
-          continue;
-        }
-        const el = helpers.createCardElement(config);
-        el.hass = this.hass;
-        this.cards.push(el);
-      }
-      this.error = "";
-    } catch (err) {
-      this.error = t("preview_unavailable", { error: (err as Error).message });
-    }
-    this.requestUpdate();
-  }
-
-  protected render() {
-    if (!this.views.length) return html`<p class="note">${t("preview_no_views")}</p>`;
-    return html`
-      ${
-        this.views.length > 1
-          ? html`<div class="tabs">
-              ${this.views.map(
-                (v, i) =>
-                  html`<button
-                    class=${i === this.view ? "on" : ""}
-                    @click=${() => (this.view = i)}
-                  >
-                    ${v.title || v.path || t("preview_view", { n: i + 1 })}
-                  </button>`,
-              )}
-            </div>`
-          : nothing
-      }
-      ${this.error ? html`<p class="note">${this.error}</p>` : nothing}
-      <div class="grid" inert>${this.cards}</div>
-      ${
-        this.skipped
-          ? html`<p class="note">
-              ${
-                this.skipped > 1
-                  ? t("preview_skipped_n", { count: this.skipped })
-                  : t("preview_skipped_one")
-              }
-            </p>`
-          : nothing
-      }
-    `;
-  }
-
-  static styles = css`
+const css = sheet(`
     :host {
       display: block;
       padding: 8px 0;
@@ -233,9 +160,92 @@ class DashboardPreview extends LitElement {
       font-size: 0.9em;
       margin: 6px 0;
     }
-  `;
+  `);
+
+type CardEl = HTMLElement & { hass?: unknown };
+interface Built {
+  cards: CardEl[];
+  skipped: number;
+  error: string;
 }
 
-if (!customElements.get("llm-dashboard-preview")) {
-  customElements.define("llm-dashboard-preview", DashboardPreview);
+function DashboardPreview(props: Props<{ hass: unknown; config: { views?: View[] } }>) {
+  const [view, setView] = createSignal(0);
+  const [built, setBuilt] = createSignal<Built>({ cards: [], skipped: 0, error: "" });
+  const views = (): View[] => {
+    const c = props.config();
+    return Array.isArray(c?.views) ? c!.views! : [];
+  };
+  let gen = 0;
+
+  async function build(v: View | undefined): Promise<Built> {
+    const out: Built = { cards: [], skipped: 0, error: "" };
+    if (!v) return out;
+    try {
+      const helpers = await cardHelpers();
+      if (!helpers) throw new Error("card helpers aren't available");
+      for (const config of viewCards(v).slice(0, 40)) {
+        if (!previewable(config)) {
+          out.skipped++;
+          continue;
+        }
+        const el = helpers.createCardElement(config);
+        el.hass = props.hass();
+        out.cards.push(el);
+      }
+    } catch (err) {
+      out.error = t("preview_unavailable", { error: (err as Error).message });
+    }
+    return out;
+  }
+
+  // Rebuilt when the proposal or the chosen view changes; a slower older build must not
+  // replace a newer one.
+  createEffect(
+    () => views()[view()],
+    (v) => {
+      const mine = ++gen;
+      void build(v).then((b) => mine === gen && setBuilt(b));
+    },
+  );
+  // every hass goes to every card, the way a dashboard feeds its cards
+  createEffect(
+    () => [props.hass(), built().cards] as const,
+    ([hass, cards]) => {
+      for (const card of cards) card.hass = hass;
+    },
+  );
+
+  return (
+    <Show when={views().length} fallback={<p class="note">{t("preview_no_views")}</p>}>
+      <Show when={views().length > 1}>
+        <div class="tabs">
+          <For each={views()}>
+            {(v, i) => (
+              <button class={i() === view() ? "on" : ""} onClick={() => setView(i())}>
+                {v.title || v.path || t("preview_view", { n: i() + 1 })}
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
+      <Show when={built().error}>
+        <p class="note">{built().error}</p>
+      </Show>
+      <div class="grid" inert>
+        {built().cards}
+      </div>
+      <Show when={built().skipped}>
+        <p class="note">
+          {built().skipped > 1 ? t("preview_skipped_n", { count: built().skipped }) : t("preview_skipped_one")}
+        </p>
+      </Show>
+    </Show>
+  );
 }
+
+define<{ hass: unknown; config: { views?: View[] } }>("llm-dashboard-preview", {
+  props: ["hass", "config"],
+  styles: () => [css],
+  view: (p) => <DashboardPreview {...p} />,
+});
