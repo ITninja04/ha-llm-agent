@@ -55,7 +55,7 @@ jobs:
         run: |
           git diff --exit-code -- custom_components/llm_agent/www
           test -z "$(git status --porcelain -- custom_components/llm_agent/www)" || { git status --short; exit 1; }
-      - name: Panel stays within its size budget (95 kB gzipped)
+      - name: Panel stays within its size budget (115 kB gzipped)
         run: |
           size=$(gzip -9c custom_components/llm_agent/www/llm-agent-panel.js | wc -c)
           echo "panel: $size bytes gzipped"
@@ -68,11 +68,16 @@ jobs:
           # settings view: 3705 bytes measured, and with the Usage view the panel left 36.
           # Then from 90 kB by 5 kB for the page chip and the page collector the floating
           # chat uses: 4399 bytes measured (88380 on main, 92779 with it), rounded up.
+          # Then from 95 kB to 115 kB while the panel moves from Lit to Solid 2.0 one view
+          # at a time, with both runtimes in the bundle until the last view is converted:
+          # the bundle grew 16820 bytes gzipped (93591 with Lit only, 110411 with the
+          # Notes view moved to Solid, 2026-11-20), nearly all of it the Solid runtime.
+          # Minifying saved too little to matter (101437). Once Lit is gone this is set to the measured size, rounded up.
           # The budget is there to catch an accidental
           # dependency or a bundled library (8 kB or more), not normal feature growth.
           # Minify does not help: Vite's lib mode with es output keeps the whitespace
           # either way.
-          test "$size" -le 97280
+          test "$size" -le 117760
       - name: Floating chat loader stays within its size budget (6 kB gzipped)
         run: |
           size=$(gzip -9c custom_components/llm_agent/www/llm-agent-float.js | wc -c)
