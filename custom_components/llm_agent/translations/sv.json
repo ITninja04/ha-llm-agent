@@ -211,6 +211,21 @@
               "reviewer_model": "Ett modell-id, till exempel claude-haiku-5-5 eller en lokal Ollama-modell. Tomt använder leverantörens standardmodell. Granskaren ser din begäran och åtgärden, aldrig verktygsutdata.",
               "always_ask": "De här åtgärderna går alltid till dig, oavsett vad granskaren säger. Kommaseparerat: domain.service (lock.*), entitets-id:n, verktygsnamn (shell) eller tool:action (integrations:remove). * matchar allt."
             }
+          },
+          "manager": {
+            "name": "Handledare (avancerat)",
+            "data": {
+              "manager": "Handledare",
+              "manager_model": "Handledarens modell",
+              "manager_every": "Kontrollera var",
+              "manager_stuck_at": "Tröskel: fastnat"
+            },
+            "data_description": {
+              "manager": "En beslutsmodell tittar på långa svar med några verktygsanrops mellanrum, och direkt efter 3 misslyckade anrop i rad. När den är säker på att AI:n har fastnat i att försöka igen ber den AI:n pröva ett annat sätt eller berätta för dig vad som stoppar den. Kräver en OpenRouter-leverantör och använder dess nyckel. Varje kontroll kostar ungefär 0,0001 $ och räknas in i dagstaket. En notering i chatten visar varje kontroll.",
+              "manager_model": "Id för en beslutsmodell hos OpenRouter. Standardtröskeln testades med typesafe/jev-1.14.",
+              "manager_every": "Verktygsanrop mellan kontrollerna.",
+              "manager_stuck_at": "Hur säker (0 till 1) handledaren måste vara på att AI:n har fastnat innan den griper in."
+            }
           }
         }
       },

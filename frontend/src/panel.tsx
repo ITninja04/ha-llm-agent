@@ -789,7 +789,7 @@ class LlmAgentPanel extends HTMLElement {
         this.usage = e.usage;
         return;
       case "notice":
-        this.push({ kind: "notice", text: e.text, stop: e.stop });
+        this.push({ kind: "notice", text: e.text, stop: e.stop, detail: e.detail });
         return;
       case "error":
         this.push({ kind: "notice", text: e.message, error: true });
@@ -1784,7 +1784,12 @@ class LlmAgentPanel extends HTMLElement {
         </Match>
         <Match when={item().kind === "notice"}>
           <div class={`notice ${notice().error ? "error" : ""}`}>
-            {notice().text}{" "}
+            <Show when={notice().detail} fallback={notice().text}>
+              <details>
+                <summary>{notice().text}</summary>
+                {notice().detail}
+              </details>
+            </Show>{" "}
             <Show when={last() && !this.running && notice().stop && CONTINUABLE.has(notice().stop!)}>
               <button class="small" onClick={() => this.continueTurn(notice().stop === "spend_cap")}>
                 {notice().stop === "spend_cap" ? t("continue_anyway") : t("continue")}
@@ -2601,6 +2606,7 @@ function toItems(messages: StoredMessage[]): Item[] {
         review: m.review ?? undefined,
       });
     }
+    if (m.role !== "user") for (const n of m.manager ?? []) items.push({ kind: "notice", ...n });
   }
   return items;
 }

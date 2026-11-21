@@ -211,6 +211,21 @@
               "reviewer_model": "Un ID de modelo, por ejemplo claude-haiku-5-5 o un modelo local de Ollama. Vacío usa el modelo predeterminado del proveedor. El revisor ve tu solicitud y la acción, nunca los resultados de herramientas.",
               "always_ask": "Estas acciones siempre se te consultan, diga lo que diga el revisor. Separadas por comas: domain.service (lock.*), ID de entidades, nombres de herramientas (shell) o tool:action (integrations:remove). * coincide con todo."
             }
+          },
+          "manager": {
+            "name": "Supervisor (avanzado)",
+            "data": {
+              "manager": "Supervisor",
+              "manager_model": "Modelo del supervisor",
+              "manager_every": "Comprobar cada",
+              "manager_stuck_at": "Umbral: atascado"
+            },
+            "data_description": {
+              "manager": "Un modelo de decisión revisa las respuestas largas cada pocas llamadas a herramientas, y en el acto tras 3 llamadas fallidas seguidas. Cuando está seguro de que la IA está atascada reintentando, le pide que pruebe otro camino o que te diga qué la bloquea. Necesita un proveedor OpenRouter y usa su clave. Cada revisión cuesta unos 0,0001 $ y cuenta para el límite diario. Una nota en el chat muestra cada revisión.",
+              "manager_model": "El id de un modelo de decisión de OpenRouter. El umbral por defecto se probó con typesafe/jev-1.14.",
+              "manager_every": "Llamadas a herramientas entre revisiones.",
+              "manager_stuck_at": "Lo seguro (de 0 a 1) que debe estar el supervisor de que la IA está atascada antes de intervenir."
+            }
           }
         }
       },

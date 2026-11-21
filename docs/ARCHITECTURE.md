@@ -85,6 +85,13 @@ Prices can be overridden in options.
 4. Tool results go back to the model. The loop repeats until a final answer,
    with a step cap (default 25 tool calls per turn).
 5. Usage totals are stored for each conversation: tokens and a $ estimate.
+6. The Manager (`manager.py`, off by default) asks a decision model (Jev via
+   OpenRouter's `/systemone`) whether the turn is stuck: every N tool calls, running
+   alongside those calls since its answer only matters for the step after them, and
+   after 3 failed calls in a row. When the stuck probability passes the threshold, a
+   fixed sentence is stored on the last tool message (`manager` key) and appended to it
+   only in `_provider_view`, so the stored output, the panel preview and undo never
+   contain it. No answer in 3 s is no decision. Why only stuck: docs/MANAGER_EVAL.md.
 
 The panel loop owns its own state rather than HA's ChatLog. ChatLog runs tool
 calls automatically as they stream, which conflicts with pausing for approval.

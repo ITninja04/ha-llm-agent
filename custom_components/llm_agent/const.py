@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .manager import DEFAULT_MODEL as MANAGER_MODEL, DEFAULT_STUCK
+
 DOMAIN = "llm_agent"
 NAME = "LLM Agent"
 
@@ -102,6 +104,13 @@ CONF_TURN_LOG = "turn_log"
 CONF_TURN_LOG_DAYS = "turn_log_days"
 CONF_TURN_LOG_MB = "turn_log_mb"
 
+# 0.12 Manager: a decision model checks long turns (manager.py). Off by default: it is
+# a second paid service, and a public install must not start spending on it unasked.
+CONF_MANAGER = "manager"
+CONF_MANAGER_MODEL = "manager_model"
+CONF_MANAGER_EVERY = "manager_every"  # tool calls between checks
+CONF_MANAGER_STUCK = "manager_stuck_at"
+
 DEFAULT_OPTIONS = {
     CONF_TOOL_RULES: "",
     CONF_HOUSEHOLD: False,
@@ -144,6 +153,10 @@ DEFAULT_OPTIONS = {
     CONF_SEARCH_BACKEND: "free",
     CONF_SEARXNG_URL: "",
     CONF_SEARCH_KEY: "",
+    CONF_MANAGER: False,
+    CONF_MANAGER_MODEL: MANAGER_MODEL,
+    CONF_MANAGER_EVERY: 5,
+    CONF_MANAGER_STUCK: DEFAULT_STUCK,  # from the offline replay, see manager.py
 }
 
 # (min, max) for every number setting, so a bad value can never break anything.
@@ -166,6 +179,8 @@ RANGES: dict[str, tuple[float, float]] = {
     CONF_RETRIES: (0, 6),
     CONF_TURN_LOG_DAYS: (1, 365),
     CONF_TURN_LOG_MB: (1, 200),
+    CONF_MANAGER_EVERY: (1, 50),
+    CONF_MANAGER_STUCK: (0, 1),
 }
 
 

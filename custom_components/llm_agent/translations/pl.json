@@ -211,6 +211,21 @@
               "reviewer_model": "Identyfikator modelu, na przykład claude-haiku-5-5 lub lokalny model Ollama. Puste pole używa domyślnego modelu dostawcy. Recenzent widzi twoją prośbę i działanie, nigdy wyniki narzędzi.",
               "always_ask": "Te działania zawsze trafiają do ciebie, niezależnie od opinii recenzenta. Rozdziel przecinkami: domain.service (lock.*), identyfikatory encji, nazwy narzędzi (shell) lub tool:action (integrations:remove). * pasuje do wszystkiego."
             }
+          },
+          "manager": {
+            "name": "Nadzorca (zaawansowane)",
+            "data": {
+              "manager": "Nadzorca",
+              "manager_model": "Model nadzorcy",
+              "manager_every": "Sprawdzaj co",
+              "manager_stuck_at": "Próg: utknął"
+            },
+            "data_description": {
+              "manager": "Model decyzyjny sprawdza długie odpowiedzi co kilka wywołań narzędzi, a od razu po 3 nieudanych wywołaniach z rzędu. Gdy jest pewny, że AI utknęła na ponawianiu, każe jej spróbować inaczej albo powiedzieć ci, co ją blokuje. Wymaga dostawcy OpenRouter i używa jego klucza. Każde sprawdzenie kosztuje około 0,0001 $ i wlicza się do dziennego limitu. Notatka w czacie pokazuje każde sprawdzenie.",
+              "manager_model": "Identyfikator modelu decyzyjnego w OpenRouter. Domyślny próg testowano z typesafe/jev-1.14.",
+              "manager_every": "Liczba wywołań narzędzi między sprawdzeniami.",
+              "manager_stuck_at": "Jak pewny (od 0 do 1) musi być nadzorca, że AI utknęła, zanim zareaguje."
+            }
           }
         }
       },

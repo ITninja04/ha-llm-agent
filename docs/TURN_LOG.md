@@ -72,7 +72,7 @@ every record of version 1 unless marked optional.
 | `cost` | float or null | Estimated USD for the turn, from the same prices as the daily cap. Null when any call in the turn had no known price; a partial sum would read as the whole cost. Reviewer calls are not included. |
 | `stop` | str or null | How the turn ended: the provider's stop reason for a normal end (`end_turn`, `stop`, ...), or `tool_limit`, `cancelled`, `spend_cap`, `member_cap`, `length`, `thinking_limit`, `refusal`, `error`. |
 | `error` | str or null | The provider or internal error message, cut to 500 characters. |
-| `decisions` | list of str | Lines added by whatever decided something about the turn (`ChatRun.decide`, for example from a checkpoint hook). At most 50, each at most 500 characters. Empty when nothing did. |
+| `decisions` | list of str | Lines added by whatever decided something about the turn (`ChatRun.decide`, for example from a checkpoint hook). The Manager adds one per check, such as `Manager after 10 tool calls: stuck, steered (stuck 0.85, every)`. At most 50, each at most 500 characters. Empty when nothing did. |
 
 ### `tool_calls` entries
 
