@@ -1179,18 +1179,10 @@ class LlmAgentPanel extends HTMLElement {
         void loadLanguage(now);
       },
     );
-    // What Lit's updated() did after each render: keep the box's placeholder in step,
-    // follow the newest message, and add copy buttons to new code blocks.
+    // Lit's updated() kept the box's placeholder in step after each render.
     createEffect(
       () => this.placeholder(),
       (text) => this.input?.setPlaceholder(text),
-    );
-    createEffect(
-      () => [this.items, this.running, this.editAt, this.photos, this.files, this.mentions, this.showChanges],
-      () => {
-        if (this.stickToBottom && this.scroller) this.scroller.scrollTop = this.scroller.scrollHeight;
-        this.addCopyButtons();
-      },
     );
     return (
       <Show
@@ -1202,6 +1194,29 @@ class LlmAgentPanel extends HTMLElement {
         </Show>
       </Show>
     );
+  }
+
+  /** Follow the newest message and add copy buttons to new code blocks, which Lit's
+   * updated() did after every render. Here it runs once the DOM has really changed: an
+   * effect would run before Solid applies the attributes of rows it just made, measure
+   * a card still closed, stop short of the bottom, and make the card's chevron animate
+   * open. The resize observer also catches the list growing when an icon or a picture
+   * loads, and the pane shrinking when the composer grows. */
+  private watchMessages(el: HTMLElement): void {
+    this.scroller = el;
+    const follow = () => {
+      if (this.stickToBottom) el.scrollTop = el.scrollHeight;
+    };
+    const sizes = new ResizeObserver(follow);
+    sizes.observe(el);
+    new MutationObserver((records) => {
+      for (const r of records) {
+        for (const n of r.addedNodes) if (n instanceof Element && n.parentNode === el) sizes.observe(n);
+        for (const n of r.removedNodes) if (n instanceof Element) sizes.unobserve(n);
+      }
+      follow();
+      this.addCopyButtons();
+    }).observe(el, { childList: true, subtree: true, characterData: true, attributes: true });
   }
 
   private placeholder(): string {
@@ -1319,7 +1334,7 @@ class LlmAgentPanel extends HTMLElement {
             class="messages"
             role="log"
             aria-label={t("conversation")}
-            ref={(el) => (this.scroller = el)}
+            ref={(el) => this.watchMessages(el)}
             onScroll={() => this.onScroll()}
           >
             <Show when={!this.items.length}>{this.renderWelcome()}</Show>{" "}
