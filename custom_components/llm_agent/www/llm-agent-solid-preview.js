@@ -2201,6 +2201,7 @@ var hi = mi`
   }
   .convs {
     overflow-y: auto;
+    overscroll-behavior: contain;
     flex: 1;
     margin: 0 -4px;
     padding: 0 4px;
@@ -2362,6 +2363,7 @@ var hi = mi`
   .messages {
     flex: 1;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 24px max(20px, calc((100% - 780px) / 2));
     display: flex;
     flex-direction: column;
@@ -3070,6 +3072,7 @@ var hi = mi`
     box-shadow: var(--shadow-lg);
     max-height: 280px;
     overflow-y: auto;
+    overscroll-behavior: contain;
     z-index: 5;
   }
   ul.mentions li {
@@ -3127,6 +3130,7 @@ var hi = mi`
     max-height: 50vh;
     max-height: 50dvh;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
   /* The Markdown editor that takes the textarea's place (composer.ts). It keeps the
      textarea's type, padding and cap so swapping one for the other moves nothing. Its
@@ -3145,6 +3149,7 @@ var hi = mi`
     max-height: 50vh;
     max-height: 50dvh;
     overflow-y: auto;
+    overscroll-behavior: contain;
     overflow-wrap: anywhere;
     cursor: text;
   }
