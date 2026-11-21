@@ -1,8 +1,8 @@
-import { css } from "lit";
-
 // Design tokens. "auto" follows the Home Assistant theme; the explicit light and dark
 // themes use a tuned palette of their own.
-export const styles = css`
+// One stylesheet, adopted by the panel and each of its views; parsed once for all of them.
+export const styles = new CSSStyleSheet();
+styles.replaceSync(`
   :host {
     display: block;
     height: 100vh;
@@ -1593,4 +1593,4 @@ export const styles = css`
     color: var(--muted);
     text-align: center;
   }
-`;
+`);

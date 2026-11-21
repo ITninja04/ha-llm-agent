@@ -16,7 +16,7 @@ export default defineConfig({
     // 111765 to 102648 bytes gzipped, with Lit and Solid both still in it.
     rolldownOptions: { output: { minify: true } },
     lib: {
-      entry: "src/panel.ts",
+      entry: "src/panel.tsx",
       formats: ["es"],
       fileName: () => "llm-agent-panel.js",
     },

@@ -277,6 +277,6 @@ function offset(ms: number, zone: string): number {
 
 define<{ hass: LocaleHass }>("llm-agent-changes", {
   props: ["hass"],
-  styles: () => [styles.styleSheet!, css],
+  styles: () => [styles, css],
   view: (p, host) => Changes(p, host),
 });

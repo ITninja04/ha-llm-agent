@@ -23,13 +23,6 @@ import { styles } from "./styles";
 import type { Hass } from "./types";
 
 // Home Assistant's icon element, which Solid's JSX types do not know.
-declare module "@solidjs/web" {
-  namespace JSX {
-    interface IntrinsicElements {
-      "ha-icon": { icon?: string };
-    }
-  }
-}
 
 type Api = Hass & {
   callApi<T>(method: "GET" | "POST" | "DELETE", path: string, data?: object): Promise<T>;
@@ -582,6 +575,6 @@ function Settings(props: Props<{ hass: Api }> & { host: HTMLElement }) {
 
 define<{ hass: Api }>("llm-agent-settings", {
   props: ["hass"],
-  styles: () => [styles.styleSheet!, css],
+  styles: () => [styles, css],
   view: (p, host) => <Settings {...p} host={host} />,
 });

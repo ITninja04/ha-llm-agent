@@ -1,7 +1,8 @@
 // The chat button on every Home Assistant page. HA loads this file on every page
 // (frontend.add_extra_js_url in __init__.py), so it stays small: it draws one button and
-// loads the window and the 88 kB panel (llm-agent-float-window.js) only on first open.
-// Plain DOM, no Lit: Lit alone would be about 6 kB gzipped, more than this whole file.
+// loads the window and the 100 kB panel (llm-agent-float-window.js) only on first open.
+// Plain DOM, no framework: the panel's Solid runtime alone is about 15 kB gzipped, more
+// than three times this whole file.
 //
 // Who sees it: whoever HA sends the llm-agent panel to (hass.panels), which is the
 // sidebar rule (admins, and everyone while household chat is on), read from HA rather
