@@ -163,10 +163,16 @@
           "debugging": {
             "name": "Foutopsporing",
             "data": {
-              "log_prompts": "Instructies en antwoorden loggen"
+              "log_prompts": "Instructies en antwoorden loggen",
+              "turn_log": "Beurtlogboek",
+              "turn_log_days": "Beurtlogboek bewaren",
+              "turn_log_mb": "Grootte van het beurtlogboek"
             },
             "data_description": {
-              "log_prompts": "Schrijft elke instructie, elk antwoord en elke toolaanroep naar het Home Assistant-logboek. Laat dit uit, tenzij je een probleem meldt: het logboek bevat dan je gesprekken."
+              "log_prompts": "Schrijft elke instructie, elk antwoord en elke toolaanroep naar het Home Assistant-logboek. Laat dit uit, tenzij je een probleem meldt: het logboek bevat dan je gesprekken.",
+              "turn_log": "Bewaart per chatbeurt één record (gebruikte tools, aantallen, tokens, kosten, tijd) om de prompt af te stemmen, los van de chats, dus een chat verwijderen verwijdert het niet. Het blijft in Home Assistant; beheerders kunnen het downloaden in de weergave Gebruik.",
+              "turn_log_days": "Oudere records worden verwijderd.",
+              "turn_log_mb": "De oudste records worden boven deze grootte verwijderd."
             }
           },
           "rules": {

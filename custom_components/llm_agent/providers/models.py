@@ -236,14 +236,30 @@ def parse_prices(provider_type: str, body: Any) -> dict[str, Price]:
     return prices
 
 
-def merge_models(provider_type: str, fetched: list[str] | None) -> list[dict[str, Any]]:
+def merge_models(
+    provider_type: str,
+    fetched: list[str] | None,
+    prices: dict[str, Price] | None = None,
+) -> list[dict[str, Any]]:
     """Our labelled suggestions that the provider still offers, then everything else it
-    offers. Without a fetched list, the suggestions alone."""
-    known = suggestions(provider_type)
+    offers. Without a fetched list, the suggestions alone. Suggestions carry
+    "suggested": True, so the model picker can keep them on top of a list of hundreds.
+
+    `prices` are the ones the provider published with the list (OpenRouter), in $ per
+    million tokens; they fill in models our table has no price for, and win over the
+    table like they do for the cost estimate (price_for)."""
+    prices = prices or {}
+
+    def priced(item: dict[str, Any]) -> dict[str, Any]:
+        if (live := prices.get(item["id"])) is not None:
+            return {**item, "input": live[0], "output": live[1], "cache_read": live[2]}
+        return item
+
+    known = [{**m, "suggested": True} for m in suggestions(provider_type)]
     if not fetched:
-        return known
+        return [priced(m) for m in known]
     offered = set(fetched)
-    merged = [m for m in known if m["id"] in offered]
+    merged = [priced(m) for m in known if m["id"] in offered]
     seen = {m["id"] for m in merged}
-    merged += [{"id": m, "label": m} for m in sorted(offered - seen)]
+    merged += [priced({"id": m, "label": m}) for m in sorted(offered - seen)]
     return merged

@@ -27,13 +27,35 @@ def test_only_chat_and_tool_models_are_listed() -> None:
 
 
 def test_merge_keeps_labels_drops_retired_suggestions() -> None:
-    known = suggestions("openai")
+    known = [{**m, "suggested": True} for m in suggestions("openai")]
     assert merge_models("openai", None) == known
     first = known[0]["id"]
     merged = merge_models("openai", [first, "brand-new"])
-    assert merged[0] == known[0]  # still labelled
+    assert merged[0] == known[0]  # still labelled, and marked as a suggestion
     assert merged[1] == {"id": "brand-new", "label": "brand-new"}
     assert len(merged) == 2  # suggestions the provider no longer offers are dropped
+
+
+def test_merge_prices_every_fetched_model_the_provider_priced() -> None:
+    """The model picker shows a price per million tokens. Before, only our dozen
+    suggestions carried one, and OpenRouter's other 360 models showed none even though
+    its list publishes a price for each."""
+    merged = merge_models(
+        "openrouter",
+        ["openrouter/auto", "z/new-model", "z/free"],
+        {"z/new-model": (0.25, 1.5, 0.025), "openrouter/auto": (1.0, 2.0, 1.0)},
+    )
+    by_id = {m["id"]: m for m in merged}
+    assert by_id["z/new-model"] == {
+        "id": "z/new-model",
+        "label": "z/new-model",
+        "input": 0.25,
+        "output": 1.5,
+        "cache_read": 0.025,
+    }
+    assert by_id["openrouter/auto"]["suggested"] is True
+    assert by_id["openrouter/auto"]["input"] == 1.0  # the published price wins
+    assert "input" not in by_id["z/free"]  # no price published: none shown
 
 
 async def test_agent_fetches_once_and_falls_back(hass: HomeAssistant, aioclient_mock) -> None:
@@ -48,7 +70,8 @@ async def test_agent_fetches_once_and_falls_back(hass: HomeAssistant, aioclient_
     aioclient_mock.clear_requests()
     aioclient_mock.get(URL, status=401)
     models, error = await agent.models("p1")
-    assert models == suggestions("openai") and "HTTP 401" in error
+    assert [m["id"] for m in models] == [m["id"] for m in suggestions("openai")]
+    assert all(m["suggested"] for m in models) and "HTTP 401" in error
     headers = aioclient_mock.mock_calls[0][3]
     assert headers["Authorization"] == "Bearer sk-test"
 

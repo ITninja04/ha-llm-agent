@@ -30,9 +30,11 @@ from .agent import (
     home_context,
     rewind_last_turn,
     rewind_to,
+    set_chat_mode,
 )
 from .attachments import MAX_FILE_BYTES, MAX_FILES, MAX_TEXT_CHARS, AttachmentError, prepare
 from .const import (
+    CHAT_MODES,
     CONF_APPROVAL_MODE,
     CONF_DAILY_CAP,
     CONF_HOME_SUMMARY,
@@ -41,6 +43,7 @@ from .const import (
     DOMAIN,
     KNOWLEDGE_BODY_MAX,
     KNOWLEDGE_INDEX_MAX,
+    MODE_YOLO,
     NOTE_MAX,
     NOTES_MAX,
     setting,
@@ -98,6 +101,7 @@ def async_register(hass: HomeAssistant) -> None:
         ws_get,
         ws_delete,
         ws_rename,
+        ws_set_mode,
         ws_truncate,
         ws_chat,
         ws_attach,
@@ -107,6 +111,7 @@ def async_register(hass: HomeAssistant) -> None:
         ws_changes,
         ws_usage,
         ws_balance,
+        ws_turn_log,
     ):
         websocket_api.async_register_command(hass, handler)
 
@@ -146,6 +151,18 @@ def ws_info(
             ],
             "running": [c for c, run in agent.runs.items() if viewer and viewer.sees(run.conv)],
             "my_default": agent.store.user_default(connection.user.id),
+            # how many turns the turn log holds, for its download button (admins only)
+            **(
+                {
+                    "turn_log": {
+                        "enabled": agent.store.turns.enabled,
+                        "count": len(agent.store.turns.records),
+                        "bytes": agent.store.turns.size(),
+                    }
+                }
+                if admin
+                else {}
+            ),
         },
     )
 
@@ -423,6 +440,9 @@ def _public(conv: dict[str, Any]) -> dict[str, Any]:
         "title": conv["title"],
         "provider_id": conv["provider_id"],
         "model": conv["model"],
+        # None for a chat from before modes were per chat: it follows the Settings mode
+        "mode": conv.get("mode"),
+        "mode_before_plan": conv.get("mode_before_plan"),
         "usage": conv["usage"],
         "stopped": conv.get("stopped"),
         "stopped_text": STOP_TEXT.get(conv.get("stopped") or ""),
@@ -473,6 +493,50 @@ async def ws_rename(
         return
     await agent.store.rename(msg["conversation_id"], msg["title"])
     connection.send_result(msg["id"])
+
+
+def _mode_refused(connection: websocket_api.ActiveConnection, mode: str | None) -> str | None:
+    """Why this user may not pick `mode`, or None. YOLO drops the guard against web
+    content steering the model, so only an admin may choose it; any other mode a member
+    picks is run as Ask for risky at most (agent.chat_mode)."""
+    if mode == MODE_YOLO and not connection.user.is_admin:
+        return "Only an admin can switch a chat to YOLO"
+    return None
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "llm_agent/conversations/mode",
+        vol.Required("conversation_id"): str,
+        vol.Required("mode"): vol.In(CHAT_MODES),
+    }
+)
+@_household
+@websocket_api.async_response
+async def ws_set_mode(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Switch a saved chat's approval mode, from the composer's mode picker."""
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    if why := _mode_refused(connection, msg["mode"]):
+        connection.send_error(msg["id"], "not_allowed", why)
+        return
+    conv = await _own(hass, connection, msg["conversation_id"])
+    if conv is None:
+        connection.send_error(msg["id"], "not_found", "Conversation not found")
+        return
+    if conv["id"] in agent.runs:
+        # the running turn reads the mode for each call, so a switch would change the
+        # rules halfway through what the person already saw start
+        connection.send_error(msg["id"], "busy", "Wait for the reply to finish first")
+        return
+    set_chat_mode(conv, msg["mode"])
+    agent.store.save(conv)
+    connection.send_result(
+        msg["id"], {"mode": conv["mode"], "mode_before_plan": conv.get("mode_before_plan")}
+    )
 
 
 @websocket_api.websocket_command(
@@ -575,6 +639,8 @@ def _file(value: Any) -> dict[str, str]:
         vol.Required("text"): vol.All(str, vol.Length(min=1, max=100000), vol.Match(r"[\s\S]*\S")),
         vol.Optional("provider_id"): str,
         vol.Optional("model"): str,
+        # The chat's approval mode from the composer's picker; kept on the chat.
+        vol.Optional("mode"): vol.In(CHAT_MODES),
         # Replace the last user message (edit and resend, or retry with the same text).
         vol.Optional("rewind", default=False): bool,
         # Run this one turn even though today's spend is past the daily cap.
@@ -612,6 +678,9 @@ async def ws_chat(
                 msg["id"], "busy", "Wait for your other chat's reply to finish first"
             )
             return
+    if why := _mode_refused(connection, msg.get("mode")):
+        connection.send_error(msg["id"], "not_allowed", why)
+        return
     conv = None
     if msg.get("conversation_id"):
         conv = await _own(hass, connection, msg["conversation_id"])
@@ -656,12 +725,19 @@ async def ws_chat(
         conv = await agent.store.create(
             pconf.id, msg.get("model") or pconf.default_model, context, user.id
         )
+        # The Settings mode is where a new chat starts; changing Settings later does not
+        # change the chats already started.
+        conv["mode"] = agent.options.get(CONF_APPROVAL_MODE)
+        if msg.get("mode"):
+            set_chat_mode(conv, msg["mode"])
     elif conv["id"] not in agent.runs:
         if conv["provider_id"] != pconf.id:
             conv["provider_id"] = pconf.id
             conv["model"] = pconf.default_model
         if msg.get("model"):
             conv["model"] = msg["model"]
+        if msg.get("mode"):
+            set_chat_mode(conv, msg["mode"])
     if conv["id"] in agent.runs:
         connection.send_error(msg["id"], "busy", "This conversation is already running")
         return
@@ -1003,3 +1079,21 @@ async def ws_balance(
     if agent is None:
         return _not_ready(connection, msg)
     connection.send_result(msg["id"], {"providers": await agent.balances.get(agent.providers())})
+
+
+@websocket_api.websocket_command({vol.Required("type"): "llm_agent/turn_log"})
+@websocket_api.require_admin
+@callback
+def ws_turn_log(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """The turn log as JSONL, for the panel's download button. Admins only: the records
+    hold tool arguments from every user's chats. See docs/TURN_LOG.md for the format."""
+    agent = _agent(hass)
+    if agent is None:
+        return _not_ready(connection, msg)
+    turns = agent.store.turns
+    connection.send_result(
+        msg["id"],
+        {"enabled": turns.enabled, "count": len(turns.records), "jsonl": turns.jsonl()},
+    )

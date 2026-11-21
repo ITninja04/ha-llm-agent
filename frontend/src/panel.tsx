@@ -146,6 +146,16 @@ class LlmAgentPanel extends HTMLElement {
   /** Models fetched from each provider, loaded the first time the model box is used. */
   @state() private fetched: Record<string, ModelSuggestion[]> = {};
   @state() private showList = false;
+  /** The chat's approval mode from the mode picker; "" follows the Settings mode, which
+   * is where every new chat starts. */
+  @state() private mode = "";
+  /** The mode Run plan goes back to after planning (null: Auto). */
+  @state() private modeBefore: string | null = null;
+  /** The model picker's list is open, what is typed in it, and the highlighted row. */
+  @state() private modelOpen = false;
+  @state() private modelQuery = "";
+  @state() private modelIndex = -1;
+  private modelInput?: HTMLInputElement;
   @state() private loadError = "";
   @state() private mentions: Mention[] = [];
   // @Name labels in the composer and the exact ids they stand for (see mentions.ts)
@@ -474,6 +484,8 @@ class LlmAgentPanel extends HTMLElement {
     this.usage = EMPTY_USAGE;
     this.running = false;
     this.showList = false;
+    this.mode = "";
+    this.modeBefore = null;
     this.startModel();
     this.setText(loadDraft(this.draftKey, null));
     this.input?.focus();
@@ -498,6 +510,8 @@ class LlmAgentPanel extends HTMLElement {
     this.usage = conv.usage;
     this.providerId = conv.provider_id;
     this.model = conv.model;
+    this.mode = conv.mode ?? "";
+    this.modeBefore = conv.mode_before_plan ?? null;
     this.items = toItems(conv.messages);
     if (conv.stopped && conv.stopped_text)
       this.items = [...this.items, {
@@ -670,6 +684,7 @@ class LlmAgentPanel extends HTMLElement {
           conversation_id: this.convId,
           provider_id: this.providerId || undefined,
           model: this.model || undefined,
+          mode: this.mode || undefined,
           rewind: rewind || undefined,
           over_cap: overCap || undefined,
           language: this.hass?.locale?.language || undefined,
@@ -909,6 +924,82 @@ class LlmAgentPanel extends HTMLElement {
       // keep the built-in suggestions; try again next time
     } finally {
       this.loadingModels.delete(id);
+    }
+  }
+
+  /** The mode this chat runs in, as a member's chat runs it (see agent.chat_mode). */
+  private get chatMode(): string {
+    const mode = this.mode || this.info?.approval_mode || "ask_risky";
+    return this.member && MEMBER_DOWNGRADED.has(mode) ? "ask_risky" : mode;
+  }
+
+  /** Switch the chat's mode. A saved chat keeps it on the server right away; a new chat
+   * sends it with its first message. */
+  private async pickMode(mode: string): Promise<void> {
+    const was = this.mode || this.info?.approval_mode || "ask_risky";
+    if (mode === "planning" && was !== "planning") this.modeBefore = was;
+    this.mode = mode;
+    if (!this.convId || this.running) return;
+    try {
+      const res = await this.ws.sendMessagePromise<{ mode: string; mode_before_plan: string | null }>({
+        type: "llm_agent/conversations/mode",
+        conversation_id: this.convId,
+        mode,
+      });
+      this.modeBefore = res.mode_before_plan;
+    } catch (err) {
+      this.push({ kind: "notice", text: errText(err), error: true });
+    }
+  }
+
+  /** Run plan: back to the mode before planning (Auto if none) and the plan goes to
+   * the model as the next message, in that mode (the message carries it). */
+  private runPlan(plan: string): void {
+    const back = this.modeBefore && this.modeBefore !== "planning" ? this.modeBefore : "autopilot";
+    this.mode = back;
+    this.modeBefore = null;
+    this.setText(`${t("run_plan_message")}\n\n${plan}`);
+    void this.send();
+  }
+
+  /** The provider's models matching what is typed, suggestions first. Every word typed
+   * must appear in the id or the name, so "gpt mini" finds gpt-5.4-mini. */
+  private matchingModels(): ModelSuggestion[] {
+    const words = this.modelQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    const all = this.fetched[this.providerId] ?? this.provider?.models ?? [];
+    const hits = all.filter((m) => {
+      const hay = `${m.id} ${m.label}`.toLowerCase();
+      return words.every((w) => hay.includes(w));
+    });
+    return [...hits.filter((m) => m.suggested), ...hits.filter((m) => !m.suggested)];
+  }
+
+  private pickModel(id: string): void {
+    this.model = id;
+    if (this.modelInput) this.modelInput.value = id;
+    this.modelOpen = false;
+    this.modelQuery = "";
+    this.modelIndex = -1;
+  }
+
+  private modelKey(e: KeyboardEvent): void {
+    const shown = this.matchingModels().slice(0, MODEL_ROWS);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      this.modelOpen = true;
+      if (!shown.length) return;
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      this.modelIndex = (this.modelIndex + step + shown.length) % shown.length;
+      this.shadowRoot?.getElementById(`model-opt-${this.modelIndex}`)?.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const picked = this.modelOpen && this.modelIndex >= 0 ? shown[this.modelIndex] : undefined;
+      // a model id the list does not have (a new one, a local model) is taken as typed
+      this.pickModel(picked ? picked.id : (e.target as HTMLInputElement).value.trim() || this.model);
+    } else if (e.key === "Escape" && this.modelOpen) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.pickModel(this.model);
     }
   }
 
@@ -1670,6 +1761,13 @@ class LlmAgentPanel extends HTMLElement {
           <div class="row reply">
             {avatar()}{" "}
             <div class="msg assistant md" innerHTML={renderMarkdown(said().text, !(last() && this.running))} />{" "}
+            <Show when={last() && !this.running && this.chatMode === "planning"}>
+              <div class="plan-run">
+                <button class="small primary" onClick={() => this.runPlan(said().text)}>
+                  <ha-icon icon="mdi:play" /> {t("run_plan")}
+                </button>
+              </div>
+            </Show>{" "}
             <Show when={!(last() && this.running)}>
               <div class="msg-actions acts">
                 <button
@@ -1953,8 +2051,8 @@ class LlmAgentPanel extends HTMLElement {
   }
 
   private renderComposer(): JSX.Element {
-    const listId = "models";
     const usage = () => this.usage;
+    const models = () => this.matchingModels();
     return (
       <footer>
         <Show when={this.pageContext}>
@@ -2050,8 +2148,29 @@ class LlmAgentPanel extends HTMLElement {
                 onChange={(e) => void this.onPick(e)}
               />
             </label>{" "}
+            <label class="model-pill mode-pill" title={t("chat_mode_title")}>
+              <ha-icon icon={MODE_ICONS[this.chatMode] ?? "mdi:shield-check-outline"} />{" "}
+              <select
+                aria-label={t("chat_mode")}
+                value={this.chatMode}
+                disabled={this.running}
+                onChange={(e) => void this.pickMode((e.target as HTMLSelectElement).value)}
+              >
+                {" "}
+                <For each={this.member ? MEMBER_MODES : CHAT_MODES}>
+                  {(m) => (
+                    <option value={m} selected={m === this.chatMode}>
+                      {chatModeName(m)}
+                    </option>
+                  )}
+                </For>{" "}
+              </select>
+            </label>{" "}
             <Show when={!this.member}>
-              <label class="model-pill" title={this.modelError || t("provider_and_model")}>
+              <label
+                class={`model-pill ${(this.info?.providers.length ?? 0) <= 1 ? "single" : ""}`}
+                title={this.modelError || t("provider_and_model")}
+              >
                 <ha-icon icon="mdi:creation-outline" />{" "}
                 <select
                   aria-label={t("provider")}
@@ -2071,20 +2190,91 @@ class LlmAgentPanel extends HTMLElement {
                 <span class="sep">/</span>{" "}
                 <input
                   class="model"
+                  role="combobox"
                   aria-label={t("model")}
-                  list={listId}
-                  value={this.model}
+                  aria-autocomplete="list"
+                  aria-controls="model-list"
+                  aria-expanded={tf(this.modelOpen)}
+                  aria-activedescendant={this.modelOpen && this.modelIndex >= 0 ? `model-opt-${this.modelIndex}` : undefined}
+                  // While the list is open the box holds only the search, with the current
+                  // model shown greyed behind it. Selecting the model's text on focus
+                  // instead does not survive a click: the mouseup drops the selection,
+                  // and typing then lands after the old name ("stub-modeltub").
+                  placeholder={this.modelOpen && this.model ? this.model : t("model_search")}
+                  autocomplete="off"
+                  spellcheck={false}
+                  ref={(el) => (this.modelInput = el)}
+                  value={this.modelOpen ? this.modelQuery : this.model}
                   disabled={this.running}
-                  onChange={(e) => (this.model = (e.target as HTMLInputElement).value.trim())}
-                  onFocus={() => void this.loadModels()}
-                />{" "}
-                <datalist id={listId}>
-                  {" "}
-                  <For each={this.fetched[this.providerId] ?? this.provider?.models}>
-                    {(m) => <option value={m.id}>{m.label}</option>}
-                  </For>{" "}
-                </datalist>
+                  onFocus={() => {
+                    void this.loadModels();
+                    this.modelQuery = "";
+                    this.modelIndex = -1;
+                    this.modelOpen = true;
+                  }}
+                  onClick={() => {
+                    // after a pick the box keeps focus, so a click must reopen the list
+                    if (this.modelOpen) return;
+                    this.modelQuery = "";
+                    this.modelIndex = -1;
+                    this.modelOpen = true;
+                  }}
+                  onInput={(e) => {
+                    this.modelQuery = (e.target as HTMLInputElement).value;
+                    this.modelIndex = this.modelQuery.trim() ? 0 : -1;
+                    this.modelOpen = true;
+                  }}
+                  onKeyDown={(e) => this.modelKey(e)}
+                  onBlur={(e) => {
+                    // typed and left without picking: the text is the model, as before
+                    if (this.modelOpen) this.pickModel((e.target as HTMLInputElement).value.trim() || this.model);
+                  }}
+                />
               </label>
+            </Show>{" "}
+            <Show when={this.modelOpen && !this.member}>
+              <ul class="models" id="model-list" role="listbox" aria-label={t("model")}>
+                <li class="models-head" role="presentation">
+                  <span>{t(this.modelQuery.trim() ? "models_found" : "models_suggested_first", { count: models().length })}</span>{" "}
+                  <span>{t("model_price_head")}</span>
+                </li>{" "}
+                <For each={models().slice(0, MODEL_ROWS)}>
+                  {(m, i) => (
+                    <li
+                      id={`model-opt-${i()}`}
+                      role="option"
+                      aria-selected={tf(i() === this.modelIndex)}
+                      class={`${i() === this.modelIndex ? "active" : ""} ${m.id === this.model ? "current" : ""}`}
+                      // mousedown, not click: the box keeps focus, so the list stays put
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        this.pickModel(m.id);
+                      }}
+                    >
+                      <Show when={m.suggested}>
+                        <ha-icon class="star" icon="mdi:star-outline" />
+                      </Show>{" "}
+                      <span class="label">
+                        {m.label !== m.id ? m.label : m.id}
+                        <Show when={m.label !== m.id}>
+                          <span class="mid">{m.id}</span>
+                        </Show>
+                      </span>{" "}
+                      <span class="price">{modelPrice(m)}</span>
+                    </li>
+                  )}
+                </For>{" "}
+                <Show when={models().length > MODEL_ROWS}>
+                  <li class="models-more" role="presentation">
+                    {t("models_more", { count: models().length - MODEL_ROWS })}
+                  </li>
+                </Show>{" "}
+                <Show when={!models().length}>
+                  <li class="models-more" role="presentation">
+                    {t("models_none")}
+                  </li>
+                </Show>
+              </ul>
             </Show>{" "}
             <span class="spacer" />{" "}
             <Show
@@ -2549,6 +2739,37 @@ function fmtTokens(n: number): string {
     : n >= 1000
       ? `${(n / 1000).toFixed(1)}k`
       : String(n);
+}
+
+// The modes the composer offers. A member's chat never skips an approval, so it is
+// offered only the modes that do not (the server checks too: websocket._mode_refused).
+const CHAT_MODES = ["ask_all", "ask_risky", "accept_edits", "reviewer", "autopilot", "yolo", "read_only", "planning"];
+const MEMBER_MODES = ["ask_all", "ask_risky", "read_only", "planning"];
+const MEMBER_DOWNGRADED = new Set(["autopilot", "reviewer", "yolo", "accept_edits"]);
+const MODE_ICONS: Record<string, string> = {
+  ask_all: "mdi:hand-back-right-outline",
+  ask_risky: "mdi:shield-check-outline",
+  accept_edits: "mdi:file-document-edit-outline",
+  reviewer: "mdi:account-eye-outline",
+  autopilot: "mdi:airplane",
+  yolo: "mdi:rocket-launch-outline",
+  read_only: "mdi:eye-outline",
+  planning: "mdi:format-list-numbered",
+};
+// Rows the model list draws at once. OpenRouter offers about 400 models; drawing them
+// all on a phone for each letter typed is slow, and nobody scrolls that far.
+const MODEL_ROWS = 60;
+
+function chatModeName(mode: string): string {
+  return has(`chat_mode_${mode}`) ? t(`chat_mode_${mode}` as Key) : mode;
+}
+
+/** Price per million tokens, input / output, where the provider or our table knows it. */
+function modelPrice(m: ModelSuggestion): string {
+  if (m.input == null || m.output == null) return "";
+  if (!m.input && !m.output) return t("model_free");
+  const fmt = (n: number) => `$${Number(n.toPrecision(3))}`;
+  return `${fmt(m.input)} / ${fmt(m.output)}`;
 }
 
 function modeName(mode?: string): string {

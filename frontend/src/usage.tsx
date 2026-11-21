@@ -8,6 +8,8 @@
 // switching the range only reloads the usage, never the balance. Nothing polls.
 // Only the connection and the language are read from hass, so a state change
 // elsewhere in the house updates nothing here.
+// The turn log download sits here too: it is the per-turn record behind these totals
+// (docs/TURN_LOG.md), fetched only when the button is pressed, since it can be MBs.
 import { For, Show, createEffect, createSignal } from "solid-js";
 import { define, hassPart, sheet, type Props } from "./element";
 import { t } from "./i18n";
@@ -80,7 +82,33 @@ function Usage(props: Props<{ hass: Hass }>) {
   const [b, setB] = createSignal<Balance[]>();
   const [days, setDays] = createSignal(30);
   const [error, setError] = createSignal("");
+  const [logNote, setLogNote] = createSignal("");
   let gen = 0;
+
+  /** Save the turn log as a .jsonl file. Built in the page from the WS reply: the panel
+   * has no download URL of its own, and the log never leaves Home Assistant otherwise. */
+  async function downloadLog(): Promise<void> {
+    const ws = conn();
+    if (!ws) return;
+    try {
+      const r = await ws.sendMessagePromise<{ enabled: boolean; count: number; jsonl: string }>({
+        type: "llm_agent/turn_log",
+      });
+      if (!r.count) {
+        setLogNote(t(r.enabled ? "turn_log_empty" : "turn_log_off"));
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([r.jsonl], { type: "application/x-ndjson" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `llm-agent-turns-${new Date().toISOString().slice(0, 10)}.jsonl`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setLogNote(t("turn_log_saved", { count: r.count }));
+    } catch (err) {
+      setLogNote(t("usage_error", { error: ERR(err) }));
+    }
+  }
 
   async function load(n: number): Promise<void> {
     const ws = conn();
@@ -302,6 +330,16 @@ function Usage(props: Props<{ hass: Hass }>) {
         {(data) => <Body u={data} />}
       </Show>
       <For each={b() ?? []}>{(x) => <BalanceRow x={x} />}</For>
+      <p class="tl">
+        <span>{t("turn_log_about")}</span>{" "}
+        {/* text only: an icon's svg here would sit after the chart's bars */}
+        <button class="small" onClick={() => void downloadLog()}>
+          {t("turn_log_download")}
+        </button>{" "}
+        <Show when={logNote()}>
+          <span>{logNote()}</span>
+        </Show>
+      </p>
     </>
   );
 }

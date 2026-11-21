@@ -163,10 +163,16 @@
           "debugging": {
             "name": "Fehlersuche",
             "data": {
-              "log_prompts": "Anweisungen und Antworten protokollieren"
+              "log_prompts": "Anweisungen und Antworten protokollieren",
+              "turn_log": "Turn-Protokoll",
+              "turn_log_days": "Turn-Protokoll aufbewahren",
+              "turn_log_mb": "Größe des Turn-Protokolls"
             },
             "data_description": {
-              "log_prompts": "Schreibt jede Anweisung, Antwort und jeden Werkzeugaufruf ins Home Assistant-Protokoll. Lass dies aus, außer wenn du ein Problem meldest: Das Protokoll enthält dann deine Unterhaltungen."
+              "log_prompts": "Schreibt jede Anweisung, Antwort und jeden Werkzeugaufruf ins Home Assistant-Protokoll. Lass dies aus, außer wenn du ein Problem meldest: Das Protokoll enthält dann deine Unterhaltungen.",
+              "turn_log": "Speichert pro Chat-Runde einen Eintrag (verwendete Werkzeuge, Anzahl, Tokens, Kosten, Dauer) zum Abstimmen des Prompts, getrennt von den Chats, sodass das Löschen eines Chats ihn nicht entfernt. Er bleibt in Home Assistant; Admins können ihn in der Nutzungsansicht herunterladen.",
+              "turn_log_days": "Ältere Einträge werden gelöscht.",
+              "turn_log_mb": "Die ältesten Einträge werden ab dieser Größe gelöscht."
             }
           },
           "rules": {

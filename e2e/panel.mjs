@@ -135,7 +135,32 @@ await page.getByText("Done, the test switch is on.").waitFor({ timeout: 15000 })
 const phoneBox = await panel.locator(".composer").boundingBox();
 if (!phoneBox || phoneBox.x < 0 || phoneBox.x + phoneBox.width > 390 || phoneBox.y + phoneBox.height > 844)
   fail(`composer is off screen on a phone: ${JSON.stringify(phoneBox)}`);
+// both pickers and Send fit on one line of the toolbar, none on top of another
+const toolbar = await panel.locator(".toolbar").evaluate((el) =>
+  [...el.children]
+    .map((c) => ({ cls: c.className, box: c.getBoundingClientRect() }))
+    .filter((c) => c.box.width > 0 && !c.cls.includes("spacer"))
+    .map((c) => ({ cls: c.cls, l: c.box.left, r: c.box.right, t: c.box.top, w: c.box.width })),
+);
+const pills = toolbar.filter((c) => c.cls.includes("model-pill"));
+if (pills.length !== 2) fail(`expected the mode and model pickers on a phone: ${JSON.stringify(toolbar)}`);
+for (const c of toolbar) if (c.r > 391) fail(`${c.cls} runs past the phone's edge: ${c.r}`);
+for (let i = 1; i < toolbar.length; i++)
+  if (toolbar[i].l < toolbar[i - 1].r - 1 || Math.abs(toolbar[i].t - toolbar[0].t) > 16)
+    fail(`toolbar items overlap or wrap on a phone: ${JSON.stringify(toolbar)}`);
+// wide enough to read: "Ask for risky" was cut to "A..." at 390 px before
+for (const [sel, min] of [["select[aria-label='Approval mode']", 80], ["input.model", 60]]) {
+  const w = (await panel.locator(sel).boundingBox())?.width ?? 0;
+  if (w < min) fail(`${sel} squeezed to ${w}px on a phone (needs ${min})`);
+}
 await page.screenshot({ path: `${shots}/llm-agent-4-phone.png` });
+await panel.locator("input.model").click();
+await panel.locator("ul.models").waitFor({ timeout: 10000 });
+const listBox = await panel.locator("ul.models").boundingBox();
+if (!listBox || listBox.x < 0 || listBox.x + listBox.width > 390 || listBox.y < 0)
+  fail(`model list is off screen on a phone: ${JSON.stringify(listBox)}`);
+await page.screenshot({ path: `${shots}/llm-agent-4b-phone-model-picker.png` });
+await panel.locator("input.model").press("Escape");
 
 // 6. retry replaces the last turn instead of adding another one
 await page.setViewportSize({ width: 1280, height: 800 });
@@ -161,9 +186,51 @@ await cont.click();
 await page.getByText("Hello from the stub model.").waitFor({ timeout: 15000 });
 if (await cont.count()) fail("Continue stayed after continuing");
 
-// 8. the model list comes from the provider when the model box is first used
-await panel.locator("input.model").focus();
-await panel.locator('datalist option[value="stub-model"]').waitFor({ state: "attached", timeout: 15000 });
+// 8. the model picker searches the provider's list as you type and picks from the keyboard
+const modelBox = panel.locator("input.model");
+const modelList = panel.locator("ul.models");
+const modelOption = (text) => panel.locator("ul.models li[role=option]", { hasText: text });
+await modelBox.click();
+await modelList.waitFor({ timeout: 10000 });
+await modelOption("stub-model").waitFor({ timeout: 15000 }); // fetched from the provider
+await modelBox.pressSequentially("zzz");
+await panel.getByText("No model matches").waitFor({ timeout: 5000 });
+if (await modelOption("stub-model").count()) fail("model list not filtered by what was typed");
+await modelBox.fill("");
+await modelBox.pressSequentially("stub");
+await modelOption("stub-model").waitFor({ timeout: 5000 });
+await page.screenshot({ path: `${shots}/llm-agent-6b-model-picker.png` });
+await modelBox.press("Enter");
+if ((await modelBox.inputValue()) !== "stub-model") fail(`Enter did not pick the model: ${await modelBox.inputValue()}`);
+if (await modelList.count()) fail("model list stayed open after picking");
+await modelBox.click();
+await modelList.waitFor({ timeout: 5000 });
+await modelBox.press("Escape");
+if (await modelList.count()) fail("Escape did not close the model list");
+if ((await modelBox.inputValue()) !== "stub-model") fail("Escape changed the model");
+
+// 8b. Planning: the reply is a plan, and Run plan sends it back in the mode from before
+await panel.getByRole("button", { name: "New chat" }).first().click();
+const modeSelect = panel.getByLabel("Approval mode");
+const modeBefore = await modeSelect.inputValue();
+await modeSelect.selectOption("planning");
+await fill("plan the kitchen lights");
+await box.press("Enter");
+const runPlan = panel.getByRole("button", { name: "Run plan" });
+await runPlan.waitFor({ timeout: 15000 });
+await page.screenshot({ path: `${shots}/llm-agent-6c-planning.png` });
+await runPlan.click();
+await panel.locator(".msg.user", { hasText: "Run this plan now:" }).waitFor({ timeout: 15000 });
+await panel.getByRole("button", { name: "Send" }).waitFor({ timeout: 15000 });
+if ((await panel.locator(".msg.assistant", { hasText: "Hello from the stub model." }).count()) !== 2)
+  fail("the plan was not answered");
+if ((await modeSelect.inputValue()) !== modeBefore)
+  fail(`Run plan left the chat in ${await modeSelect.inputValue()}, not ${modeBefore}`);
+if (await runPlan.count()) fail("Run plan still offered after leaving planning");
+// the mode is kept with the chat: reopen it and it is still there
+await panel.locator(".conv", { hasText: "plan the kitchen lights" }).click();
+await panel.locator(".msg.user", { hasText: "Run this plan now:" }).waitFor({ timeout: 15000 });
+if ((await modeSelect.inputValue()) !== modeBefore) fail("the chat's mode was not kept");
 
 // 9. typing @ suggests entities; the box shows the name, and the id goes with the message
 await fill("");

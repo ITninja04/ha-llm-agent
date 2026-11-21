@@ -35,6 +35,8 @@ export interface ModelSuggestion {
   label: string;
   input?: number | null;
   output?: number | null;
+  /** one of our suggestions, kept on top of the list */
+  suggested?: boolean;
 }
 
 export interface ProviderInfo {
@@ -52,6 +54,8 @@ export interface Info {
   providers: ProviderInfo[];
   running: string[];
   my_default?: { provider_id: string; model: string } | null;
+  /** admins only: what the turn log holds, for its download button */
+  turn_log?: { enabled: boolean; count: number; bytes: number };
   /** false for household members: no notes, model choice or undo */
   is_admin?: boolean;
   household?: boolean;
@@ -153,6 +157,9 @@ export interface Conversation {
   title: string;
   provider_id: string;
   model: string;
+  /** the chat's own approval mode; null follows the Settings mode */
+  mode?: string | null;
+  mode_before_plan?: string | null;
   usage: Usage;
   stopped?: string | null;
   stopped_text?: string | null;

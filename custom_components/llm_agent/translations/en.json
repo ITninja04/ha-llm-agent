@@ -163,10 +163,16 @@
           "debugging": {
             "name": "Debugging",
             "data": {
-              "log_prompts": "Log prompts and replies"
+              "log_prompts": "Log prompts and replies",
+              "turn_log": "Turn log",
+              "turn_log_days": "Keep turn log for",
+              "turn_log_mb": "Turn log size"
             },
             "data_description": {
-              "log_prompts": "Writes every prompt, reply and tool call to the Home Assistant log. Leave this off unless you are reporting a problem: the log then contains your conversations."
+              "log_prompts": "Writes every prompt, reply and tool call to the Home Assistant log. Leave this off unless you are reporting a problem: the log then contains your conversations.",
+              "turn_log": "Keeps one record per chat turn (tools used, counts, tokens, cost, time) for tuning the prompt, apart from the chats, so deleting a chat does not remove it. It stays in Home Assistant; admins can download it from the Usage view.",
+              "turn_log_days": "Older records are deleted.",
+              "turn_log_mb": "The oldest records are deleted past this size."
             }
           },
           "rules": {
