@@ -23,12 +23,15 @@ from .const import (
     CONF_AUTO_DELETE_DAYS,
     CONF_FLOAT_BUTTON,
     CONF_HOUSEHOLD,
+    CONF_SOLID_PREVIEW,
     DEFAULT_OPTIONS,
     DOMAIN,
     FLOAT_LOADER,
     NAME,
     PANEL_ELEMENT,
     PANEL_URL,
+    PREVIEW_ELEMENT,
+    PREVIEW_URL,
     STATIC_URL,
     setting,
 )
@@ -105,6 +108,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> 
             require_admin=require_admin,
         )
 
+    _sync_preview(hass, version if options.get(CONF_SOLID_PREVIEW) else None, module_url)
+
     _sync_float_button(
         hass,
         f"{STATIC_URL}/{FLOAT_LOADER}.js?v={version}"
@@ -138,7 +143,39 @@ async def _async_update_listener(hass: HomeAssistant, entry: LLMAgentConfigEntry
         hass.data.pop(_KEEP_PANEL, None)
         if entry.state is not ConfigEntryState.LOADED:  # the setup after it failed
             frontend.async_remove_panel(hass, PANEL_URL, warn_if_unknown=False)
+            _sync_preview(hass, None)
             _sync_float_button(hass, None)
+
+
+def _sync_preview(hass: HomeAssistant, version: str | None, lit_url: str = "") -> None:
+    """Register the Solid Notes preview page when `version` is set, else remove it.
+
+    Registered straight through the frontend rather than panel_custom, because a
+    settings save reloads the entry while the page may be open, and only the frontend
+    call can update a panel in place (the main panel above does the same). lit_url is
+    the main panel bundle, which the page loads to show the Lit view beside the Solid one.
+    """
+    if version is None:
+        frontend.async_remove_panel(hass, PREVIEW_URL, warn_if_unknown=False)
+        return
+    frontend.async_register_built_in_panel(
+        hass,
+        component_name="custom",
+        sidebar_title="Notes (Solid)",
+        sidebar_icon="mdi:flask-outline",
+        frontend_url_path=PREVIEW_URL,
+        config={
+            "_panel_custom": {
+                "name": PREVIEW_ELEMENT,
+                "embed_iframe": False,
+                "trust_external": False,
+                "module_url": f"{STATIC_URL}/{PREVIEW_ELEMENT}.js?v={version}",
+            },
+            "lit_url": lit_url,
+        },
+        require_admin=True,
+        update=PREVIEW_URL in hass.data.get(frontend.DATA_PANELS, {}),
+    )
 
 
 def _sync_float_button(hass: HomeAssistant, url: str | None) -> None:
@@ -177,6 +214,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) ->
     await agent.store.flush()
     if not hass.data.get(_KEEP_PANEL):
         frontend.async_remove_panel(hass, PANEL_URL, warn_if_unknown=False)
+        _sync_preview(hass, None)
         _sync_float_button(hass, None)
     hass.data.pop(DOMAIN, None)
     return True

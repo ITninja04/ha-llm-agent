@@ -5,16 +5,19 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "build": "tsc --noEmit && vite build && vite build -c vite.float.config.ts",
+    "build": "tsc --noEmit && vite build && vite build -c vite.float.config.ts && vite build -c vite.solid.config.ts",
     "check": "tsc --noEmit"
   },
   "dependencies": {
+    "@solidjs/web": "^2.0.3",
     "dompurify": "^3.2.0",
     "lit": "^3.3.0",
     "marked": "^18.1.1",
+    "solid-js": "^2.0.3",
     "tiny-markdown-editor": "0.2.35"
   },
   "devDependencies": {
+    "@solidjs/vite-plugin": "^3.0.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"
   }
