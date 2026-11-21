@@ -211,6 +211,21 @@
               "reviewer_model": "A model id, for example claude-haiku-5-5 or a local Ollama model. Empty uses the provider's default model. The reviewer sees your request and the action, never tool output.",
               "always_ask": "These actions always come to you, whatever the reviewer says. Comma-separated: domain.service (lock.*), entity ids, tool names (shell) or tool:action (integrations:remove). * matches anything."
             }
+          },
+          "manager": {
+            "name": "Manager (advanced)",
+            "data": {
+              "manager": "Manager",
+              "manager_model": "Manager model",
+              "manager_every": "Check every",
+              "manager_stuck_at": "Stuck threshold"
+            },
+            "data_description": {
+              "manager": "A decision model looks at long replies every few tool calls, and at once after 3 failed calls in a row. When it is sure the AI is stuck retrying, it tells the AI to try another way or tell you what is blocking it. Needs an OpenRouter provider and uses its key. Each check costs about $0.0001 and counts toward the daily cap. A note in the chat shows every check.",
+              "manager_model": "An OpenRouter decision model id. typesafe/jev-1.14 is the one the default threshold was tested with.",
+              "manager_every": "Tool calls between checks.",
+              "manager_stuck_at": "How sure (0 to 1) the manager must be that the AI is stuck before it steps in."
+            }
           }
         }
       },

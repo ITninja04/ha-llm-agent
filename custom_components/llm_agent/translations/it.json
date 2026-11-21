@@ -211,6 +211,21 @@
               "reviewer_model": "Un ID di modello, ad esempio claude-haiku-5-5 o un modello Ollama locale. Se vuoto usa il modello predefinito del fornitore. Il revisore vede la tua richiesta e l'azione, mai i risultati degli strumenti.",
               "always_ask": "Queste azioni vengono sempre sottoposte a te, qualunque cosa dica il revisore. Separate da virgole: domain.service (lock.*), ID di entità, nomi di strumenti (shell) o tool:action (integrations:remove). * corrisponde a tutto."
             }
+          },
+          "manager": {
+            "name": "Supervisore (avanzato)",
+            "data": {
+              "manager": "Supervisore",
+              "manager_model": "Modello del supervisore",
+              "manager_every": "Controlla ogni",
+              "manager_stuck_at": "Soglia: bloccato"
+            },
+            "data_description": {
+              "manager": "Un modello decisionale controlla le risposte lunghe ogni poche chiamate agli strumenti, e subito dopo 3 chiamate fallite di fila. Quando è sicuro che l'IA è bloccata a riprovare, le chiede di provare un'altra strada o di dirti cosa la blocca. Richiede un provider OpenRouter e ne usa la chiave. Ogni controllo costa circa 0,0001 $ e conta nel limite giornaliero. Una nota nella chat mostra ogni controllo.",
+              "manager_model": "L'id di un modello decisionale di OpenRouter. La soglia predefinita è stata provata con typesafe/jev-1.14.",
+              "manager_every": "Chiamate agli strumenti tra un controllo e l'altro.",
+              "manager_stuck_at": "Quanto (da 0 a 1) il supervisore deve essere sicuro che l'IA sia bloccata prima di intervenire."
+            }
           }
         }
       },

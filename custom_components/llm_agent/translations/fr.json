@@ -211,6 +211,21 @@
               "reviewer_model": "Un identifiant de modèle, par exemple claude-haiku-5-5 ou un modèle Ollama local. Vide, utilise le modèle par défaut du fournisseur. Le vérificateur voit ta demande et l'action, jamais les résultats des outils.",
               "always_ask": "Ces actions te sont toujours soumises, quel que soit l'avis du vérificateur. Séparés par des virgules : domain.service (lock.*), identifiants d'entités, noms d'outils (shell) ou tool:action (integrations:remove). * correspond à tout."
             }
+          },
+          "manager": {
+            "name": "Superviseur (avancé)",
+            "data": {
+              "manager": "Superviseur",
+              "manager_model": "Modèle du superviseur",
+              "manager_every": "Vérifier tous les",
+              "manager_stuck_at": "Seuil : bloqué"
+            },
+            "data_description": {
+              "manager": "Un modèle de décision examine les longues réponses toutes les quelques actions d'outils, et aussitôt après 3 appels échoués d'affilée. Quand il est sûr que l'IA tourne en rond, il lui demande d'essayer autrement ou de vous dire ce qui la bloque. Nécessite un fournisseur OpenRouter et utilise sa clé. Chaque vérification coûte environ 0,0001 $ et compte dans le plafond journalier. Une note dans le chat montre chaque vérification.",
+              "manager_model": "L'id d'un modèle de décision OpenRouter. Le seuil par défaut a été testé avec typesafe/jev-1.14.",
+              "manager_every": "Appels d'outils entre deux vérifications.",
+              "manager_stuck_at": "À quel point (de 0 à 1) le superviseur doit être sûr que l'IA est bloquée avant d'intervenir."
+            }
           }
         }
       },

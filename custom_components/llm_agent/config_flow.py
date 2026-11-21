@@ -57,6 +57,10 @@ from .const import (
     CONF_HOUSEHOLD,
     CONF_KEEP_TURNS,
     CONF_LOG_PROMPTS,
+    CONF_MANAGER,
+    CONF_MANAGER_EVERY,
+    CONF_MANAGER_MODEL,
+    CONF_MANAGER_STUCK,
     CONF_MAX_CHATS,
     CONF_MAX_REPLY_TOKENS,
     CONF_MAX_STEPS,
@@ -168,6 +172,15 @@ SECTIONS: dict[str, tuple[bool, list[str]]] = {
             CONF_SEARCH_KEY,
         ],
     ),
+    "manager": (
+        True,
+        [
+            CONF_MANAGER,
+            CONF_MANAGER_MODEL,
+            CONF_MANAGER_EVERY,
+            CONF_MANAGER_STUCK,
+        ],
+    ),
     "debugging": (True, [CONF_LOG_PROMPTS, CONF_TURN_LOG, CONF_TURN_LOG_DAYS, CONF_TURN_LOG_MB]),
 }
 
@@ -183,6 +196,7 @@ _UNITS = {
     CONF_TURN_LOG_DAYS: (1, "days"),
     CONF_TURN_LOG_MB: (1, "MB"),
     CONF_TIMEOUT: (10, "s"),
+    CONF_MANAGER_STUCK: (0.05, None),
 }
 
 
@@ -198,6 +212,8 @@ def _field(key: str, opts: dict[str, Any]) -> tuple[Any, Any]:
         return vol.Required(key, default=current), SelectSelector(
             SelectSelectorConfig(options=choices, mode=SelectSelectorMode.DROPDOWN)
         )
+    if key == CONF_MANAGER_MODEL:
+        return vol.Required(key, default=opts.get(key) or DEFAULT_OPTIONS[key]), TextSelector()
     if key in (CONF_REVIEWER_MODEL, CONF_ALWAYS_ASK, CONF_TOOL_RULES, CONF_APPROVAL_PHONE):
         return vol.Optional(key, description={"suggested_value": opts.get(key)}), TextSelector(
             TextSelectorConfig(multiline=key in (CONF_ALWAYS_ASK, CONF_TOOL_RULES))
