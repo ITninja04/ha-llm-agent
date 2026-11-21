@@ -2209,6 +2209,13 @@ class LlmAgentPanel extends HTMLElement {
                     this.modelIndex = -1;
                     this.modelOpen = true;
                   }}
+                  onClick={() => {
+                    // after a pick the box keeps focus, so a click must reopen the list
+                    if (this.modelOpen) return;
+                    this.modelQuery = "";
+                    this.modelIndex = -1;
+                    this.modelOpen = true;
+                  }}
                   onInput={(e) => {
                     this.modelQuery = (e.target as HTMLInputElement).value;
                     this.modelIndex = this.modelQuery.trim() ? 0 : -1;
