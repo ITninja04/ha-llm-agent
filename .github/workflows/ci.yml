@@ -75,8 +75,9 @@ jobs:
           # Minifying saved too little to matter (101437). Once Lit is gone this is set to the measured size, rounded up.
           # The budget is there to catch an accidental
           # dependency or a bundled library (8 kB or more), not normal feature growth.
-          # Minify does not help: Vite's lib mode with es output keeps the whitespace
-          # either way.
+          # Vite's own minify option keeps the whitespace in lib mode with es output, so
+          # the panel build minifies through the bundler's output option instead (see
+          # vite.config.ts): 111765 to 102648 bytes when it was turned on.
           test "$size" -le 117760
       - name: Floating chat loader stays within its size budget (6 kB gzipped)
         run: |

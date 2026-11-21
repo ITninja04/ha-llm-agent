@@ -11,6 +11,10 @@ export default defineConfig({
     emptyOutDir: false, // www/i18n holds the translations
     target: "es2022",
     sourcemap: false,
+    // Vite's own minify option leaves whitespace alone in lib mode with es output, but
+    // the bundler's output minifier does not: measured 2026-11-20 it took the panel from
+    // 111765 to 102648 bytes gzipped, with Lit and Solid both still in it.
+    rolldownOptions: { output: { minify: true } },
     lib: {
       entry: "src/panel.ts",
       formats: ["es"],
