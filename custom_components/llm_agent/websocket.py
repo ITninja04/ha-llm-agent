@@ -38,7 +38,6 @@ from .const import (
     CONF_HOME_SUMMARY,
     CONF_HOUSEHOLD,
     CONF_PROTECT_SENSITIVE,
-    CONF_SOLID_PREVIEW,
     DOMAIN,
     KNOWLEDGE_BODY_MAX,
     KNOWLEDGE_INDEX_MAX,
@@ -108,7 +107,6 @@ def async_register(hass: HomeAssistant) -> None:
         ws_changes,
         ws_usage,
         ws_balance,
-        ws_solid_preview,
     ):
         websocket_api.async_register_command(hass, handler)
 
@@ -1005,27 +1003,3 @@ async def ws_balance(
     if agent is None:
         return _not_ready(connection, msg)
     connection.send_result(msg["id"], {"providers": await agent.balances.get(agent.providers())})
-
-
-@websocket_api.websocket_command(
-    {vol.Required("type"): "llm_agent/solid_preview", vol.Required("enabled"): bool}
-)
-@websocket_api.require_admin
-@callback
-def ws_solid_preview(
-    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
-) -> None:
-    """Turn the Solid 2.0 Notes preview page on or off (see CONF_SOLID_PREVIEW).
-
-    The only way to set the option: it has no field in the settings form, so a user of
-    the integration never sees a half-built page. Saving reloads the entry like any
-    settings save, and the reload adds or removes the sidebar page.
-    """
-    entries = hass.config_entries.async_loaded_entries(DOMAIN)
-    if not entries:
-        return _not_ready(connection, msg)
-    entry = entries[0]
-    hass.config_entries.async_update_entry(
-        entry, options={**entry.options, CONF_SOLID_PREVIEW: msg["enabled"]}
-    )
-    connection.send_result(msg["id"], {"enabled": msg["enabled"]})

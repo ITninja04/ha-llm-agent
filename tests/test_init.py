@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -10,15 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-import custom_components.llm_agent
-from custom_components.llm_agent.const import (
-    DOMAIN,
-    PANEL_URL,
-    PREVIEW_ELEMENT,
-    PREVIEW_URL,
-    STATIC_URL,
-)
-from custom_components.llm_agent.settings_export import export_text
+from custom_components.llm_agent.const import DOMAIN, PANEL_URL
 
 from .conftest import entry_options
 from .test_agent import ScriptedProvider, reply_text
@@ -104,52 +95,6 @@ async def test_settings_save_removes_the_panel_when_the_reload_fails(
     with patch("custom_components.llm_agent.Agent", side_effect=RuntimeError("setup broke")):
         await _save_settings(hass, entry, cost={"max_steps": 31})
     assert PANEL_URL not in hass.data["frontend_panels"]
-
-
-async def test_solid_preview_page_exists_only_while_its_option_is_on(
-    hass: HomeAssistant, hass_ws_client, hass_admin_user
-) -> None:
-    """The preview is a half-built page for one person to try. It must not appear for
-    anyone running the integration who has not turned it on, must survive a settings
-    save like the main panel, and must load a bundle that is really in www/."""
-    entry = await _setup(hass)
-    panels = hass.data["frontend_panels"]
-    assert PREVIEW_URL not in panels  # off for every existing and new install
-    assert "solid_preview" not in export_text(dict(entry.options))
-
-    client = await hass_ws_client(hass)
-    await client.send_json_auto_id({"type": "llm_agent/solid_preview", "enabled": True})
-    assert (await client.receive_json())["result"] == {"enabled": True}
-    await hass.async_block_till_done()
-    page = panels[PREVIEW_URL]
-    assert page.require_admin is True
-    custom = page.config["_panel_custom"]
-    assert custom["name"] == PREVIEW_ELEMENT
-    file = custom["module_url"].removeprefix(f"{STATIC_URL}/").split("?")[0]
-    assert (Path(custom_components.llm_agent.__file__).parent / "www" / file).is_file()
-    # the page loads the shipping panel bundle for the Lit view beside the Solid one
-    assert page.config["lit_url"] == panels[PANEL_URL].config["_panel_custom"]["module_url"]
-
-    # an ordinary settings save keeps it
-    await _save_settings(hass, entry, cost={"max_steps": 31})
-    assert PREVIEW_URL in panels
-
-    await client.send_json_auto_id({"type": "llm_agent/solid_preview", "enabled": False})
-    await client.receive_json()
-    await hass.async_block_till_done()
-    assert PREVIEW_URL not in panels
-
-    hass_admin_user.groups = []
-    await client.send_json_auto_id({"type": "llm_agent/solid_preview", "enabled": True})
-    msg = await client.receive_json()
-    assert msg["error"]["code"] == "unauthorized"
-
-
-async def test_solid_preview_page_goes_with_the_entry(hass: HomeAssistant) -> None:
-    entry = await _setup(hass, solid_preview=True)
-    assert PREVIEW_URL in hass.data["frontend_panels"]
-    assert await hass.config_entries.async_unload(entry.entry_id)
-    assert PREVIEW_URL not in hass.data["frontend_panels"]
 
 
 async def test_ws_rejects_non_admin(hass: HomeAssistant, hass_ws_client, hass_admin_user) -> None:
