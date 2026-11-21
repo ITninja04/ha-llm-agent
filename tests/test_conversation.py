@@ -12,6 +12,7 @@ from homeassistant.setup import async_setup_component
 import pytest
 
 from custom_components.llm_agent.providers import ProviderError
+from custom_components.llm_agent.providers.base import Done, TextDelta, Usage
 
 from .test_agent import ScriptedProvider, reply_text, reply_tool
 from .test_init import _setup
@@ -63,3 +64,47 @@ async def test_assist_reports_provider_errors(hass: HomeAssistant, agent_id: str
     # HA speaks the error back to the user instead of failing silently.
     assert result.response.response_type == intent.IntentResponseType.ERROR
     assert "API key was rejected" in result.response.speech["plain"]["speech"]
+
+
+async def test_assist_uses_the_reply_length_setting_and_retries_a_reply_spent_thinking(
+    hass: HomeAssistant, agent_id: str
+) -> None:
+    # A fixed 2048 used to be sent, and a reasoning model could spend all of it thinking
+    # and answer nothing at all, with no retry and no message.
+    thought = [Usage(100, 16000, reasoning_tokens=16000), Done("length")]
+    provider = ScriptedProvider([thought, reply_text("The lamp is off.")])
+    with patch(PATCH, return_value=provider):
+        result = await conversation.async_converse(
+            hass, "is the lamp on", None, Context(), agent_id=agent_id
+        )
+    assert [c["max_tokens"] for c in provider.calls] == [16000, 32000]
+    assert result.response.speech["plain"]["speech"] == "The lamp is off."
+    # the retry is sent the same history, not an empty assistant turn
+    assert provider.calls[1]["messages"] == provider.calls[0]["messages"]
+
+
+async def test_assist_says_why_when_the_retry_is_spent_thinking_too(
+    hass: HomeAssistant, agent_id: str
+) -> None:
+    thought = [Usage(100, 16000, reasoning_tokens=16000), Done("length")]
+    provider = ScriptedProvider([list(thought), list(thought)])
+    with patch(PATCH, return_value=provider):
+        result = await conversation.async_converse(
+            hass, "is the lamp on", None, Context(), agent_id=agent_id
+        )
+    assert len(provider.calls) == 2  # one retry, never a loop
+    assert result.response.response_type == intent.IntentResponseType.ERROR
+    assert "Maximum reply length" in result.response.speech["plain"]["speech"]
+
+
+async def test_assist_keeps_a_reply_with_text_that_hit_the_limit(
+    hass: HomeAssistant, agent_id: str
+) -> None:
+    cut = [TextDelta("The lamp is"), Usage(100, 16000), Done("length")]
+    provider = ScriptedProvider([cut])
+    with patch(PATCH, return_value=provider):
+        result = await conversation.async_converse(
+            hass, "is the lamp on", None, Context(), agent_id=agent_id
+        )
+    assert len(provider.calls) == 1
+    assert result.response.speech["plain"]["speech"] == "The lamp is"

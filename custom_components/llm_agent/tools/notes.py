@@ -35,6 +35,17 @@ NOT_BEHAVIOUR = (
     "instructions setting and do not call this. Never store secrets."
 )
 ACTIONS = ["add", "edit", "disable", "remove"]
+# Every note refusal names the knowledge base, with the tool for it: when the only way out
+# it named was "shorten it", the model rewrote one fact three times on 2026-11-18 and never
+# stored it. The store's own refusals already name both ways out in words a person in the
+# panel reads too, so they only get the tool name added (KNOWLEDGE_TOOL).
+KNOWLEDGE_WAY_OUT = (
+    "To keep the whole fact, propose it as a knowledge base entry with change_knowledge "
+    "(title, one-line summary, body), or propose editing or disabling an older note."
+)
+KNOWLEDGE_TOOL = (
+    "Propose a knowledge base entry with change_knowledge (title, one-line summary, body)."
+)
 TITLES = {"add": "Add", "edit": "Edit", "disable": "Disable", "remove": "Remove"}
 
 
@@ -83,11 +94,22 @@ class _Proposal(Tool):
     def _after(self, before: dict[str, Any] | None, args: dict[str, Any]) -> str:
         raise NotImplementedError
 
+    def _check(self, home: HomeNotes, args: dict[str, Any]) -> None:
+        """Raise Refused if applying `args` now would be refused, so a card that cannot
+        succeed is never shown."""
+
+    def _refused(self, err: Refused) -> ToolError:
+        return ToolError(str(err))
+
     async def preview(self, ctx: ToolContext, args: dict[str, Any]) -> Preview:
         home = _home(ctx)
         before = None if args["action"] == "add" else self._get(home, args["id"])
         if args["action"] != "add" and before is None:
             raise ToolError(f"There is no {self.what} {args['id']}")
+        try:
+            self._check(home, args)
+        except Refused as err:
+            raise self._refused(err) from None
         self._shown[id(args)] = before
         while len(self._shown) > 64:
             self._shown.pop(next(iter(self._shown)))
@@ -123,7 +145,7 @@ class _Proposal(Tool):
             else:
                 result = {"ok": True, self.what.split()[-1]: self._apply(ctx, home, args, item_id)}
         except Refused as err:
-            raise ToolError(str(err)) from None
+            raise self._refused(err) from None
         return ToolOutput(result, label, snapshot_id=snap)
 
     def _new_id(self) -> str:
@@ -146,10 +168,11 @@ class ChangeHomeNote(_Proposal):
         super().__init__(
             "change_home_note",
             "Propose adding, editing, disabling or removing one home note; a person "
-            "approves it. Notes are short lasting facts and household rules about this "
-            "home, such as which room is upstairs or a plug that must stay on. The "
-            "enabled notes are in your instructions, each with its [id]. "
-            f"{NOT_BEHAVIOUR} At most {NOTE_MAX} characters per note.",
+            "approves it. A note is one short, current, lasting fact or household rule "
+            "about this home, such as which room is upstairs or a plug that must stay on. "
+            "Anything longer, or with history, dates or steps, goes in the knowledge base "
+            "with change_knowledge instead. The enabled notes are in your instructions, "
+            f"each with its [id]. {NOT_BEHAVIOUR} At most {NOTE_MAX} characters per note.",
             obj(
                 {
                     "action": {"type": "string", "enum": ACTIONS},
@@ -167,8 +190,22 @@ class ChangeHomeNote(_Proposal):
             if not isinstance(text, str) or not text.strip():
                 raise ToolError("Give the note's text")
             if len(text.strip()) > NOTE_MAX:
-                raise ToolError(f"A note is limited to {NOTE_MAX} characters; shorten it")
+                raise ToolError(f"A note is limited to {NOTE_MAX} characters. {KNOWLEDGE_WAY_OUT}")
         return args
+
+    def _check(self, home: HomeNotes, args: dict[str, Any]) -> None:
+        if args["action"] == "remove":
+            return
+        home.check_note(
+            None if args["action"] == "add" else args["id"],
+            args["text"] if args["action"] in ("add", "edit") else None,
+            False if args["action"] == "disable" else None,
+        )
+
+    def _refused(self, err: Refused) -> ToolError:
+        # The store's words are shown to people in the panel too, so the tool name is
+        # added here, for the model only.
+        return ToolError(f"{err} {KNOWLEDGE_TOOL}")
 
     def _get(self, home: HomeNotes, item_id: str) -> dict[str, Any] | None:
         return home.note(item_id)
