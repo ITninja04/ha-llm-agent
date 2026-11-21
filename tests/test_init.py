@@ -84,6 +84,18 @@ async def test_settings_save_keeps_the_panel_through_the_reload(hass: HomeAssist
     assert module.endswith(f"?v={hass.data[f'{DOMAIN}_version']}")
 
 
+async def test_panel_keeps_clear_of_the_safe_areas_itself(hass: HomeAssistant) -> None:
+    """HA pads a custom panel's container by the phone's safe-area insets unless the
+    panel opts out. The panel is a full-screen box that pads itself, so with HA's
+    padding too it was taller than the iPhone screen and the page scrolled. The opt-out
+    must hold for the first registration and for the in-place update a save does."""
+    entry = await _setup(hass)
+    custom = lambda: hass.data["frontend_panels"][PANEL_URL].config["_panel_custom"]  # noqa: E731
+    assert custom()["handle_safe_area"] is True
+    await _save_settings(hass, entry, cost={"max_steps": 31})
+    assert custom()["handle_safe_area"] is True
+
+
 async def test_settings_save_removes_the_panel_when_the_reload_fails(
     hass: HomeAssistant,
 ) -> None:

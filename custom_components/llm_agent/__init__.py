@@ -85,7 +85,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> 
         # Kept across a settings save (see _async_update_listener): update it in place,
         # which sends the browser one change and, when nothing changed, none it acts on.
         # panel_custom has no update option, so its config is reused with the new URL.
-        custom = {**kept.config["_panel_custom"], "module_url": module_url}
+        custom = {
+            **kept.config["_panel_custom"],
+            "module_url": module_url,
+            "handle_safe_area": True,
+        }
         frontend.async_register_built_in_panel(
             hass,
             component_name="custom",
@@ -106,6 +110,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: LLMAgentConfigEntry) -> 
             module_url=module_url,
             embed_iframe=False,
             require_admin=require_admin,
+            # the panel pads itself by the safe-area insets (see panel.ts styles)
+            handle_safe_area=True,
         )
 
     _sync_preview(hass, version if options.get(CONF_SOLID_PREVIEW) else None, module_url)

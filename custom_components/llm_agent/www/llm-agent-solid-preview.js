@@ -2031,7 +2031,7 @@ var hi = mi`
     font-size: 15px;
     -webkit-font-smoothing: antialiased;
   }
-  /* inside the floating window, which sets the size */
+  /* inside the floating window, which sets the size and keeps clear of the safe areas */
   :host([embedded]) {
     height: 100%;
   }
