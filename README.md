@@ -639,6 +639,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   scrolling the Home Assistant page behind it.
 - **0.10.3 (released):** a reply whose whole length went on thinking is retried once with
   double the room, then stops with a message that says which setting to raise.
+- **0.10.4 (released):** a hidden developer preview of the Notes view written with Solid
+  2.0, off unless an admin turns it on. Nothing changes for anyone else.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
