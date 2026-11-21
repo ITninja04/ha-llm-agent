@@ -141,6 +141,7 @@ def _usage(data: dict[str, Any]) -> Usage:
         input_tokens=max(0, _count(data, "input_tokens") - cached),
         output_tokens=_count(data, "output_tokens"),
         cache_read_tokens=cached,
+        reasoning_tokens=_count(_obj(data.get("output_tokens_details")), "reasoning_tokens"),
     )
 
 
