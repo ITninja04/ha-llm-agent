@@ -311,6 +311,19 @@ async def test_a_stuck_answer_steers_the_next_request_only(hass: HomeAssistant) 
     ]
 
 
+async def test_the_turn_records_cost_matches_the_chats_with_a_check_in_it(
+    hass: HomeAssistant,
+) -> None:
+    # Before 0.12.1 the record left the check out: on the live install a turn logged
+    # $0.001327 while the chat showed $0.001366, the gap being one $0.000039 check.
+    provider = ScriptedProvider([tool("c1", "light.a"), tool("c2", "light.b"), text("Done.")])
+    agent, conv, _, _ = await _run(hass, provider, [answer(0.2)], manager=True, manager_every=2)
+    record = agent.last_record
+    assert record["manager_cost"] == 0.00003
+    assert record["cost"] is not None and record["cost"] > record["manager_cost"]
+    assert record["cost"] == conv["usage"]["cost"]
+
+
 async def test_three_failed_calls_get_a_check_at_once(hass: HomeAssistant) -> None:
     # unknown tools fail, and with checks every 50 calls only the chain can trigger one
     replies = [tool(f"c{i}", name="no_such_tool") for i in range(3)] + [text("I am stuck.")]
