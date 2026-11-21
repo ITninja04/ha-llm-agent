@@ -635,6 +635,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   the page you are looking at (dashboard entities, the editor you are in, an open entity).
 - **0.10.1 (released):** page context on Home Assistant's default Overview includes the entities
   shown there.
+- **0.10.2 (released):** touch scrolling in the chat stays in the chat on phones instead of
+  scrolling the Home Assistant page behind it.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
