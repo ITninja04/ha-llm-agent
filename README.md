@@ -646,6 +646,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
   get the same retry when a reply's whole length goes on thinking.
 - **0.10.6 (released):** on an iPhone the full panel fits the screen again: the header
   no longer scrolls away and the chat box is no longer cut off at the bottom.
+- **0.10.7 (released):** the hidden Notes (Solid) preview page is gone; the panel
+  itself is moving to Solid one view at a time.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
