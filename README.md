@@ -693,6 +693,8 @@ The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md). In short:
 - **0.12.0 (released):** per-chat modes, model search, a tool call budget the AI is told
   about, a turn log for tuning the prompt, and the Manager, an optional check that
   notices when a long reply is stuck retrying and tells the AI to change approach.
+- **0.12.1 (released):** the turn log's cost now includes the Manager's checks, so it
+  matches the chat's total.
 - **1.0:** a default HACS store listing, translations and accessibility, and a docs site.
 - **Backlog:** more languages (panel, replies, right-to-left), accessibility (keyboard,
   screen readers, contrast, reduced motion, voice), and web research extras.
