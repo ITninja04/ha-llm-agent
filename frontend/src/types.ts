@@ -135,7 +135,7 @@ export type Item =
       reviewing?: boolean;
       image?: string;
     }
-  | { kind: "notice"; text: string; error?: boolean; stop?: string };
+  | { kind: "notice"; text: string; error?: boolean; stop?: string; detail?: string };
 
 export interface Approval {
   summary: string;
@@ -161,7 +161,7 @@ export interface Conversation {
 
 export type StoredMessage =
   | { role: "user"; content: string; photos?: number; files?: FileInfo[]; page?: string }
-  | { role: "assistant"; content: string; tool_calls: ToolCallInfo[] }
+  | { role: "assistant"; content: string; tool_calls: ToolCallInfo[]; manager?: Note[] }
   | {
       role: "tool";
       tool_call_id: string;
@@ -173,7 +173,14 @@ export type StoredMessage =
       decision: string | null;
       review?: ReviewVerdict | null;
       preview: string;
+      manager?: Note[];
     };
+
+/** A Manager check as the panel shows it: one line, and its numbers under it. */
+export interface Note {
+  text: string;
+  detail: string;
+}
 
 export type ChatEvent =
   | { type: "delta"; text: string }
@@ -208,7 +215,7 @@ export type ChatEvent =
   | { type: "review_start"; call_id: string; model: string }
   | ({ type: "review"; call_id: string } & ReviewVerdict)
   | { type: "usage"; usage: Usage }
-  | { type: "notice"; text: string; stop?: string }
+  | { type: "notice"; text: string; stop?: string; detail?: string }
   | { type: "error"; message: string }
   | { type: "done"; usage: Usage };
 

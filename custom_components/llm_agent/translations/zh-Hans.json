@@ -205,6 +205,21 @@
               "reviewer_model": "模型 ID，例如 claude-haiku-5-5 或本地 Ollama 模型。留空使用提供商的默认模型。审核者只看到你的请求和操作，不会看到工具输出。",
               "always_ask": "无论审核者如何决定，这些操作始终交给你确认。用逗号分隔：domain.service（lock.*）、实体 ID、工具名称（shell）或 tool:action（integrations:remove）。* 匹配任意内容。"
             }
+          },
+          "manager": {
+            "name": "主管（高级）",
+            "data": {
+              "manager": "主管",
+              "manager_model": "主管模型",
+              "manager_every": "检查间隔",
+              "manager_stuck_at": "阈值：卡住"
+            },
+            "data_description": {
+              "manager": "一个决策模型每隔几次工具调用查看一次较长的回复，连续 3 次调用失败时也会立即查看。当它确定 AI 卡在反复重试时，会让 AI 换一种做法，或告诉你是什么挡住了它。需要一个 OpenRouter 提供方并使用其密钥。每次检查约 0.0001 美元，计入每日上限。聊天中的备注会显示每次检查。",
+              "manager_model": "OpenRouter 上决策模型的 ID。默认阈值是用 typesafe/jev-1.14 测试得出的。",
+              "manager_every": "两次检查之间的工具调用次数。",
+              "manager_stuck_at": "主管需要多确定（0 到 1）AI 卡住了，才会介入。"
+            }
           }
         }
       },

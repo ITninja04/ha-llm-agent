@@ -205,6 +205,21 @@
               "reviewer_model": "Um ID de modelo, por exemplo claude-haiku-5-5 ou um modelo local do Ollama. Vazio usa o modelo padrão do provedor. O revisor vê sua solicitação e a ação, nunca os resultados das ferramentas.",
               "always_ask": "Estas ações sempre são encaminhadas a você, independentemente do que o revisor disser. Separadas por vírgulas: domain.service (lock.*), IDs de entidades, nomes de ferramentas (shell) ou tool:action (integrations:remove). * corresponde a qualquer coisa."
             }
+          },
+          "manager": {
+            "name": "Supervisor (avançado)",
+            "data": {
+              "manager": "Supervisor",
+              "manager_model": "Modelo do supervisor",
+              "manager_every": "Verificar a cada",
+              "manager_stuck_at": "Limite: travado"
+            },
+            "data_description": {
+              "manager": "Um modelo de decisão confere as respostas longas a cada poucas chamadas de ferramentas, e na hora após 3 chamadas com falha seguidas. Quando tem certeza de que a IA está travada tentando de novo, pede que ela tente outro caminho ou diga a você o que a bloqueia. Precisa de um provedor OpenRouter e usa a chave dele. Cada verificação custa cerca de US$ 0,0001 e conta para o limite diário. Uma nota no chat mostra cada verificação.",
+              "manager_model": "O id de um modelo de decisão do OpenRouter. O limite padrão foi testado com typesafe/jev-1.14.",
+              "manager_every": "Chamadas de ferramentas entre verificações.",
+              "manager_stuck_at": "O quanto (de 0 a 1) o supervisor precisa ter certeza de que a IA travou antes de intervir."
+            }
           }
         }
       },

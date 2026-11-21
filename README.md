@@ -285,6 +285,21 @@ approves or denies each risky action in your place.
 - Its verdict shows on the tool card and goes in the audit log. Its tokens and cost are
   shown separately and count towards the daily spend cap.
 
+**Manager (off by default).** A decision model looks at long replies every 5 tool calls,
+and at once after 3 failed calls in a row, and answers one question: is the AI working,
+drifting, stuck or done. It answers with numbers, never with text.
+- When it is at least 70% sure the AI is stuck retrying, one fixed sentence is added to
+  what the AI reads next: "You are retrying without getting closer. Try a different
+  approach, or stop and tell the owner what is blocking you." It can't run, skip or
+  approve anything.
+- Every check shows as a small Manager note in the chat. Open it for the numbers.
+- It needs an OpenRouter provider and uses its key. A check costs about $0.0001 and counts
+  towards the daily spend cap. If it fails or takes over 3 seconds, the reply carries on
+  as if it were off.
+- What it does not do: notice an AI that wanders into something you did not ask for,
+  tell you when the work is finished, or decide to carry on past the tool call limit. In
+  testing on real chats it could not do those reliably, so it does not try.
+
 **MCP servers.** Add a server with HA's Model Context Protocol integration (it handles
 the address and sign-in), then turn on **Use tools from MCP servers**. Its tools show up
 as `mcp_<server>_<tool>`. Those servers are outside your home: their tools can do
@@ -423,6 +438,7 @@ default, a safe range and a one-line explanation. The less common groups start f
 | Approval rules | Allow, ask or deny rules that apply in every approval mode |
 | Household and phone | Household members' chat on or off, their daily limit, and the phone that approves |
 | Reviewer mode | The reviewer's provider and model (the chat's own by default), and the always-ask list |
+| Manager (advanced) | The Manager on or off, its model, how often it checks, and how sure it must be that the AI is stuck before it steps in |
 | Web research | Web pages on or off, fetching LAN addresses (off), web search: Free (HA forum, HA GitHub issues and Wikipedia, no key, the default), SearXNG (self-hosted, covers the whole web), Brave Search, or Off |
 | Debugging | Log full prompts and replies (the log then contains your conversations) |
 

@@ -381,6 +381,12 @@ async def _own(
     return conv if viewer.sees(conv) else None
 
 
+def _notes(msg: dict[str, Any]) -> list[dict[str, str]]:
+    """The Manager notes on a stored message, as the panel draws them: only the line and
+    the detail, the same two fields the live notice carries."""
+    return [{"text": r["text"], "detail": r["detail"]} for r in msg["manager"]]
+
+
 def _public(conv: dict[str, Any]) -> dict[str, Any]:
     """Conversation as the panel needs it: no raw provider blocks or context."""
     messages = []
@@ -401,6 +407,7 @@ def _public(conv: dict[str, Any]) -> dict[str, Any]:
                     "role": "assistant",
                     "content": m.get("content", ""),
                     "tool_calls": m.get("tool_calls", []),
+                    **({"manager": _notes(m)} if m.get("manager") else {}),
                 }
             )
         else:
@@ -416,6 +423,7 @@ def _public(conv: dict[str, Any]) -> dict[str, Any]:
                     "decision": m.get("decision"),
                     "review": m.get("review"),
                     "preview": m["content"][:1500],
+                    **({"manager": _notes(m)} if m.get("manager") else {}),
                 }
             )
     return {

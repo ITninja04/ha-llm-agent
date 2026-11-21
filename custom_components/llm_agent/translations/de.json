@@ -205,6 +205,21 @@
               "reviewer_model": "Eine Modell-ID, etwa claude-haiku-5-5 oder ein lokales Ollama-Modell. Leer verwendet das Standardmodell des Anbieters. Der Prüfer sieht deine Anfrage und die Aktion, aber nie Werkzeugausgaben.",
               "always_ask": "Diese Aktionen kommen immer zu dir, unabhängig vom Urteil des Prüfers. Kommagetrennt: domain.service (lock.*), Entitäts-IDs, Werkzeugnamen (shell) oder tool:action (integrations:remove). * passt auf alles."
             }
+          },
+          "manager": {
+            "name": "Manager (erweitert)",
+            "data": {
+              "manager": "Manager",
+              "manager_model": "Manager-Modell",
+              "manager_every": "Prüfen alle",
+              "manager_stuck_at": "Schwelle: festgefahren"
+            },
+            "data_description": {
+              "manager": "Ein Entscheidungsmodell prüft lange Antworten alle paar Werkzeugaufrufe und sofort nach 3 fehlgeschlagenen Aufrufen in Folge. Ist es sicher, dass die KI sich festgefahren hat, fordert es sie auf, einen anderen Weg zu versuchen oder dir zu sagen, was sie blockiert. Braucht einen OpenRouter-Anbieter und nutzt dessen Schlüssel. Jede Prüfung kostet etwa 0,0001 $ und zählt zum Tageslimit. Ein Hinweis im Chat zeigt jede Prüfung.",
+              "manager_model": "Die ID eines Entscheidungsmodells bei OpenRouter. Die Standardschwelle wurde mit typesafe/jev-1.14 getestet.",
+              "manager_every": "Werkzeugaufrufe zwischen zwei Prüfungen.",
+              "manager_stuck_at": "Wie sicher (0 bis 1) der Manager sein muss, dass die KI festgefahren ist, bevor er eingreift."
+            }
           }
         }
       },

@@ -205,6 +205,21 @@
               "reviewer_model": "模型 ID，例如 claude-haiku-5-5 或本機 Ollama 模型。留空使用供應商的預設模型。審查者只看到你的請求和操作，不會看到工具輸出。",
               "always_ask": "無論審查者如何決定，這些操作一律交給你確認。以逗號分隔：domain.service（lock.*）、實體 ID、工具名稱（shell）或 tool:action（integrations:remove）。* 比對任意內容。"
             }
+          },
+          "manager": {
+            "name": "主管（進階）",
+            "data": {
+              "manager": "主管",
+              "manager_model": "主管模型",
+              "manager_every": "檢查間隔",
+              "manager_stuck_at": "門檻：卡住"
+            },
+            "data_description": {
+              "manager": "一個決策模型每隔幾次工具呼叫查看一次較長的回覆，連續 3 次呼叫失敗時也會立即查看。當它確定 AI 卡在反覆重試時，會要 AI 換個做法，或告訴你是什麼擋住了它。需要一個 OpenRouter 提供者並使用其金鑰。每次檢查約 0.0001 美元，計入每日上限。聊天中的備註會顯示每次檢查。",
+              "manager_model": "OpenRouter 上決策模型的 ID。預設門檻是以 typesafe/jev-1.14 測試得出的。",
+              "manager_every": "兩次檢查之間的工具呼叫次數。",
+              "manager_stuck_at": "主管需要多確定（0 到 1）AI 卡住了，才會介入。"
+            }
           }
         }
       },

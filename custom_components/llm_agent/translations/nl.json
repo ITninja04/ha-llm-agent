@@ -205,6 +205,21 @@
               "reviewer_model": "Een model-ID, bijvoorbeeld claude-haiku-5-5 of een lokaal Ollama-model. Leeg gebruikt het standaardmodel van de provider. De beoordelaar ziet je verzoek en de actie, nooit tooluitvoer.",
               "always_ask": "Deze acties komen altijd bij jou terecht, ongeacht wat de beoordelaar zegt. Kommagescheiden: domain.service (lock.*), entiteit-ID's, toolnamen (shell) of tool:action (integrations:remove). * komt met alles overeen."
             }
+          },
+          "manager": {
+            "name": "Manager (geavanceerd)",
+            "data": {
+              "manager": "Manager",
+              "manager_model": "Managermodel",
+              "manager_every": "Controleer elke",
+              "manager_stuck_at": "Drempel: vastgelopen"
+            },
+            "data_description": {
+              "manager": "Een beslismodel bekijkt lange antwoorden om de paar toolaanroepen, en meteen na 3 mislukte aanroepen op rij. Als het zeker is dat de AI vastloopt in herhalen, vraagt het de AI een andere weg te proberen of jou te vertellen wat blokkeert. Heeft een OpenRouter-provider nodig en gebruikt diens sleutel. Elke controle kost ongeveer $0,0001 en telt mee voor het daglimiet. Een notitie in de chat toont elke controle.",
+              "manager_model": "De id van een beslismodel op OpenRouter. De standaarddrempel is getest met typesafe/jev-1.14.",
+              "manager_every": "Toolaanroepen tussen twee controles.",
+              "manager_stuck_at": "Hoe zeker (0 tot 1) de manager moet zijn dat de AI vastzit voordat hij ingrijpt."
+            }
           }
         }
       },
