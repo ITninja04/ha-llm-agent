@@ -51,7 +51,7 @@ const ERR = (err: unknown) => (err as { message?: string }).message ?? String(er
 class LlmAgentChanges extends LitElement {
   static styles = [
     styles,
-    css`:host{flex:1;min-height:0;height:auto;overflow-y:auto;background:none;container-type:inline-size}
+    css`:host{flex:1;min-height:0;height:auto;overflow-y:auto;overscroll-behavior:contain;background:none;container-type:inline-size}
 .bar{display:flex;flex-wrap:wrap;gap:8px;padding:12px 20px}
 .bar>*{font:inherit;font-size:13px;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
 .bar>[type=search]{flex:1;min-width:140px}
