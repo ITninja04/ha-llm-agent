@@ -1,5 +1,6 @@
 // The panel's words. English is built in; other languages are small JSON files served
 // next to the bundle and fetched once, so the bundle doesn't grow with each language.
+import { createSignal } from "solid-js";
 import en from "../../custom_components/llm_agent/www/i18n/en.json";
 
 export type Key = keyof typeof en;
@@ -20,10 +21,15 @@ export const LANGUAGES = [
 
 let table: Partial<Record<Key, string>> = {};
 let loaded = "en";
+// Bumped when the table changes, and read by t(), so a Solid view showing words updates
+// when the language arrives or changes. Marked pure so the floating chat window, which
+// imports only pickLanguage from here, does not pull the Solid runtime in.
+const changed = /* @__PURE__ */ createSignal(0);
 
 /** The text for `key` in the loaded language (English when missing), with `{name}`
  * placeholders filled in. */
 export function t(key: Key, vars?: Record<string, string | number>): string {
+  changed[0]();
   const text = table[key] ?? en[key];
   return vars ? text.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? String(vars[name]) : m)) : text;
 }
@@ -50,6 +56,7 @@ export async function loadLanguage(code: string | undefined): Promise<boolean> {
   if (lang === "en") {
     table = {};
     loaded = "en";
+    changed[1]((n) => n + 1);
     return true;
   }
   try {
@@ -64,6 +71,7 @@ export async function loadLanguage(code: string | undefined): Promise<boolean> {
     }
     table = next;
     loaded = lang;
+    changed[1]((n) => n + 1);
     return true;
   } catch {
     return false; // stay in English
