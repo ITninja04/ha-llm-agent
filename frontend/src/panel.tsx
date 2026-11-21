@@ -2193,15 +2193,18 @@ class LlmAgentPanel extends HTMLElement {
                   aria-controls="model-list"
                   aria-expanded={tf(this.modelOpen)}
                   aria-activedescendant={this.modelOpen && this.modelIndex >= 0 ? `model-opt-${this.modelIndex}` : undefined}
-                  placeholder={t("model_search")}
+                  // While the list is open the box holds only the search, with the current
+                  // model shown greyed behind it. Selecting the model's text on focus
+                  // instead does not survive a click: the mouseup drops the selection,
+                  // and typing then lands after the old name ("stub-modeltub").
+                  placeholder={this.modelOpen && this.model ? this.model : t("model_search")}
                   autocomplete="off"
                   spellcheck={false}
                   ref={(el) => (this.modelInput = el)}
-                  value={this.model}
+                  value={this.modelOpen ? this.modelQuery : this.model}
                   disabled={this.running}
-                  onFocus={(e) => {
+                  onFocus={() => {
                     void this.loadModels();
-                    (e.target as HTMLInputElement).select();
                     this.modelQuery = "";
                     this.modelIndex = -1;
                     this.modelOpen = true;
