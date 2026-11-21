@@ -163,10 +163,16 @@
           "debugging": {
             "name": "Felsökning",
             "data": {
-              "log_prompts": "Logga instruktioner och svar"
+              "log_prompts": "Logga instruktioner och svar",
+              "turn_log": "Turlogg",
+              "turn_log_days": "Behåll turloggen i",
+              "turn_log_mb": "Turloggens storlek"
             },
             "data_description": {
-              "log_prompts": "Skriver varje instruktion, svar och verktygsanrop till Home Assistant-loggen. Låt detta vara av om du inte rapporterar ett problem: loggen innehåller då dina konversationer."
+              "log_prompts": "Skriver varje instruktion, svar och verktygsanrop till Home Assistant-loggen. Låt detta vara av om du inte rapporterar ett problem: loggen innehåller då dina konversationer.",
+              "turn_log": "Sparar en post per chattur (använda verktyg, antal, tokens, kostnad, tid) för att finjustera prompten, skild från chattarna, så att den inte försvinner när en chatt tas bort. Den stannar i Home Assistant; administratörer kan ladda ner den i vyn Användning.",
+              "turn_log_days": "Äldre poster tas bort.",
+              "turn_log_mb": "De äldsta posterna tas bort över den här storleken."
             }
           },
           "rules": {

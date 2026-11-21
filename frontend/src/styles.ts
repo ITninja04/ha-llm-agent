@@ -1444,6 +1444,110 @@ styles.replaceSync(`
   .model-pill input.model {
     width: 170px;
   }
+  /* The toolbar holds the attach button, both pickers and Send. On a 390 px phone the
+     pickers shrink (and cut their text) rather than push Send off the edge or wrap it
+     onto a line of its own. */
+  .toolbar > .attach,
+  .toolbar > button.send {
+    flex-shrink: 0;
+  }
+  .toolbar > .model-pill {
+    flex: 0 1 auto;
+    overflow: hidden;
+  }
+  .model-pill select {
+    min-width: 0;
+    text-overflow: ellipsis;
+  }
+  .model-pill input.model {
+    flex: 1 1 auto;
+    min-width: 72px;
+  }
+  .mode-pill select {
+    max-width: 130px;
+  }
+  @media (max-width: 600px) {
+    .model-pill select {
+      max-width: 88px;
+    }
+    .model-pill input.model {
+      width: 120px;
+    }
+  }
+  .plan-run {
+    margin: 6px 0 0;
+  }
+  .plan-run button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    --mdc-icon-size: 16px;
+  }
+  ul.models {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: calc(100% + 6px);
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
+    max-height: min(360px, 50vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    z-index: 5;
+    font-size: 13px;
+  }
+  ul.models li {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    min-height: 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    --mdc-icon-size: 14px;
+  }
+  ul.models li.active {
+    background: var(--accent-soft);
+  }
+  ul.models li.current .label {
+    font-weight: 600;
+  }
+  ul.models li.models-head,
+  ul.models li.models-more {
+    cursor: default;
+    color: var(--muted);
+    font-size: 11.5px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  ul.models .star {
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  ul.models .label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  ul.models .mid {
+    margin-left: 8px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11.5px;
+  }
+  ul.models .price {
+    flex-shrink: 0;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11.5px;
+  }
   .model-pill select:focus,
   .model-pill input:focus {
     box-shadow: none;

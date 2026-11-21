@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+    # labeled and unlabeled too, so adding the new-dependency label reruns the guard
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 
 permissions:
@@ -40,6 +42,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # the size and dependency checks below compare with origin/main
+          fetch-depth: 0
+      - name: No new dependency without the new-dependency label
+        # Every package is code that runs in someone's Home Assistant, and the panel's
+        # dependencies end up in the bundle every user downloads. So adding, removing or
+        # changing one is a decision someone makes on purpose, marked by the label, not
+        # a habit that slips in with a feature. Compared as parsed JSON, so reformatting
+        # package.json or manifest.json does not trip it.
+        env:
+          LABELED: ${{ contains(github.event.pull_request.labels.*.name, 'new-dependency') }}
+        run: |
+          deps() { python3 -c 'import json, sys; d = json.load(sys.stdin); print(json.dumps({k: d.get(k) for k in sys.argv[1:]}, sort_keys=True, indent=1))' "$@"; }
+          changed=""
+          for spec in "frontend/package.json dependencies devDependencies" "custom_components/llm_agent/manifest.json requirements"; do
+            set -- $spec
+            file=$1
+            shift
+            was=$(git show "origin/main:$file" | deps "$@")
+            now=$(deps "$@" < "$file")
+            if [ "$was" != "$now" ]; then
+              echo "$file: $* differ from main:"
+              diff <(echo "$was") <(echo "$now") || true
+              changed=1
+            fi
+          done
+          if [ -n "$changed" ] && [ "$LABELED" != "true" ]; then
+            echo "Dependencies changed. If that is intended, add the new-dependency label to the PR."
+            exit 1
+          fi
+          if [ -n "$changed" ]; then echo "dependencies: changed, labeled new-dependency"; else echo "dependencies: unchanged from main"; fi
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -55,30 +88,18 @@ jobs:
         run: |
           git diff --exit-code -- custom_components/llm_agent/www
           test -z "$(git status --porcelain -- custom_components/llm_agent/www)" || { git status --short; exit 1; }
-      - name: Panel stays within its size budget (100 kB gzipped)
+      - name: Panel grows by at most 8 KiB in one change
+        # Size matters here only when something big slips in: an accidentally bundled
+        # library adds 8 kB or more gzipped, while a feature adds one or two. So the
+        # check is how much this change grows the panel against main's committed copy,
+        # not an absolute budget that every feature has to raise. On main itself the
+        # two are the same file and the growth is 0.
         run: |
           size=$(gzip -9c custom_components/llm_agent/www/llm-agent-panel.js | wc -c)
-          echo "panel: $size bytes gzipped"
-          # Raised from 60 kB for file attachments and the Changes view, then from 64 kB
-          # when the editor, the notes view and Markdown in sent messages left under 200
-          # bytes. Then from 72 kB by 14 kB for tiny-markdown-editor, the library that
-          # formats the chat box as it is typed: it measured 14019 bytes gzipped in the
-          # bundle (the panel with the library against the same panel with it stubbed
-          # out), rounded up to the next KiB. Then from 86 kB by 4 kB for the integration
-          # settings view: 3705 bytes measured, and with the Usage view the panel left 36.
-          # Then from 90 kB by 5 kB for the page chip and the page collector the floating
-          # chat uses: 4399 bytes measured (88380 on main, 92779 with it), rounded up.
-          # Then to 115 kB while the panel moved from Lit to Solid 2.0 one view at a time,
-          # with both runtimes in the bundle: it grew 16820 bytes gzipped (93591 with Lit
-          # only, 110411 with the Notes view moved, 2026-11-20), nearly all of it the
-          # Solid runtime. Vite's own minify option keeps the whitespace in lib mode with
-          # es output, so the panel build minifies through the bundler's output option
-          # instead (see vite.config.ts): 111765 to 102648 bytes when it was turned on.
-          # Then down to 100 kB with Lit gone: 101910 bytes measured, rounded up to the
-          # next KiB.
-          # The budget is there to catch an accidental dependency or a bundled library
-          # (8 kB or more), not normal feature growth.
-          test "$size" -le 102400
+          base=$(git show origin/main:custom_components/llm_agent/www/llm-agent-panel.js | gzip -9c | wc -c)
+          delta=$((size - base))
+          echo "panel: $size bytes gzipped, main: $base, growth: $delta (limit 8192)"
+          test "$delta" -le 8192
       - name: Floating chat loader stays within its size budget (6 kB gzipped)
         run: |
           size=$(gzip -9c custom_components/llm_agent/www/llm-agent-float.js | wc -c)

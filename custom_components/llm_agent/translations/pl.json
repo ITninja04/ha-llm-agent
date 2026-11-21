@@ -163,10 +163,16 @@
           "debugging": {
             "name": "Debugowanie",
             "data": {
-              "log_prompts": "Zapisuj instrukcje i odpowiedzi w dzienniku"
+              "log_prompts": "Zapisuj instrukcje i odpowiedzi w dzienniku",
+              "turn_log": "Dziennik tur",
+              "turn_log_days": "Przechowuj dziennik tur",
+              "turn_log_mb": "Rozmiar dziennika tur"
             },
             "data_description": {
-              "log_prompts": "Zapisuje każdą instrukcję, odpowiedź i wywołanie narzędzia w dzienniku Home Assistant. Pozostaw wyłączone, chyba że zgłaszasz problem: dziennik będzie wtedy zawierać twoje rozmowy."
+              "log_prompts": "Zapisuje każdą instrukcję, odpowiedź i wywołanie narzędzia w dzienniku Home Assistant. Pozostaw wyłączone, chyba że zgłaszasz problem: dziennik będzie wtedy zawierać twoje rozmowy.",
+              "turn_log": "Zapisuje jeden wpis na każdą turę czatu (użyte narzędzia, liczby, tokeny, koszt, czas) do dostrajania promptu, osobno od czatów, więc usunięcie czatu go nie usuwa. Zostaje w Home Assistant; administratorzy mogą go pobrać w widoku Użycie.",
+              "turn_log_days": "Starsze wpisy są usuwane.",
+              "turn_log_mb": "Najstarsze wpisy są usuwane powyżej tego rozmiaru."
             }
           },
           "rules": {

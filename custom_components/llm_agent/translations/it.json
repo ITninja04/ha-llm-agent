@@ -163,10 +163,16 @@
           "debugging": {
             "name": "Debug",
             "data": {
-              "log_prompts": "Registra istruzioni e risposte"
+              "log_prompts": "Registra istruzioni e risposte",
+              "turn_log": "Registro dei turni",
+              "turn_log_days": "Conserva il registro dei turni",
+              "turn_log_mb": "Dimensione del registro dei turni"
             },
             "data_description": {
-              "log_prompts": "Scrive ogni istruzione, risposta e chiamata agli strumenti nel registro di Home Assistant. Lascia disattivato a meno che tu non stia segnalando un problema: il registro conterrà le tue conversazioni."
+              "log_prompts": "Scrive ogni istruzione, risposta e chiamata agli strumenti nel registro di Home Assistant. Lascia disattivato a meno che tu non stia segnalando un problema: il registro conterrà le tue conversazioni.",
+              "turn_log": "Conserva un record per ogni turno di chat (strumenti usati, conteggi, token, costo, tempo) per mettere a punto il prompt, separato dalle chat, quindi eliminare una chat non lo rimuove. Resta in Home Assistant; gli amministratori possono scaricarlo dalla vista Utilizzo.",
+              "turn_log_days": "I record più vecchi vengono eliminati.",
+              "turn_log_mb": "I record più vecchi vengono eliminati oltre questa dimensione."
             }
           },
           "rules": {

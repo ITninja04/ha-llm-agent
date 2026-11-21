@@ -163,10 +163,16 @@
           "debugging": {
             "name": "Débogage",
             "data": {
-              "log_prompts": "Journaliser les instructions et les réponses"
+              "log_prompts": "Journaliser les instructions et les réponses",
+              "turn_log": "Journal des tours",
+              "turn_log_days": "Conserver le journal des tours",
+              "turn_log_mb": "Taille du journal des tours"
             },
             "data_description": {
-              "log_prompts": "Écrit chaque instruction, réponse et appel d'outil dans le journal de Home Assistant. Laisse cette option désactivée sauf si tu signales un problème : le journal contient alors tes conversations."
+              "log_prompts": "Écrit chaque instruction, réponse et appel d'outil dans le journal de Home Assistant. Laisse cette option désactivée sauf si tu signales un problème : le journal contient alors tes conversations.",
+              "turn_log": "Garde un enregistrement par tour de chat (outils utilisés, nombres, jetons, coût, durée) pour ajuster le prompt, à part des chats, donc supprimer un chat ne le supprime pas. Il reste dans Home Assistant ; les administrateurs peuvent le télécharger depuis la vue Utilisation.",
+              "turn_log_days": "Les enregistrements plus anciens sont supprimés.",
+              "turn_log_mb": "Les enregistrements les plus anciens sont supprimés au-delà de cette taille."
             }
           },
           "rules": {
